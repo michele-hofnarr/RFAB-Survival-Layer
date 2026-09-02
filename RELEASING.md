@@ -24,15 +24,16 @@ _build.bat
 
 Produces `scripts/*.pex` from `scripts/source/*.psc`.
 
-## 3. Build the HUD widget (only if `widget/*.as` changed)
+## 3. Build the HUD widget (only if `widget/*.as` or `widget/icons/*.png` changed)
 
 ```
 widget/build_widget.sh
 ```
 
 Produces `Interface/widgets/RFABSurvivalLayer/RSLHud.swf` (and the
-`Interface/exported/` copy). Needs FFDec. `widget/_base_skyui_activeeffects.swf`
-is the SkyUI SDK input.
+`Interface/exported/` copy). Needs FFDec + Python (Pillow). Inputs:
+`widget/_base_skyui_activeeffects.swf` (SkyUI SDK), `widget/src/**/*.as`,
+`widget/icons/*.png` (embedded as `ico_*` by `widget/embed_icons.py`).
 
 ## 4. Sanity pass
 

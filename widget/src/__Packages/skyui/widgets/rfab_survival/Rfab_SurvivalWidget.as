@@ -3,6 +3,8 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    var _built = false;
    var _rows;
    var _frame;
+   var _tempIco;
+   var _tempState = -1;
    var _autoHide = false;
    var _masterAlpha = 90;
    var _visTarget = -1;
@@ -15,10 +17,12 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    static var BAR_W = 128;
    static var BAR_H = 8;
    static var ROW_PITCH = 19;
+   static var TEMP_GAP = 9;    // bars -> temperature icon
+   static var TEMP_ICON = 18;
 
-   // palette (Skyrim bone tones)
-   static var COL_FRAME = 0x6B5F49;
-   static var COL_FRAME_HI = 0xB6A784;
+   // palette
+   static var COL_FRAME = 0xFFFFFF;    // common frame around bars + icons
+   static var COL_FRAME_HI = 0xFFFFFF;
    static var COL_PANEL = 0x0B0B0D;
    static var COL_BARBG = 0x000000;
    static var COL_NOTCH = 0xE8E0D0;
@@ -26,6 +30,9 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    static var COL_SLEEP = 0x8CA3C0;
    static var COL_HUNGER = 0xC49A5E;
    static var COL_COLD = 0x9AD0E0;
+   static var TEMP_ICO = ["ico_temp0", "ico_temp1", "ico_temp2", "ico_temp3", "ico_temp4"];
+   static var TEMP_COL = [0x7FB8E0, 0x9AD0E0, 0xE8E0D0, 0xE0A860, 0xE07840];
+   static var NEED_ICO = ["ico_sleep", "ico_food", "ico_cold"];
 
    function Rfab_SurvivalWidget()
    {
@@ -65,7 +72,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
       this._built = true;
 
       var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
-      var innerW = C.BAR_X + C.BAR_W;
+      var innerW = C.BAR_X + C.BAR_W + C.TEMP_GAP + C.TEMP_ICON;
       var innerH = 2 * C.ROW_PITCH + C.BAR_H;
 
       // frame + backing panel
@@ -84,7 +91,8 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
          var icon = row.createEmptyMovieClip("icon", 1);
          icon._x = C.ICON * 0.5;
          icon._y = C.BAR_H * 0.5;
-         this.drawIcon(icon, i, this.axisColor(i));
+         var im = this.attachIcon(icon, C.NEED_ICO[i], C.ICON);
+         if (im != undefined) { this.tint(im, this.axisColor(i)); }
 
          var bg = row.createEmptyMovieClip("bg", 2);
          this.paint(bg, C.BAR_X, 0, C.BAR_W, C.BAR_H, C.COL_BARBG, 45);
@@ -102,16 +110,22 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
          i = i + 1;
       }
 
+      // temperature-feel icon: one slot, right of the bars, vertically centered
+      this._tempIco = this.createEmptyMovieClip("rslTemp", 30);
+      this._tempIco._x = C.BAR_X + C.BAR_W + C.TEMP_GAP + C.TEMP_ICON * 0.5;
+      this._tempIco._y = innerH * 0.5;
+
       this._alpha = 100;
    }
 
    // update from Papyrus
-   function setData(a_ss, a_sf, a_sn, a_hs, a_hf, a_hn, a_cs, a_cf, a_cn, a_au, a_al)
+   function setData(a_ss, a_sf, a_sn, a_hs, a_hf, a_hn, a_cs, a_cf, a_cn, a_au, a_al, a_tf)
    {
       this.build();
 
       this._autoHide = a_au >= 0.5;
       this._masterAlpha = a_al;
+      this.setTemp(a_tf);
 
       var shown0 = a_ss >= 0.5;
       var shown1 = a_hs >= 0.5;
@@ -175,7 +189,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    function getWidth()
    {
       var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
-      return C.BAR_X + C.BAR_W + C.PAD * 2;
+      return C.BAR_X + C.BAR_W + C.TEMP_GAP + C.TEMP_ICON + C.PAD * 2;
    }
 
    function getHeight()
@@ -216,57 +230,43 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
       this.stroke(a_mc, a_x + 2, a_y + 2, a_w - 4, a_h - 4, 1, C.COL_FRAME_HI, 30);
    }
 
-   // stroked axis icon, centered at (0,0), radius ~6.5
-   function drawIcon(a_mc, a_i, a_col)
+   // Attach an embedded bitmap ("ico_*", 64x64 white glyph on alpha) to a_parent,
+   // centered on (0,0), fitted to a_size px. Returns the holder clip (for tint()).
+   function attachIcon(a_parent, a_name, a_size)
    {
-      var r = 6.5;
-      a_mc.lineStyle(1.5, a_col, 95);
-      if (a_i == 0)
-      {
-         // moon: crescent from two arcs
-         a_mc.moveTo(0, -r);
-         a_mc.curveTo(r * 1.4, 0, 0, r);
-         a_mc.curveTo(r * 0.45, 0, 0, -r);
-      }
-      else if (a_i == 1)
-      {
-         // fork
-         a_mc.moveTo(-3.4, -r);
-         a_mc.lineTo(-3.4, -1);
-         a_mc.moveTo(0, -r);
-         a_mc.lineTo(0, -1);
-         a_mc.moveTo(3.4, -r);
-         a_mc.lineTo(3.4, -1);
-         a_mc.moveTo(-3.4, -1);
-         a_mc.lineTo(3.4, -1);
-         a_mc.moveTo(0, -1);
-         a_mc.lineTo(0, r);
-      }
-      else
-      {
-         // snowflake: 3 axes (6 spokes) + end barbs
-         this.snowAxis(a_mc, 0, 1, r);
-         this.snowAxis(a_mc, 0.866, 0.5, r);
-         this.snowAxis(a_mc, 0.866, -0.5, r);
-      }
-      a_mc.lineStyle();
+      var bd = flash.display.BitmapData.loadBitmap(a_name);
+      if (bd == undefined) { return undefined; }
+      var mc = a_parent.createEmptyMovieClip("ico", a_parent.getNextHighestDepth());
+      mc.attachBitmap(bd, 0, "auto", true);
+      var sc = a_size / bd.width;
+      mc._xscale = sc * 100;
+      mc._yscale = sc * 100;
+      mc._x = -a_size * 0.5;
+      mc._y = -a_size * 0.5;
+      return mc;
    }
 
-   function snowAxis(a_mc, a_ux, a_uy, a_r)
+   // Recolor a white glyph clip to a solid RGB, keeping its alpha silhouette.
+   function tint(a_mc, a_col)
    {
-      var tx = a_ux * a_r;
-      var ty = a_uy * a_r;
-      // spoke
-      a_mc.moveTo(-tx, -ty);
-      a_mc.lineTo(tx, ty);
-      // barbs at both ends, across the spoke
-      var px = -a_uy;
-      var py = a_ux;
-      var k = a_r * 0.42;
-      var m = 0.6;
-      a_mc.moveTo(tx * m - px * k, ty * m - py * k);
-      a_mc.lineTo(tx * m + px * k, ty * m + py * k);
-      a_mc.moveTo(-tx * m - px * k, -ty * m - py * k);
-      a_mc.lineTo(-tx * m + px * k, -ty * m + py * k);
+      var c = new Color(a_mc);
+      c.setTransform({ra:0, ga:0, ba:0, aa:100,
+                      rb:(a_col >> 16) & 0xFF, gb:(a_col >> 8) & 0xFF, bb:a_col & 0xFF, ab:0});
+   }
+
+   // Swap the temperature-feel icon (0 cold-fast .. 4 warm-fast). No-op if unchanged.
+   function setTemp(a_n)
+   {
+      var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
+      if (a_n < 0) { a_n = 0; }
+      if (a_n > 4) { a_n = 4; }
+      if (a_n == this._tempState) { return; }
+      this._tempState = a_n;
+
+      var d = this._tempIco;
+      for (var k in d) { if (typeof(d[k]) == "movieclip") { d[k].removeMovieClip(); } }
+
+      var mc = this.attachIcon(d, C.TEMP_ICO[a_n], C.TEMP_ICON);
+      if (mc != undefined) { this.tint(mc, C.TEMP_COL[a_n]); }
    }
 }

@@ -337,6 +337,22 @@ float Function Frac01(float x)
     return x
 EndFunction
 
+; 0..4 "temperature feel" for the widget icon, from Severity - Mitigation:
+;   0 much colder (cold rising fast) .. 2 balanced .. 4 much warmer (falling fast)
+int Function TempFeel()
+    float d = Severity() - Mitigation()
+    If d >= 25.0
+        return 0
+    ElseIf d >= 8.0
+        return 1
+    ElseIf d > -8.0
+        return 2
+    ElseIf d > -25.0
+        return 3
+    EndIf
+    return 4
+EndFunction
+
 ; Once per tick: push layout + bar values to the widget.
 Function PushWidget()
     Quest q = _RSL_Forms.QstWidget()
@@ -372,7 +388,7 @@ Function PushWidget()
     w.VAnchor = AnchorName(GV(gHudWidgetVAnchor, 0.0), false)
     w.SetScale(GV(gHudWidgetScale, 100.0))
 
-    w.PushData(slShown, slFill, slSafe, huShown, huFill, huSafe, coShown, coFill, coSafe,         GV(gHudWidgetAutoHide, 1.0) > 0.5, GV(gHudWidgetAlpha, 100.0))
+    w.PushData(slShown, slFill, slSafe, huShown, huFill, huSafe, coShown, coFill, coSafe,         GV(gHudWidgetAutoHide, 1.0) > 0.5, GV(gHudWidgetAlpha, 100.0), TempFeel())
 EndFunction
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)

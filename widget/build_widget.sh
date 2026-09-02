@@ -11,6 +11,8 @@
 # Deps: java, FFDec (JPEXS) at the path below.
 # In:   _base_skyui_activeeffects.swf  (copy of SkyUI activeeffects.swf)
 #       src/__Packages/skyui/widgets/rfab_survival/*.as
+#       icons/*.png  (64x64 RGBA - needs + temp-feel icons, embedded as
+#                     DefineBitsLossless2 "ico_<name>" by embed_icons.py)
 # Out:  ../Interface/exported/widgets/RFABSurvivalLayer/RSLHud.swf (+ fallback path)
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -40,9 +42,13 @@ PY
 
 java -jar "$FF" -importScript "$TMP/renamed.swf" "$TMP/built.swf" "$HERE/src"
 
+# Embed the bone/needs + temperature icons (icons/*.png) as DefineBitsLossless2
+# tags exported for AS as "ico_<name>" - FFDec -importScript cannot add symbols.
+python3 "$HERE/embed_icons.py" "$TMP/built.swf" "$TMP/withicons.swf" "$HERE/icons"
+
 # ZLIB (CWS) pack: FFDec -compress is unreliable here, do it ourselves.
 mkdir -p "$(dirname "$OUT")"
-python3 - "$TMP/built.swf" "$OUT" <<'PY2'
+python3 - "$TMP/withicons.swf" "$OUT" <<'PY2'
 import sys,zlib
 raw=open(sys.argv[1],'rb').read()
 if raw[:3] in (b'CWS',b'ZWS'):

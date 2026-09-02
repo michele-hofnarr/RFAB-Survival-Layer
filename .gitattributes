@@ -2,6 +2,7 @@
 *.pex   binary
 *.swf   binary
 *.esp   binary
+*.png   binary
 
 # MCM translations are UTF-16LE with BOM. Git must not touch them.
 Interface/Translations/*.txt -text
