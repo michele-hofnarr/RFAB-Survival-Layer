@@ -168,6 +168,30 @@ GlobalVariable Function FireHitWarm() global
     return Game.GetFormFromFile(0x00000BA6, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
+GlobalVariable Function ElemLesionEnabled() global
+    return Game.GetFormFromFile(0x00000C13, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionColdThr() global
+    return Game.GetFormFromFile(0x00000C14, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionHypoChance() global
+    return Game.GetFormFromFile(0x00000C15, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionHitP() global
+    return Game.GetFormFromFile(0x00000C16, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionContractP() global
+    return Game.GetFormFromFile(0x00000C17, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionBandageP() global
+    return Game.GetFormFromFile(0x00000C18, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
 GlobalVariable Function PenaltyPrimary() global
     return Game.GetFormFromFile(0x00000817, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
@@ -194,6 +218,10 @@ EndFunction
 
 GlobalVariable Function HudWidget() global
     return Game.GetFormFromFile(0x0000084C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudColor() global
+    return Game.GetFormFromFile(0x00000CCB, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HudWidgetAutoHide() global
@@ -434,6 +462,10 @@ Keyword Function KwMagicDamageFire() global
     return Game.GetFormFromFile(0x0001CEAD, "Skyrim.esm") as Keyword
 EndFunction
 
+Keyword Function KwMagicDamageShock() global
+    return Game.GetFormFromFile(0x0001CEAF, "Skyrim.esm") as Keyword
+EndFunction
+
 ; --- diseases: common cold --------------------------------------
 
 Spell Function DiseaseColdCommon1() global
@@ -576,6 +608,34 @@ EndFunction
 
 Message Function MsgFoodPoisonCured() global
     return Game.GetFormFromFile(0x000008A6, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DiseaseElemLesion1() global
+    return Game.GetFormFromFile(0x00000C3E, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseElemLesion2() global
+    return Game.GetFormFromFile(0x00000C40, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseElemLesion3() global
+    return Game.GetFormFromFile(0x00000C42, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgElemLesion1() global
+    return Game.GetFormFromFile(0x00000C44, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgElemLesion2() global
+    return Game.GetFormFromFile(0x00000C45, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgElemLesion3() global
+    return Game.GetFormFromFile(0x00000C46, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgElemLesionCured() global
+    return Game.GetFormFromFile(0x00000C47, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; --- RFAB disease wrappers (stage 1 = RFAB, stages 2/3 = ours) --
