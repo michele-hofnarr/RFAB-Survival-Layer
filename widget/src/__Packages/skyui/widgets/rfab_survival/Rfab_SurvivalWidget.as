@@ -19,7 +19,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    static var BAR_H = 8;
    static var ROW_PITCH = 19;
    static var TEMP_GAP = 13;   // bars -> temperature icon
-   static var TEMP_ICON = 26;
+   static var TEMP_ICON = 39;  // x1.5 - reads clearly as the state indicator
    static var RIGHT_EXTRA = 8; // extra frame past the temperature icon
    static var TEMP_FADE = 0.5; // seconds, icon crossfade
 
