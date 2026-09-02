@@ -462,6 +462,7 @@ begin
 
   // HUD widget. HudWidget = master on/off; the 3 bars always show together.
   AddGlobal(PFX + 'HudWidget',           1,     'Short');
+  AddGlobal(PFX + 'HudColor',            1,     'Short');   // 1 = tinted icons/bars, 0 = plain white
   AddGlobal(PFX + 'HudWidgetAutoHide',   0,     'Short');   // hide when all safe (off by default)
   AddGlobal(PFX + 'HudWidgetX',          220,   'Float');    // px at 1280 wide
   AddGlobal(PFX + 'HudWidgetY',          655,   'Float');    // px at 720 tall
@@ -2397,6 +2398,7 @@ begin
     EmitGlobalGetter(sl, 'ColdGrace');
     EmitGlobalGetter(sl, 'WarmupMult');
     EmitGlobalGetter(sl, 'HudWidget');
+    EmitGlobalGetter(sl, 'HudColor');
     EmitGlobalGetter(sl, 'HudWidgetAutoHide');
     EmitGlobalGetter(sl, 'HudWidgetX');
     EmitGlobalGetter(sl, 'HudWidgetY');
@@ -2724,6 +2726,7 @@ begin
     sl.Add('      "content": [');
     JsonHeader(sl, '_RSL_HdrHudWidget');
     JsonToggle(sl, PFX + 'HudWidget');
+    JsonToggle(sl, PFX + 'HudColor');
     JsonToggle(sl, PFX + 'HudWidgetAutoHide');
     JsonHeader(sl, '_RSL_HdrHudPos');
     JsonSlider(sl, PFX + 'HudWidgetX',      '0', '1280', '5');

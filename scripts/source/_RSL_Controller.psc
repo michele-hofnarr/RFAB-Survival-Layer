@@ -181,6 +181,7 @@ GlobalVariable gColdColdChanceMaxAt
 
 ; HUD widget
 GlobalVariable gHudWidget
+GlobalVariable gHudColor
 GlobalVariable gHudWidgetAutoHide
 GlobalVariable gHudWidgetX
 GlobalVariable gHudWidgetY
@@ -388,7 +389,7 @@ Function PushWidget()
     w.VAnchor = AnchorName(GV(gHudWidgetVAnchor, 0.0), false)
     w.SetScale(GV(gHudWidgetScale, 100.0))
 
-    w.PushData(slShown, slFill, slSafe, huShown, huFill, huSafe, coShown, coFill, coSafe,         GV(gHudWidgetAutoHide, 1.0) > 0.5, GV(gHudWidgetAlpha, 100.0), TempFeel())
+    w.PushData(slShown, slFill, slSafe, huShown, huFill, huSafe, coShown, coFill, coSafe,         GV(gHudWidgetAutoHide, 1.0) > 0.5, GV(gHudWidgetAlpha, 100.0), TempFeel(), GV(gHudColor, 1.0) >= 0.5)
 EndFunction
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
@@ -469,6 +470,7 @@ Function Bind()
     gColdGrace           = _RSL_Forms.ColdGrace()
     gWarmupMult          = _RSL_Forms.WarmupMult()
     gHudWidget           = _RSL_Forms.HudWidget()
+    gHudColor            = _RSL_Forms.HudColor()
     gHudWidgetAutoHide   = _RSL_Forms.HudWidgetAutoHide()
     gHudWidgetX          = _RSL_Forms.HudWidgetX()
     gHudWidgetY          = _RSL_Forms.HudWidgetY()

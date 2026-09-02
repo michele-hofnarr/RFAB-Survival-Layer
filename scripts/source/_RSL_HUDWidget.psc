@@ -56,11 +56,12 @@ endFunction
 function PushData(bool sleepShown, float sleepFill, float sleepSafe, \
                   bool hungerShown, float hungerFill, float hungerSafe, \
                   bool coldShown, float coldFill, float coldSafe, \
-                  bool autoHide, float masterAlpha, int tempFeel)
+                  bool autoHide, float masterAlpha, int tempFeel, bool colorUI)
     float s = 0.0
     float h = 0.0
     float c = 0.0
     float a = 0.0
+    float ci = 0.0
     If sleepShown
         s = 1.0
     EndIf
@@ -73,15 +74,18 @@ function PushData(bool sleepShown, float sleepFill, float sleepSafe, \
     If autoHide
         a = 1.0
     EndIf
-    PushRaw(s, sleepFill, sleepSafe, h, hungerFill, hungerSafe, c, coldFill, coldSafe, a, masterAlpha, tempFeel as float)
+    If colorUI
+        ci = 1.0
+    EndIf
+    PushRaw(s, sleepFill, sleepSafe, h, hungerFill, hungerSafe, c, coldFill, coldSafe, a, masterAlpha, tempFeel as float, ci)
 EndFunction
 
 function PushRaw(float p0, float p1, float p2, float p3, float p4, float p5, \
-                float p6, float p7, float p8, float p9, float p10, float p11)
+                float p6, float p7, float p8, float p9, float p10, float p11, float p12)
     If !Ready
         return
     EndIf
-    float[] args = new float[12]
+    float[] args = new float[13]
     args[0]  = p0
     args[1]  = p1
     args[2]  = p2
@@ -94,5 +98,6 @@ function PushRaw(float p0, float p1, float p2, float p3, float p4, float p5, \
     args[9]  = p9
     args[10] = p10
     args[11] = p11
+    args[12] = p12
     UI.InvokeFloatA(HUD_MENU, WidgetRoot + ".setData", args)
 EndFunction

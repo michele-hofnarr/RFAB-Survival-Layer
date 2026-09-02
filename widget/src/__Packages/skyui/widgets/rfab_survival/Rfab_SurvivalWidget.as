@@ -5,6 +5,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    var _frame;
    var _tempIco;
    var _tempState = -1;
+   var _colorUI = true;
    var _autoHide = false;
    var _masterAlpha = 90;
    var _visTarget = -1;
@@ -17,12 +18,15 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    static var BAR_W = 128;
    static var BAR_H = 8;
    static var ROW_PITCH = 19;
-   static var TEMP_GAP = 9;    // bars -> temperature icon
-   static var TEMP_ICON = 18;
+   static var TEMP_GAP = 13;   // bars -> temperature icon
+   static var TEMP_ICON = 26;
+   static var RIGHT_EXTRA = 8; // extra frame past the temperature icon
+   static var TEMP_FADE = 0.5; // seconds, icon crossfade
 
    // palette
    static var COL_FRAME = 0xFFFFFF;    // common frame around bars + icons
    static var COL_FRAME_HI = 0xFFFFFF;
+   static var COL_MONO = 0xFFFFFF;
    static var COL_PANEL = 0x0B0B0D;
    static var COL_BARBG = 0x000000;
    static var COL_NOTCH = 0xE8E0D0;
@@ -60,9 +64,11 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
 
    function axisColor(a_i)
    {
-      if (a_i == 0) { return skyui.widgets.rfab_survival.Rfab_SurvivalWidget.COL_SLEEP; }
-      if (a_i == 1) { return skyui.widgets.rfab_survival.Rfab_SurvivalWidget.COL_HUNGER; }
-      return skyui.widgets.rfab_survival.Rfab_SurvivalWidget.COL_COLD;
+      var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
+      if (!this._colorUI) { return C.COL_MONO; }
+      if (a_i == 0) { return C.COL_SLEEP; }
+      if (a_i == 1) { return C.COL_HUNGER; }
+      return C.COL_COLD;
    }
 
    // build
@@ -75,9 +81,9 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
       var innerW = C.BAR_X + C.BAR_W + C.TEMP_GAP + C.TEMP_ICON;
       var innerH = 2 * C.ROW_PITCH + C.BAR_H;
 
-      // frame + backing panel
+      // frame + backing panel (extended a touch past the temperature icon)
       this._frame = this.createEmptyMovieClip("rslFrame", 5);
-      this.drawPanel(this._frame, -C.PAD, -C.PAD - 3, innerW + C.PAD * 2, innerH + C.PAD * 2 + 3);
+      this.drawPanel(this._frame, -C.PAD, -C.PAD - 3, innerW + C.PAD * 2 + C.RIGHT_EXTRA, innerH + C.PAD * 2 + 3);
 
       // rows
       this._rows = [];
@@ -92,7 +98,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
          icon._x = C.ICON * 0.5;
          icon._y = C.BAR_H * 0.5;
          var im = this.attachIcon(icon, C.NEED_ICO[i], C.ICON);
-         if (im != undefined) { this.tint(im, this.axisColor(i)); }
+         this.tint(im, this.axisColor(i));
 
          var bg = row.createEmptyMovieClip("bg", 2);
          this.paint(bg, C.BAR_X, 0, C.BAR_W, C.BAR_H, C.COL_BARBG, 45);
@@ -106,7 +112,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
          notch._x = C.BAR_X + C.BAR_W * 0.75;
          this.paint(notch, 0, -2, 2, C.BAR_H + 4, C.COL_NOTCH, 85);
 
-         this._rows[i] = {row:row, fill:fill, notch:notch, icon:icon};
+         this._rows[i] = {row:row, fill:fill, notch:notch, icon:icon, iconMc:im};
          i = i + 1;
       }
 
@@ -119,12 +125,19 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    }
 
    // update from Papyrus
-   function setData(a_ss, a_sf, a_sn, a_hs, a_hf, a_hn, a_cs, a_cf, a_cn, a_au, a_al, a_tf)
+   function setData(a_ss, a_sf, a_sn, a_hs, a_hf, a_hn, a_cs, a_cf, a_cn, a_au, a_al, a_tf, a_ci)
    {
       this.build();
 
       this._autoHide = a_au >= 0.5;
       this._masterAlpha = a_al;
+
+      var col = a_ci >= 0.5;
+      if (col != this._colorUI)
+      {
+         this._colorUI = col;
+         this.recolor();
+      }
       this.setTemp(a_tf);
 
       var shown0 = a_ss >= 0.5;
@@ -170,7 +183,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
       this.paint(r.fill, 0, 0, C.BAR_W * (f / 100), C.BAR_H, this.axisColor(a_i), 92);
 
       // notch marks the threshold; turns red when fill drops below it
-      var nCol = C.COL_NOTCH;
+      var nCol = this._colorUI ? C.COL_NOTCH : C.COL_MONO;
       if (danger) { nCol = C.COL_DANGER; }
       r.notch._x = C.BAR_X + C.BAR_W * (s / 100);
       r.notch.clear();
@@ -189,7 +202,7 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    function getWidth()
    {
       var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
-      return C.BAR_X + C.BAR_W + C.TEMP_GAP + C.TEMP_ICON + C.PAD * 2;
+      return C.BAR_X + C.BAR_W + C.TEMP_GAP + C.TEMP_ICON + C.PAD * 2 + C.RIGHT_EXTRA;
    }
 
    function getHeight()
@@ -232,11 +245,13 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
 
    // Attach an embedded bitmap ("ico_*", 64x64 white glyph on alpha) to a_parent,
    // centered on (0,0), fitted to a_size px. Returns the holder clip (for tint()).
+   // Unique clip name so two can coexist during a crossfade.
    function attachIcon(a_parent, a_name, a_size)
    {
       var bd = flash.display.BitmapData.loadBitmap(a_name);
       if (bd == undefined) { return undefined; }
-      var mc = a_parent.createEmptyMovieClip("ico", a_parent.getNextHighestDepth());
+      var dp = a_parent.getNextHighestDepth();
+      var mc = a_parent.createEmptyMovieClip("i" + dp, dp);
       mc.attachBitmap(bd, 0, "auto", true);
       var sc = a_size / bd.width;
       mc._xscale = sc * 100;
@@ -249,12 +264,31 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
    // Recolor a white glyph clip to a solid RGB, keeping its alpha silhouette.
    function tint(a_mc, a_col)
    {
+      if (a_mc == undefined) { return; }
       var c = new Color(a_mc);
       c.setTransform({ra:0, ga:0, ba:0, aa:100,
                       rb:(a_col >> 16) & 0xFF, gb:(a_col >> 8) & 0xFF, bb:a_col & 0xFF, ab:0});
    }
 
-   // Swap the temperature-feel icon (0 cold-fast .. 4 warm-fast). No-op if unchanged.
+   // Re-tint the fixed icons after a colour-mode flip. Bars/notches fix
+   // themselves on the paintRow calls right after this in setData().
+   function recolor()
+   {
+      var i = 0;
+      while (i < 3)
+      {
+         this.tint(this._rows[i].iconMc, this.axisColor(i));
+         i = i + 1;
+      }
+      var col = this._colorUI
+              ? skyui.widgets.rfab_survival.Rfab_SurvivalWidget.TEMP_COL[this._tempState]
+              : skyui.widgets.rfab_survival.Rfab_SurvivalWidget.COL_MONO;
+      var d = this._tempIco;
+      for (var k in d) { if (typeof(d[k]) == "movieclip") { this.tint(d[k], col); } }
+   }
+
+   // Swap the temperature-feel icon (0 cold-fast .. 4 warm-fast). Crossfades
+   // over TEMP_FADE s. No-op if unchanged.
    function setTemp(a_n)
    {
       var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
@@ -264,9 +298,22 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
       this._tempState = a_n;
 
       var d = this._tempIco;
-      for (var k in d) { if (typeof(d[k]) == "movieclip") { d[k].removeMovieClip(); } }
+      var k;
+      for (k in d) { if (typeof(d[k]) == "movieclip") { this.fadeOutRemove(d[k]); } }
 
       var mc = this.attachIcon(d, C.TEMP_ICO[a_n], C.TEMP_ICON);
-      if (mc != undefined) { this.tint(mc, C.TEMP_COL[a_n]); }
+      if (mc == undefined) { return; }
+      this.tint(mc, this._colorUI ? C.TEMP_COL[a_n] : C.COL_MONO);
+      mc._alpha = 0;
+      new mx.transitions.Tween(mc, "_alpha", mx.transitions.easing.None.easeNone,
+                               0, 100, C.TEMP_FADE, true);
+   }
+
+   function fadeOutRemove(a_mc)
+   {
+      var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
+      var tw = new mx.transitions.Tween(a_mc, "_alpha", mx.transitions.easing.None.easeNone,
+                                        a_mc._alpha, 0, C.TEMP_FADE, true);
+      tw.onMotionFinished = function() { a_mc.removeMovieClip(); };
    }
 }
