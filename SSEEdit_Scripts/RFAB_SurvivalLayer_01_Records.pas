@@ -344,11 +344,13 @@ begin
   // Combat multiplies the sleep AND hunger accrual rate (GetCombatState == 1).
   AddGlobal(PFX + 'CombatFatigueMult',   5,     'Float');
 
-  // HUNGER axis. Food*Pct = % of the bar a meal restores (multiples of 5).
+  // HUNGER axis. Food restore is weight-scaled: Food*Pct = % of the bar per kg
+  // of item weight (DATA - Weight). Plain Food -> HungerFoodPct; RFAB_SpecialFood
+  // or RFAB_RawFood (with a strong stomach) -> HungerSpecialFoodPct.
   AddGlobal(PFX + 'HungerGrace',         12,    'Float');
   AddGlobal(PFX + 'HungerMax',           48,    'Float');
-  AddGlobal(PFX + 'HungerFoodPct',        25,    'Float');
-  AddGlobal(PFX + 'HungerSpecialFoodPct', 75,    'Float');
+  AddGlobal(PFX + 'HungerFoodPct',        50,    'Float');   // % of bar per kg, plain Food
+  AddGlobal(PFX + 'HungerSpecialFoodPct', 100,   'Float');   // % of bar per kg, meal / raw-if-hardy
 
   // COLD model (multiplicative):
   //   sev = RegionBase x Weather x Night x Swim x Fire (RegionBase rises with altitude)
@@ -2761,6 +2763,9 @@ begin
     JsonHeader(sl, '_RSL_HdrHungerCurve');
     JsonSlider(sl, PFX + 'HungerGrace', '0',  '48',  '1');
     JsonSlider(sl, PFX + 'HungerMax',   '24', '168', '1');
+    JsonHeader(sl, '_RSL_HdrHungerFood');
+    JsonSlider(sl, PFX + 'HungerFoodPct',        '0', '200', '5');
+    JsonSlider(sl, PFX + 'HungerSpecialFoodPct', '0', '300', '5');
     TrimLastComma(sl);
     sl.Add('      ]');
     sl.Add('    },');

@@ -220,7 +220,7 @@ EndEvent
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 34
+int SETTINGS_VERSION = 35   ; v35: food restore is weight-scaled (HungerFoodPct / HungerSpecialFoodPct now % per kg)
 
 Function MigrateSettings()
     If !ready
@@ -1012,11 +1012,12 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
     EndIf
 
     float mx = gHungerMax.GetValue()
+    bool raw = kwRawFood && akBaseObject.HasKeyword(kwRawFood)
 
     ; Raw food on a weak stomach (no REQ_KW_StrongStomach race, not undead):
     ; a poison-roll, and it gives NO nourishment - it comes back up, so the
     ; hunger counter goes to max instead of dropping.
-    bool rawWeak = kwRawFood && akBaseObject.HasKeyword(kwRawFood) \
+    bool rawWeak = raw \
                    && !(kwStrongStomach && pl.HasKeyword(kwStrongStomach)) \
                    && !pl.HasKeyword(kwUndead)
 
@@ -1038,21 +1039,30 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
         return
     EndIf
 
-    ; Graded: RFAB_SpecialFood (stews / roasts / dishes) restores
-    ; HungerSpecialFoodPct%, everything else HungerFoodPct%. Fall back to the
-    ; 2+ effects heuristic for non-RFAB special dishes.
-    float pct = GV(gHungerFoodPct, 25.0)
-    If (kwSpecialFood && akBaseObject.HasKeyword(kwSpecialFood)) || food.GetNumEffects() >= 2
-        pct = GV(gHungerSpecialFoodPct, 75.0)
+    ; Restore scales with the item's WEIGHT (DATA - Weight), per kg:
+    ;   plain Food item          -> HungerFoodPct % of the bar per kg (def. 50)
+    ;   RFAB_SpecialFood keyword  -> HungerSpecialFoodPct % per kg     (def. 100)
+    ;   RFAB_RawFood keyword      -> same as SpecialFood (dense, uncooked) -
+    ;     only reachable with a strong stomach (rawWeak already returned above).
+    ; The 2+ effects check stays as a fallback for non-RFAB dishes.
+    float w = akBaseObject.GetWeight()
+    If w <= 0.0
+        w = 0.1          ; weightless food (some modded produce) still counts a little
+    EndIf
+
+    float pct = GV(gHungerFoodPct, 50.0)
+    If raw || (kwSpecialFood && akBaseObject.HasKeyword(kwSpecialFood)) || food.GetNumEffects() >= 2
+        pct = GV(gHungerSpecialFoodPct, 100.0)
     EndIf
 
     ; gutworm steals nutrition: a meal helps -25 / -50 / -80 % less by stage.
     float gwMult = 1.0 - GwFoodPenalty()
-    float v = StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0) - mx * 0.01 * pct * gwMult
+    float v = StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0) - mx * 0.01 * pct * w * gwMult
     If v < 0.0
         v = 0.0
     EndIf
     StorageUtil.SetFloatValue(pl, K_HUNGER, v)
+    _RSL_Log.W("ate " + eid + " w=" + w + " pct/kg=" + pct + " -> hunger " + v)
     Touch()
 EndEvent
 
