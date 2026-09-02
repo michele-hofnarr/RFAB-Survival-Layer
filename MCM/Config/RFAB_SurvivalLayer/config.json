@@ -1,0 +1,1150 @@
+{
+  "modName": "RFAB_SurvivalLayer",
+  "displayName": "RFAB Survival",
+  "pages": [
+    {
+      "pageDisplayName": "$_RSL_PageHelp",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HlpHOverview",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp01",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp02",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp03",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp04",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp05",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp06",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_HlpHNeeds",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp07",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp08",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp09",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp10",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp11",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp12",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_HlpHCold",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp13",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp14",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp15",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp16",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp17",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp18",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp19",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp20",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp21",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp22",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_HlpHDisease",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp23",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp24",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp25",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp26",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp27",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp28",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp29",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_HlpHHypo",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp30",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp31",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp32",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp33",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_HlpHTune",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp34",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp35",
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PageHud",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HdrHudWidget",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_HudWidget",
+          "help": "$_RSL_HudWidget_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|84C"
+          }
+        },
+        {
+          "text": "$_RSL_HudWidgetAutoHide",
+          "help": "$_RSL_HudWidgetAutoHide_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|84D"
+          }
+        },
+        {
+          "text": "$_RSL_HdrHudPos",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_HudWidgetX",
+          "help": "$_RSL_HudWidgetX_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 1280,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|84E"
+          }
+        },
+        {
+          "text": "$_RSL_HudWidgetY",
+          "help": "$_RSL_HudWidgetY_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 720,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|84F"
+          }
+        },
+        {
+          "text": "$_RSL_HudWidgetScale",
+          "help": "$_RSL_HudWidgetScale_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 200,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|850"
+          }
+        },
+        {
+          "text": "$_RSL_HudWidgetAlpha",
+          "help": "$_RSL_HudWidgetAlpha_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|851"
+          }
+        },
+        {
+          "text": "$_RSL_HudWidgetHAnchor",
+          "help": "$_RSL_HudWidgetHAnchor_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 2,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|852"
+          }
+        },
+        {
+          "text": "$_RSL_HudWidgetVAnchor",
+          "help": "$_RSL_HudWidgetVAnchor_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 2,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|853"
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PageSleep",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HdrSleepCurve",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_SleepGrace",
+          "help": "$_RSL_SleepGrace_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 48,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|804"
+          }
+        },
+        {
+          "text": "$_RSL_SleepMax",
+          "help": "$_RSL_SleepMax_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 24,
+            "max": 168,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|805"
+          }
+        },
+        {
+          "text": "$_RSL_HdrSleepRecovery",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_SleepRestorePerHour",
+          "help": "$_RSL_SleepRestorePerHour_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 24,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|806"
+          }
+        },
+        {
+          "text": "$_RSL_SleepMinHours",
+          "help": "$_RSL_SleepMinHours_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 8,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|807"
+          }
+        },
+        {
+          "text": "$_RSL_HdrCombat",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_CombatFatigueMult",
+          "help": "$_RSL_CombatFatigueMult_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 15,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|BA4"
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PageHunger",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HdrHungerCurve",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_HungerGrace",
+          "help": "$_RSL_HungerGrace_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 48,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|808"
+          }
+        },
+        {
+          "text": "$_RSL_HungerMax",
+          "help": "$_RSL_HungerMax_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 24,
+            "max": 168,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|809"
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PageCold",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HdrColdModel",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_ColdRate",
+          "help": "$_RSL_ColdRate_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0.25,
+            "max": 3,
+            "step": 0.25,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|813"
+          }
+        },
+        {
+          "text": "$_RSL_ColdGrace",
+          "help": "$_RSL_ColdGrace_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|84A"
+          }
+        },
+        {
+          "text": "$_RSL_WarmupMult",
+          "help": "$_RSL_WarmupMult_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 10,
+            "step": 0.5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|86C"
+          }
+        },
+        {
+          "text": "$_RSL_WarmthPerSlot",
+          "help": "$_RSL_WarmthPerSlot_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 30,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|814"
+          }
+        },
+        {
+          "text": "$_RSL_ResistWeight",
+          "help": "$_RSL_ResistWeight_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 200,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|868"
+          }
+        },
+        {
+          "text": "$_RSL_DryMinutes",
+          "help": "$_RSL_DryMinutes_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 30,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|816"
+          }
+        },
+        {
+          "text": "$_RSL_FrostHitCold",
+          "help": "$_RSL_FrostHitCold_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 20,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|BA5"
+          }
+        },
+        {
+          "text": "$_RSL_FireHitWarm",
+          "help": "$_RSL_FireHitWarm_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 20,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|BA6"
+          }
+        },
+        {
+          "text": "$_RSL_HdrRegion",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_RegionWinterhold",
+          "help": "$_RSL_RegionWinterhold_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|856"
+          }
+        },
+        {
+          "text": "$_RSL_RegionPale",
+          "help": "$_RSL_RegionPale_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|857"
+          }
+        },
+        {
+          "text": "$_RSL_RegionEastmarch",
+          "help": "$_RSL_RegionEastmarch_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|858"
+          }
+        },
+        {
+          "text": "$_RSL_RegionReach",
+          "help": "$_RSL_RegionReach_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|859"
+          }
+        },
+        {
+          "text": "$_RSL_RegionHjaalmarch",
+          "help": "$_RSL_RegionHjaalmarch_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|85A"
+          }
+        },
+        {
+          "text": "$_RSL_RegionHaafingar",
+          "help": "$_RSL_RegionHaafingar_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|85B"
+          }
+        },
+        {
+          "text": "$_RSL_RegionWhiterun",
+          "help": "$_RSL_RegionWhiterun_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|85C"
+          }
+        },
+        {
+          "text": "$_RSL_RegionFalkreath",
+          "help": "$_RSL_RegionFalkreath_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|85D"
+          }
+        },
+        {
+          "text": "$_RSL_RegionRift",
+          "help": "$_RSL_RegionRift_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|85E"
+          }
+        },
+        {
+          "text": "$_RSL_RegionDefault",
+          "help": "$_RSL_RegionDefault_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|85F"
+          }
+        },
+        {
+          "text": "$_RSL_RegionSnowFloor",
+          "help": "$_RSL_RegionSnowFloor_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8E3"
+          }
+        },
+        {
+          "text": "$_RSL_RegionAltitude",
+          "help": "$_RSL_RegionAltitude_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 200,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|869"
+          }
+        },
+        {
+          "text": "$_RSL_HdrMult",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_WeatherClear",
+          "help": "$_RSL_WeatherClear_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 400,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|860"
+          }
+        },
+        {
+          "text": "$_RSL_WeatherCloudy",
+          "help": "$_RSL_WeatherCloudy_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 400,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|861"
+          }
+        },
+        {
+          "text": "$_RSL_WeatherRain",
+          "help": "$_RSL_WeatherRain_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 400,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|862"
+          }
+        },
+        {
+          "text": "$_RSL_WeatherSnow",
+          "help": "$_RSL_WeatherSnow_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 400,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|863"
+          }
+        },
+        {
+          "text": "$_RSL_NightMult",
+          "help": "$_RSL_NightMult_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 100,
+            "max": 400,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|864"
+          }
+        },
+        {
+          "text": "$_RSL_SwimMult",
+          "help": "$_RSL_SwimMult_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 100,
+            "max": 500,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|865"
+          }
+        },
+        {
+          "text": "$_RSL_FireMult",
+          "help": "$_RSL_FireMult_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|867"
+          }
+        },
+        {
+          "text": "$_RSL_SevInterior",
+          "help": "$_RSL_SevInterior_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|855"
+          }
+        },
+        {
+          "text": "$_RSL_SevColdInterior",
+          "help": "$_RSL_SevColdInterior_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 150,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8BD"
+          }
+        },
+        {
+          "text": "$_RSL_AltitudeLow",
+          "help": "$_RSL_AltitudeLow_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 25000,
+            "step": 500,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|86A"
+          }
+        },
+        {
+          "text": "$_RSL_AltitudeHigh",
+          "help": "$_RSL_AltitudeHigh_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 30000,
+            "step": 500,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|86B"
+          }
+        },
+        {
+          "text": "$_RSL_FireRadius",
+          "help": "$_RSL_FireRadius_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 100,
+            "max": 2000,
+            "step": 50,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|812"
+          }
+        },
+        {
+          "text": "$_RSL_HdrColdVisual",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_ColdVisualShader",
+          "help": "$_RSL_ColdVisualShader_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|83F"
+          }
+        },
+        {
+          "text": "$_RSL_ColdVisualThreshold",
+          "help": "$_RSL_ColdVisualThreshold_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|840"
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PageDisease",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HdrDisease",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_DiseaseEnabled",
+          "help": "$_RSL_DiseaseEnabled_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|841"
+          }
+        },
+        {
+          "text": "$_RSL_DiseaseProgressHours",
+          "help": "$_RSL_DiseaseProgressHours_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 5,
+            "max": 120,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|842"
+          }
+        },
+        {
+          "text": "$_RSL_DiseaseDecayHours",
+          "help": "$_RSL_DiseaseDecayHours_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 5,
+            "max": 240,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|843"
+          }
+        },
+        {
+          "text": "$_RSL_DiseaseHitChance",
+          "help": "$_RSL_DiseaseHitChance_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|87D"
+          }
+        },
+        {
+          "text": "$_RSL_FoodPoisonChance",
+          "help": "$_RSL_FoodPoisonChance_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|89C"
+          }
+        },
+        {
+          "text": "$_RSL_RfabDzEnabled",
+          "help": "$_RSL_RfabDzEnabled_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8BE"
+          }
+        },
+        {
+          "text": "$_RSL_HypothermiaEnabled",
+          "help": "$_RSL_HypothermiaEnabled_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8A7"
+          }
+        },
+        {
+          "text": "$_RSL_HypothermiaThreshold",
+          "help": "$_RSL_HypothermiaThreshold_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8A8"
+          }
+        },
+        {
+          "text": "$_RSL_HypothermiaWorsenHours",
+          "help": "$_RSL_HypothermiaWorsenHours_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 24,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8AA"
+          }
+        },
+        {
+          "text": "$_RSL_HypothermiaRecoverHours",
+          "help": "$_RSL_HypothermiaRecoverHours_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 24,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8AB"
+          }
+        },
+        {
+          "text": "$_RSL_HypothermiaDrainPerSec",
+          "help": "$_RSL_HypothermiaDrainPerSec_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 10,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8AC"
+          }
+        },
+        {
+          "text": "$_RSL_HypothermiaDrainRamp",
+          "help": "$_RSL_HypothermiaDrainRamp_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 5,
+            "max": 120,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|8BA"
+          }
+        },
+        {
+          "text": "$_RSL_ColdColdThreshold",
+          "help": "$_RSL_ColdColdThreshold_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|86D"
+          }
+        },
+        {
+          "text": "$_RSL_ColdColdChanceMin",
+          "help": "$_RSL_ColdColdChanceMin_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|878"
+          }
+        },
+        {
+          "text": "$_RSL_ColdColdChanceMax",
+          "help": "$_RSL_ColdColdChanceMax_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|879"
+          }
+        },
+        {
+          "text": "$_RSL_ColdColdChanceMaxAt",
+          "help": "$_RSL_ColdColdChanceMaxAt_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|87A"
+          }
+        },
+        {
+          "text": "$_RSL_BtnCureCold",
+          "help": "$_RSL_BtnCureCold_help",
+          "type": "text",
+          "action": {
+            "type": "CallGlobalFunction",
+            "script": "_RSL_Controller",
+            "function": "CureColdDisease"
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PagePenalty",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_HdrPenalty",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_PenaltyPrimary",
+          "help": "$_RSL_PenaltyPrimary_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|817"
+          }
+        },
+        {
+          "text": "$_RSL_PenaltyCross",
+          "help": "$_RSL_PenaltyCross_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|818"
+          }
+        },
+        {
+          "text": "$_RSL_PenaltySpeed",
+          "help": "$_RSL_PenaltySpeed_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 50,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|831"
+          }
+        },
+        {
+          "text": "$_RSL_SpeedCap",
+          "help": "$_RSL_SpeedCap_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 80,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|832"
+          }
+        },
+        {
+          "text": "$_RSL_PenaltyCap",
+          "help": "$_RSL_PenaltyCap_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 95,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|819"
+          }
+        },
+        {
+          "text": "$_RSL_TierStep",
+          "help": "$_RSL_TierStep_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 5,
+            "max": 25,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|81A"
+          }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "$_RSL_PageDebug",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        {
+          "text": "$_RSL_ModEnabled",
+          "help": "$_RSL_ModEnabled_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|800"
+          }
+        },
+        {
+          "text": "$_RSL_PollInterval",
+          "help": "$_RSL_PollInterval_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 30,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|81E"
+          }
+        },
+        {
+          "text": "$_RSL_DebugLog",
+          "help": "$_RSL_DebugLog_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|81F"
+          }
+        },
+        {
+          "text": "$_RSL_BtnReset",
+          "help": "$_RSL_BtnReset_help",
+          "type": "text",
+          "action": {
+            "type": "CallGlobalFunction",
+            "script": "_RSL_Controller",
+            "function": "ResetDefaults"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# Widget build scratch (build_widget.sh cleans these itself)
+widget/.build/
+widget/.d/
+widget/.chk/
+
+# Editors / OS
+*.swp
+*.swo
+*~
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# MO2 local state (rewritten by the manager)
+meta.ini
+
+# Build artifacts - reproduced from source, uploaded straight to a GitHub
+# Release (see RELEASING.md), not tracked:
+#   .pex   <- _build.bat from scripts/source/*.psc
+#   .esp   <- Apply Script RFAB_SurvivalLayer_01_Records in xEdit
+#   .swf   <- build_widget.sh (FFDec) from widget/*.as; _base_* is an SDK input
+scripts/*.pex
+RFAB_SurvivalLayer.esp
+Interface/**/*.swf
+widget/*.swf

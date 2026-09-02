@@ -1,0 +1,133 @@
+CC Survival Mode (ccqdrsse001-survivalmode.esl) - reference lists for the
+RFAB Survival Layer cold model. NOT a dependency; formIDs are master-relative
+to the .esl's masters -> resolve via Game.GetFormFromFile(local, "<master>").
+
+cold model = same architecture as ours (runtime weather/region/interior/fire/
+torch/water). Useful GLOB constants:
+  Survival_ColdResistFoodBonus = 25.0
+  Survival_ColdResistMaxValue = 206.0
+  Survival_ColdTargetGameHoursToNumb = 1.333400011062622
+  Survival_ColdLevelInFreezingWater = 30.0
+  Survival_ColdRestoreLargeAmount = 400.0
+  Survival_ColdRestoreMediumAmount = 200.0
+  Survival_ColdRestoreSmallAmount = 75.0
+  Survival_ColdNeedValue = 55.0
+  Survival_ColdResistTorchBonus = 25.0
+  Survival_ColdLevelMult = 50.0
+  Survival_ColdNeedMaxValue = 1000.0
+  Survival_ColdResistNormalArmorBonus = 0.05000000074505806
+  Survival_ColdResistWarmArmorBonus = 0.10000000149011612
+  Survival_ColdResistColdArmorBonus = 0.019999999552965164
+
+Survival_WarmUpObjectsList  (56)
+  0x0F597F  Skyrim.esm
+  0x035F49  Skyrim.esm
+  0x035F47  Skyrim.esm
+  0x0289E8  Dragonborn.esm
+  0x0A9230  Skyrim.esm
+  0x018619  Dragonborn.esm
+  0x090CA4  Skyrim.esm
+  0x018616  Dragonborn.esm
+  0x10D820  Skyrim.esm
+  0x0C2BF1  Skyrim.esm
+  0x0DB682  Skyrim.esm
+  0x02C0B0  Dragonborn.esm
+  0x0C6918  Skyrim.esm
+  0x0FB9B0  Skyrim.esm
+  0x0CBB23  Skyrim.esm
+  0x0B6C08  Skyrim.esm
+  0x0951D8  Skyrim.esm
+  0x0E7C9A  Skyrim.esm
+  0x0CBB2F  Skyrim.esm
+  0x101A51  Skyrim.esm
+  0x051577  Skyrim.esm
+  0x0F6304  Skyrim.esm
+  0x10ACC0  Skyrim.esm
+  0x04C5CE  Skyrim.esm
+  0x04C5CF  Skyrim.esm
+  0x0AF8BA  Skyrim.esm
+  0x0622F0  Skyrim.esm
+  0x035F4A  Skyrim.esm
+  0x0F2AC3  Skyrim.esm
+  0x0D61B6  Skyrim.esm
+  0x0D61BE  Skyrim.esm
+  0x0EF77F  Skyrim.esm
+  0x0F2AC6  Skyrim.esm
+  0x013B40  Skyrim.esm
+  0x013B42  Skyrim.esm
+  0x0877F3  Skyrim.esm
+  0x1094AB  Skyrim.esm
+  0x0CD824  Skyrim.esm
+  0x0CD823  Skyrim.esm
+  0x0AA71C  Skyrim.esm
+  0x033DA4  Skyrim.esm
+  0x106112  Skyrim.esm
+  0x1092E2  Skyrim.esm
+  0x033DA9  Skyrim.esm
+  0x04318B  Skyrim.esm
+  0x0FFF43  Skyrim.esm
+  0x108D70  Skyrim.esm
+  0x09C6CE  Skyrim.esm
+  0x0CAE0B  Skyrim.esm
+  0x0BBCF1  Skyrim.esm
+  0x0BF9E1  Skyrim.esm
+  0x03CF6E  Dragonborn.esm
+  0x02B074  Dragonborn.esm
+  0x01A56A  Dragonborn.esm
+  0x01A56B  Dragonborn.esm
+  0x0D5E82  Skyrim.esm
+
+Survival_ColdInteriorLocations  (20)
+  0x018EEA  Skyrim.esm
+  0x0FDA46  Skyrim.esm
+  0x0BC0A3  Skyrim.esm
+  0x019172  Skyrim.esm
+  0x019186  Skyrim.esm
+  0x0162AF  Dawnguard.esm
+  0x01918C  Skyrim.esm
+  0x01918F  Skyrim.esm
+  0x019198  Skyrim.esm
+  0x02D51C  Skyrim.esm
+  0x0192A8  Skyrim.esm
+  0x01914C  Skyrim.esm
+  0x0192B5  Skyrim.esm
+  0x0192B6  Skyrim.esm
+  0x0192CA  Skyrim.esm
+  0x014294  Dragonborn.esm
+  0x014298  Dragonborn.esm
+  0x032892  Dragonborn.esm
+  0x0142A6  Dragonborn.esm
+  0x0142C4  Dragonborn.esm
+
+Survival_ColdInteriorCells  (2)
+  0x01527E  Skyrim.esm
+  0x0152C3  Skyrim.esm
+
+Survival_InteriorAreas  (21)
+  0x069857  Skyrim.esm
+  0x01EE62  Skyrim.esm
+  0x020DCB  Skyrim.esm
+  0x01FAE2  Skyrim.esm
+  0x050015  Skyrim.esm
+  0x02C965  Skyrim.esm
+  0x04F838  Skyrim.esm
+  0x03A9D6  Skyrim.esm
+  0x0243DE  Skyrim.esm
+  0x0C97EB  Skyrim.esm
+  0x0C350D  Skyrim.esm
+  0x01CDD3  Skyrim.esm
+  0x01CDD9  Skyrim.esm
+  0x021EDB  Skyrim.esm
+  0x01E49D  Skyrim.esm
+  0x02B101  Skyrim.esm
+  0x02A9D8  Skyrim.esm
+  0x020BFE  Skyrim.esm
+  0x0048C7  Dawnguard.esm
+  0x004BEA  Dawnguard.esm
+  0x002F64  Dawnguard.esm
+
+Survival_BlizzardWeather  (1)
+  0x0C8221  Skyrim.esm
+
+Survival_AshWeather  (1)
+  0x032336  Dragonborn.esm
