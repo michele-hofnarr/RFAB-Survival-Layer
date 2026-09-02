@@ -314,6 +314,32 @@ Mitigation = min(Mitigation, 200) × ColdDiseaseMitMult
 | BRR | Заумь | стоимость всех школ +20 % | стоимость всех школ +40 %, макс. магии −20 ед |
 | DR | Изнеможение | скор. атаки −10 %, скор. произн. −20 % | скор. атаки −15 %, скор. произн. −30 %, реген запаса −50 % |
 
+### Обморожения и ожоги (ключ `EL`) — своя логика P
+
+Тканевые повреждения от стихийной магии и глубокого холода. Disease-тип
+(«Излечить болезни» откатывает на стадию), но движок P **не** обычный —
+`AdvanceElemLesion`:
+
+| вход | что делает с P |
+|---|---|
+| `cold ≥ ElemLesionColdThr` (90) | дрейф вниз (ухудшение) `−100 / DiseaseProgressHours` /ч |
+| любая другая «плохая» ось (голод / сон / умеренный холод) | дрейф 0 — заморожено, ни туда ни сюда |
+| все оси в норме (`!DzAnyAxisBad`) | дрейф вверх (заживление) `+100 / DiseaseDecayHours × (1 + Сопр.болезням/100)` /ч |
+| попадание стихийным уроном (холод / огонь / **молния**), не чаще 1 / 0.5 c | `P −= ElemLesionHitP (4) × коэф. сопротивления` (FrostResist / FireResist / ElectricResist) |
+| «Чистая льняная ткань» [RFAB] съедена | `P += ElemLesionBandageP (10)` |
+
+Заражение (0 → 1): `P ≤ −ElemLesionContractP` (70, от накопленных попаданий),
+**или** бросок раз в игровой час, пока **гипотермия на стадии 2+**, с шансом
+`ElemLesionHypoChance` (50 %/игр. час) — как остаточное последствие тяжёлого
+переохлаждения. Переход стадий 1↔3 — тот же стохастический бросок
+`RandomFloat < |P| × dt`, что у остальных болезней.
+
+| Стадия | эффекты |
+|---|---|
+| 1 Тканевый стресс | скор. атаки −10 %, скор. произнесения −10 %, скрытность −10 ед |
+| 2 Термо-неврологический шок | скор. атаки −15 %, произн. −15 %, скрытность −20 ед, скорость −10 %, реген запаса −30 % |
+| 3 Обширный некроз | скор. атаки −25 %, произн. −25 %, скрытность −30 ед, скорость −15 %, реген здоровья −50 %, макс. запаса −25 ед, устойчивость −15 ед |
+
 ---
 
 ## 6. Гипотермия
@@ -414,6 +440,15 @@ HypothermiaDrainRamp` (30). Большой пул HP и реген только 
 - `GetActorNumeric{Health,Magicka,Stamina}Regen` — плоская часть регена.
 - `GetActiveEffectsFromActor`, `GetActiveEffectsTotalInfo` — интроспекция.
 
+### Формы, на которые опирается мод (сверх статов)
+
+- `MagicDamageFrost` / `MagicDamageFire` / `MagicDamageShock` (KYWD, Skyrim.esm) —
+  на них ловятся стихийные попадания (мороз/огонь → шкала cold; все три →
+  P «обморожений»). Резолвятся по EditorID генератором.
+- `RFAB_Bandage` (ALCH, RFAB.esp, EditorID `RFAB_Bandage`) — «Чистая льняная
+  ткань»; её приём даёт `+ElemLesionBandageP` к P «обморожений».
+- Полный список внешних зависимостей — `SSEEdit_Scripts/RFAB_Validate_Deps.pas`.
+
 ### Проверка из консоли
 
 `player.getav DiseaseResist` · `FrostResist` · `MagickaRateMult` ·
@@ -443,7 +478,10 @@ HypothermiaDrainRamp` (30). Большой пул HP и реген только 
   `DiseaseHitChance`, `FoodPoisonChance`, `RfabDzEnabled`, `HypothermiaEnabled`,
   `HypothermiaThreshold`, `HypothermiaWorsenHours`, `HypothermiaRecoverHours`,
   `HypothermiaDrainPerSec`, `HypothermiaDrainRamp`, `ColdColdThreshold`,
-  `ColdColdChanceMin/Max/MaxAt`; кнопка «вылечить все болезни мода».
+  `ColdColdChanceMin/Max/MaxAt`, `ElemLesionEnabled`, `ElemLesionHypoChance`,
+  `ElemLesionHitP`; кнопка «вылечить все болезни мода».
+  (`ElemLesionColdThr` / `ElemLesionContractP` / `ElemLesionBandageP` —
+  GLOB-only, правятся через консоль / `_RSL_Balance.psc`.)
 - **Штрафы** — `PenaltyPrimary`, `PenaltyCross`, `PenaltySpeed`, `SpeedCap`,
   `PenaltyCap`, `TierStep`.
 - **Debug** — «Мод включён», `PollInterval`, «Отладочный лог», кнопка «Сбросить

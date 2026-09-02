@@ -1,7 +1,7 @@
 # Feature notes
 
-Three features designed and shipped. Design decisions and their rationale kept
-here; mechanics are in README.md.
+Features designed and shipped. Design decisions and their rationale kept here;
+mechanics are in README.md.
 
 ---
 
@@ -63,3 +63,51 @@ now gates **both** the snow floor and the altitude ramp.
 - **Caveat to watch:** confirm real mountain regions (High Hrothgar / Throat of
   the World / Falkreath's southern peaks) list a snow-class weather so genuine
   peaks keep the ramp. They almost certainly do.
+
+---
+
+## 4. Elemental Lesions disease (frostbite & burns) — SHIPPED
+
+A 4th survival system: `ElemLesion` (id `"EL"`), a 3-stage Disease-type SPEL
+(Тканевый стресс → Термо-неврологический шок → Обширный некроз). Penalties
+from the shared library hit every build at once (WeapSpeed/CastSpeed/Sneak/
+Speed/StamRegen/HealRegen/MaxStamina/WeakPoise).
+
+### The bespoke P model (`_RSL_Controller.AdvanceElemLesion`)
+
+Standard diseases use `_RSL_Disease.StepP(bad_bool, ...)` where `bad` = any axis
+past half its penalty ramp. This one does not fit that:
+
+| input | P effect |
+|---|---|
+| `cold >= ElemLesionColdThr` (90) | drift `-(100 / DiseaseProgressHours)` /h |
+| `DzAnyAxisBad` true but `cold < 90` (hungry/tired/mild cold) | drift 0 — frozen |
+| `!DzAnyAxisBad` (all clear) | drift `+(100 / DiseaseDecayHours) x (1 + DiseaseResist/100)` /h |
+| frost/fire/shock hit, rate-limited 0.5 s (shared with the cold-bar gate) | `P -= ElemLesionHitP x ResistFactor(FrostResist/FireResist/ElectricResist)` |
+| `RFAB_Bandage` consumed (`OnObjectEquipped`, EditorID match) | `P += ElemLesionBandageP` |
+
+- `_RSL_Disease.StepP` was **split**: `StepPManual(p, id, drift, dt)` holds the
+  sub-step + roll + clamp; `StepP` derives `drift` from `bad` and delegates.
+  `AddP(p, id, delta)` for the one-shot hit/bandage deltas. `AdvanceElemLesion`
+  calls `StepPManual` with its custom drift.
+- Hit/bandage deltas queue into `K_ELPACC` (signed, ±40), folded into P once per
+  tick by `AdvanceElemLesion` via `AddP` (single writer).
+- Contract (stage 0→1): `P <= -ElemLesionContractP` (70), OR a per-game-hour
+  roll `< ElemLesionHypoChance` (50) while **hypothermia stage >= 2** - a
+  lasting after-effect of serious cold exposure. (`cold >= 90` alone was too
+  brief a window - hypothermia ends it fast, and by stage 3 you are dying.)
+
+### Decisions
+
+- `cold >= 90` not `<= 90` (spec typo; 90 = the hypothermia threshold too).
+- Heals only when **all** axes clear (`!DzAnyAxisBad`) - hunger/sleep gate
+  healing without being able to cause the disease.
+- **Disease-type**, not Ability: engine Cure-Disease walks it back one stage
+  (counted in `OnMagicEffectApply` like the other 5). Bandage + good conditions
+  are the *primary* recovery; a potion is a shortcut.
+- `IsHostile()` still absent on `MagicEffect` here - the `MagicDamage*` keywords
+  are the only filter (same as feature 2).
+- Route B (cold contract) is gated on **hypothermia stage >= 2** at 50 %, not
+  raw `cold >= 90` at 25 % - the raw-cold window is too brief (hypothermia ends
+  it fast, stage 3 is lethal), and frostbite as an after-effect of severe
+  hypothermia is the more authentic model.

@@ -130,6 +130,16 @@ dz.FoodPoison.msg.contract=Вас мутит от съеденного.
 dz.FoodPoison.msg.2=Отравление привело к обезвоживанию.
 dz.FoodPoison.msg.3=Инфекция попала в кровь: бактериемия.
 dz.FoodPoison.msg.cured=Пищевое отравление прошло.
+dz.ElemLesion.name.1=Тканевый стресс
+dz.ElemLesion.name.2=Термо-неврологический шок
+dz.ElemLesion.name.3=Обширный некроз
+dz.ElemLesion.flavour.1=Микроразрывы тканей от стихии. Тело работает через боль.
+dz.ElemLesion.flavour.2=Нервы обожжены и обморожены. Реакции сбиты, движения скованы.
+dz.ElemLesion.flavour.3=Омертвевшие участки не заживают. Тело едва слушается.
+dz.ElemLesion.msg.contract=Стихия обожгла и обморозила ткани.
+dz.ElemLesion.msg.2=Поражение тканей углубилось: термо-неврологический шок.
+dz.ElemLesion.msg.3=Ткани отмирают: обширный некроз.
+dz.ElemLesion.msg.cured=Поражённые ткани восстановились.
 
 # ---- hypothermia ----
 hy.name.1=Лёгкая гипотермия

@@ -447,6 +447,16 @@ begin
   AddGlobal(PFX + 'ColdColdChanceMin',   10,    'Float');
   AddGlobal(PFX + 'ColdColdChanceMax',   90,    'Float');
   AddGlobal(PFX + 'ColdColdChanceMaxAt', 90,    'Float');
+  // elemental lesions (frostbite/burns): a 3-stage Disease-type SPEL with a
+  // bespoke P model - worsens from cold>=ColdThr and from frost/fire/shock hits
+  // (P -= HitP x resist), heals only when every axis is clear, +BandageP per
+  // RFAB_Bandage used. Contract: P<=-ContractP, or a roll at hypothermia st.>=2.
+  AddGlobal(PFX + 'ElemLesionEnabled',       1,  'Short');
+  AddGlobal(PFX + 'ElemLesionColdThr',       90, 'Float');   // cold >= this worsens existing lesions
+  AddGlobal(PFX + 'ElemLesionHypoChance',    50, 'Float');   // %/game-hour to contract at hypothermia stage >= 2
+  AddGlobal(PFX + 'ElemLesionHitP',          4,  'Float');   // P per elemental hit (pre-resist)
+  AddGlobal(PFX + 'ElemLesionContractP',     70, 'Float');   // |P| to contract from hits
+  AddGlobal(PFX + 'ElemLesionBandageP',      10, 'Float');
 
   // HUD widget. HudWidget = master on/off; the 3 bars always show together.
   AddGlobal(PFX + 'HudWidget',           1,     'Short');
@@ -1669,6 +1679,14 @@ begin
     'MgefSneak=15',
     'MgefSneak=25,MgefSpeed=10,MgefStamRegen=40',
     'MgefSneak=35,MgefSpeed=10,MgefStamRegen=40,MgefHealDrain=1,MgefMagicWeak=15');
+
+  // Elemental lesions (frostbite/burns from elemental magic + deep cold). The
+  // bespoke P model lives in _RSL_Controller.AdvanceElemLesion; here it is just
+  // three Disease-type stage SPELs. Penalties hit every build at once.
+  BuildDiseaseTriad(disTpl, 'ElemLesion',
+    'MgefWeapSpeed=10,MgefCastSpeed=10,MgefSneak=10',
+    'MgefWeapSpeed=15,MgefCastSpeed=15,MgefSneak=20,MgefSpeed=10,MgefStamRegen=30',
+    'MgefWeapSpeed=25,MgefCastSpeed=25,MgefSneak=30,MgefSpeed=15,MgefHealRegen=50,MgefMaxStamina=25,MgefWeakPoise=15');
 end;
 
 // --- Package 4: wrappers over RFAB's own diseases ----------------------
@@ -2364,6 +2382,12 @@ begin
     EmitGlobalGetter(sl, 'DryMinutes');
     EmitGlobalGetter(sl, 'FrostHitCold');
     EmitGlobalGetter(sl, 'FireHitWarm');
+    EmitGlobalGetter(sl, 'ElemLesionEnabled');
+    EmitGlobalGetter(sl, 'ElemLesionColdThr');
+    EmitGlobalGetter(sl, 'ElemLesionHypoChance');
+    EmitGlobalGetter(sl, 'ElemLesionHitP');
+    EmitGlobalGetter(sl, 'ElemLesionContractP');
+    EmitGlobalGetter(sl, 'ElemLesionBandageP');
     EmitGlobalGetter(sl, 'PenaltyPrimary');
     EmitGlobalGetter(sl, 'PenaltyCross');
     EmitGlobalGetter(sl, 'PenaltyCap');
@@ -2450,9 +2474,10 @@ begin
     sl.Add('EndFunction');
     sl.Add('');
 
-    // frost/fire hit -> cold-bar nudge
+    // frost/fire hit -> cold-bar nudge; all three -> elemental-lesion P damage
     EmitSkyrimKywd(sl, 'KwMagicDamageFrost', 'MagicDamageFrost');
     EmitSkyrimKywd(sl, 'KwMagicDamageFire',  'MagicDamageFire');
+    EmitSkyrimKywd(sl, 'KwMagicDamageShock', 'MagicDamageShock');
 
     sl.Add('; --- diseases: common cold --------------------------------------');
     sl.Add('');
@@ -2470,6 +2495,7 @@ begin
     EmitScratchDiseaseGetters(sl, 'Gutworm');
     EmitScratchDiseaseGetters(sl, 'Greenspore');
     EmitScratchDiseaseGetters(sl, 'FoodPoison');
+    EmitScratchDiseaseGetters(sl, 'ElemLesion');
 
     sl.Add('; --- RFAB disease wrappers (stage 1 = RFAB, stages 2/3 = ours) --');
     sl.Add('');
@@ -2809,6 +2835,9 @@ begin
     JsonSlider(sl, PFX + 'ColdColdChanceMin',    '0', '100', '5');
     JsonSlider(sl, PFX + 'ColdColdChanceMax',    '0', '100', '5');
     JsonSlider(sl, PFX + 'ColdColdChanceMaxAt',  '0', '100', '5');
+    JsonToggle(sl, PFX + 'ElemLesionEnabled');
+    JsonSlider(sl, PFX + 'ElemLesionHypoChance', '0', '100', '5');
+    JsonSlider(sl, PFX + 'ElemLesionHitP',       '0', '20',  '1');
     sl.Add('        {');
     sl.Add('          "text": "$_RSL_BtnCureCold",');
     sl.Add('          "help": "$_RSL_BtnCureCold_help",');

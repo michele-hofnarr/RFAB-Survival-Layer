@@ -93,25 +93,27 @@ Function HalveP(Actor p, string id) global
     StorageUtil.SetFloatValue(p, k, StorageUtil.GetFloatValue(p, k, 0.0) * 0.5)
 EndFunction
 
-; Drive the hidden accumulator P over one tick and roll for stage steps. Shared
-; by every disease except hypothermia.
-;   bad = true  -> a survival axis is past its line -> P falls (disease worsens)
-;   bad = false -> every axis is fine               -> P rises (disease heals)
-; DiseaseResist tilts both drift rates. Continuous roll: RandomFloat(0,100) <
-; |P|*dt. A big dt is split into <=0.25h sub-steps (one roll each). On a proc P
-; resets to 0. Returns the net stage delta CLAMPED to +/-1 so one call never
-; skips a stage - the frequent tick catches up step by step.
-int Function StepP(Actor p, string id, bool bad, float dtHours, float diseaseResist, float worsenHours, float recoverHours) global
+; One-shot add to P, clamped +/-100. For inputs the drift model does not cover
+; (elemental-hit damage, bandage heal on elemental lesions).
+Function AddP(Actor p, string id, float delta) global
+    string k = "_RSL_Dz_" + id + "_Prog"
+    float v = StorageUtil.GetFloatValue(p, k, 0.0) + delta
+    If v > 100.0
+        v = 100.0
+    ElseIf v < -100.0
+        v = -100.0
+    EndIf
+    StorageUtil.SetFloatValue(p, k, v)
+EndFunction
+
+; The sub-step + stochastic-roll core. P drifts by driftPerHour (signed);
+; each <=0.25h sub-step rolls RandomFloat(0,100) < |P|*sub; on a proc P resets
+; to 0 and the stage moves one step. Net capped +/-1 per call so the frequent
+; tick catches up step by step. Callers with a bespoke worsen/heal rule pass
+; the signed drift directly; StepP derives it from a bad-bool and delegates.
+int Function StepPManual(Actor p, string id, float drift, float dtHours) global
     string k = "_RSL_Dz_" + id + "_Prog"
     float prog = StorageUtil.GetFloatValue(p, k, 0.0)
-
-    float drift = (100.0 / recoverHours) * (1.0 + diseaseResist * 0.01)
-    If bad
-        drift = -(100.0 / worsenHours) * (1.0 - diseaseResist * 0.01)
-        If drift > 0.0
-            drift = 0.0
-        EndIf
-    EndIf
 
     int iters = 1
     If dtHours > 0.25
@@ -153,6 +155,22 @@ int Function StepP(Actor p, string id, bool bad, float dtHours, float diseaseRes
         net = -1
     EndIf
     return net
+EndFunction
+
+; Drive P over one tick and roll for stage steps. Shared by every disease
+; except hypothermia and elemental lesions.
+;   bad = true  -> a survival axis is past its line -> P falls (disease worsens)
+;   bad = false -> every axis is fine               -> P rises (disease heals)
+; DiseaseResist tilts both drift rates.
+int Function StepP(Actor p, string id, bool bad, float dtHours, float diseaseResist, float worsenHours, float recoverHours) global
+    float drift = (100.0 / recoverHours) * (1.0 + diseaseResist * 0.01)
+    If bad
+        drift = -(100.0 / worsenHours) * (1.0 - diseaseResist * 0.01)
+        If drift > 0.0
+            drift = 0.0
+        EndIf
+    EndIf
+    return StepPManual(p, id, drift, dtHours)
 EndFunction
 
 ; Deterministic threshold-crossing accumulator (hypothermia, not a roll):

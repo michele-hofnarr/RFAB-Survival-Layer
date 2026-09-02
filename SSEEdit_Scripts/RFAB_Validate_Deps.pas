@@ -107,13 +107,15 @@ begin
   sl.Add('Skyrim.esm|#013203|RACE|RaceSlaughterfish (greenspore on hit)');
   sl.Add('Skyrim.esm|#0F5D16|KYWD|ActorTypeTroll (gutworm on hit)');
   sl.Add('Skyrim.esm|#013796|KYWD|ActorTypeUndead (vampire exemption)');
-  sl.Add('Skyrim.esm|MagicDamageFrost|KYWD|frost hit -> cold bar');
-  sl.Add('Skyrim.esm|MagicDamageFire|KYWD|fire hit -> cold bar');
+  sl.Add('Skyrim.esm|MagicDamageFrost|KYWD|frost hit -> cold bar + lesion P');
+  sl.Add('Skyrim.esm|MagicDamageFire|KYWD|fire hit -> cold bar + lesion P');
+  sl.Add('Skyrim.esm|MagicDamageShock|KYWD|shock hit -> lesion P');
   sl.Add('Skyrim.esm|#0DC20D|EFSH|FxColdShader (ice crust visual)');
   sl.Add('RFAB.esp|#0CD63E|KYWD|KwRawFood (food poisoning trigger)');
   sl.Add('RFAB.esp|#4CF31E|KYWD|KwStrongStomach (poison immunity)');
   sl.Add('RFAB.esp|#0CD63D|KYWD|KwSpecialFood (75% hunger restore)');
   sl.Add('RFAB.esp|#0CE2AD|KYWD|KwSpecialDrink (drinks carry no hunger)');
+  sl.Add('RFAB.esp|RFAB_Bandage|ALCH|Clean linen cloth - heals elemental-lesion P');
 end;
 
 // A record in `sig` group of `fileName` whose EditorID or local FormID matches

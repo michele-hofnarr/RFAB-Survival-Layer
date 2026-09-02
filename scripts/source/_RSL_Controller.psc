@@ -26,6 +26,7 @@ string  K_TIER_CO   = "_RSL_TierCold"
 string  K_HYWAIT    = "_RSL_HypoWaitBlocked"   ; 1 while SetInChargen blocks rest
 string  K_ELEMACC   = "_RSL_ElemAccum"         ; signed cold nudge from frost/fire hits, pending fold
 string  K_ELEMT     = "_RSL_ElemLastT"         ; real seconds, last accepted frost/fire hit
+string  K_ELPACC    = "_RSL_Dz_EL_PAcc"        ; signed elemental-lesion P delta (hits -, bandage +), pending fold
 
 ; Form cache. Filled once so the tick does not call GetFormFromFile.
 
@@ -38,6 +39,7 @@ FormList coldInteriors
 Keyword  kwUndead
 Keyword  kwMagicDamageFrost
 Keyword  kwMagicDamageFire
+Keyword  kwMagicDamageShock
 
 Spell    sCC1
 Spell    sCC2
@@ -89,6 +91,17 @@ Message  msgHY3
 Message  msgHYCured
 Message  msgHYNoRest
 
+; elemental lesions (id "EL") - a Disease-type SPEL with a bespoke P model
+; (AdvanceElemLesion). Worsens from cold >= threshold and from frost/fire/shock
+; hits; heals only when every axis is clear; RFAB_Bandage nudges P up.
+Spell    sEL1
+Spell    sEL2
+Spell    sEL3
+Message  msgEL1
+Message  msgEL2
+Message  msgEL3
+Message  msgELCured
+
 GlobalVariable gModEnabled
 GlobalVariable gSleepGrace
 GlobalVariable gSleepMax
@@ -130,6 +143,12 @@ GlobalVariable gResistWeight
 GlobalVariable gDryMinutes
 GlobalVariable gFrostHitCold
 GlobalVariable gFireHitWarm
+GlobalVariable gElemLesionEnabled
+GlobalVariable gElemLesionColdThr
+GlobalVariable gElemLesionHypoChance
+GlobalVariable gElemLesionHitP
+GlobalVariable gElemLesionContractP
+GlobalVariable gElemLesionBandageP
 GlobalVariable gPenaltyPrimary
 GlobalVariable gPenaltyCross
 GlobalVariable gPenaltySpeed
@@ -374,6 +393,7 @@ Function Bind()
     kwUndead    = _RSL_Forms.ActorTypeUndead()
     kwMagicDamageFrost = _RSL_Forms.KwMagicDamageFrost()
     kwMagicDamageFire  = _RSL_Forms.KwMagicDamageFire()
+    kwMagicDamageShock = _RSL_Forms.KwMagicDamageShock()
 
     gModEnabled          = _RSL_Forms.ModEnabled()
     gSleepGrace          = _RSL_Forms.SleepGrace()
@@ -415,6 +435,12 @@ Function Bind()
     gDryMinutes          = _RSL_Forms.DryMinutes()
     gFrostHitCold        = _RSL_Forms.FrostHitCold()
     gFireHitWarm         = _RSL_Forms.FireHitWarm()
+    gElemLesionEnabled   = _RSL_Forms.ElemLesionEnabled()
+    gElemLesionColdThr   = _RSL_Forms.ElemLesionColdThr()
+    gElemLesionHypoChance = _RSL_Forms.ElemLesionHypoChance()
+    gElemLesionHitP      = _RSL_Forms.ElemLesionHitP()
+    gElemLesionContractP = _RSL_Forms.ElemLesionContractP()
+    gElemLesionBandageP  = _RSL_Forms.ElemLesionBandageP()
     gPenaltyPrimary      = _RSL_Forms.PenaltyPrimary()
     gPenaltyCross        = _RSL_Forms.PenaltyCross()
     gPenaltyCap          = _RSL_Forms.PenaltyCap()
@@ -467,6 +493,13 @@ Function Bind()
     msgCC2    = _RSL_Forms.MsgColdCommon2()
     msgCC3    = _RSL_Forms.MsgColdCommon3()
     msgCCCured = _RSL_Forms.MsgColdCommonCured()
+    sEL1      = _RSL_Forms.DiseaseElemLesion1()
+    sEL2      = _RSL_Forms.DiseaseElemLesion2()
+    sEL3      = _RSL_Forms.DiseaseElemLesion3()
+    msgEL1    = _RSL_Forms.MsgElemLesion1()
+    msgEL2    = _RSL_Forms.MsgElemLesion2()
+    msgEL3    = _RSL_Forms.MsgElemLesion3()
+    msgELCured = _RSL_Forms.MsgElemLesionCured()
 
     raceDraugr        = _RSL_Forms.RaceDraugr()
     raceSlaughterfish = _RSL_Forms.RaceSlaughterfish()
@@ -695,6 +728,7 @@ Event OnUpdate()
     ApplyElemHits()
     AdvanceCold(dtHours)
     AdvanceColdDisease(undead, dtHours)
+    AdvanceElemLesion(undead, dtHours)
     int hd = 0
     While hd < 4
         AdvanceHitDz(hd, undead, dtHours)
@@ -751,6 +785,9 @@ Function LogCold()
     int hyStage = _RSL_Disease.GetStage(pl, "HY")
     If hyStage > 0 || StorageUtil.GetFloatValue(pl, "_RSL_Dz_HY_Prog", 0.0) != 0.0
         _RSL_Log.W("hypo: stage=" + hyStage + " P=" + StorageUtil.GetFloatValue(pl, "_RSL_Dz_HY_Prog", 0.0) + " s3=" + StorageUtil.GetFloatValue(pl, "_RSL_Dz_HY_S3", 0.0) + " has3=" + (sHY3 && pl.HasSpell(sHY3)) + " hp=" + pl.GetActorValue("Health"))
+    EndIf
+    If _RSL_Disease.GetStage(pl, "EL") > 0 || StorageUtil.GetFloatValue(pl, "_RSL_Dz_EL_Prog", 0.0) != 0.0 || StorageUtil.GetFloatValue(pl, K_ELPACC, 0.0) != 0.0
+        _RSL_Log.W("elemLes: stage=" + _RSL_Disease.GetStage(pl, "EL") + " P=" + StorageUtil.GetFloatValue(pl, "_RSL_Dz_EL_Prog", 0.0) + " pAcc=" + StorageUtil.GetFloatValue(pl, K_ELPACC, 0.0) + " coldDeep=" + (StorageUtil.GetFloatValue(pl, K_COLD, 0.0) >= GV(gElemLesionColdThr, 90.0)) + " hyStage=" + _RSL_Disease.GetStage(pl, "HY") + " allClear=" + !DzAnyAxisBad(pl.HasKeyword(kwUndead)))
     EndIf
     If hdId
         int hi = 0
@@ -902,6 +939,7 @@ Event OnSleepStop(bool abInterrupted)
     If slept > 0.0
         bool undead = pl.HasKeyword(kwUndead)
         AdvanceColdDisease(undead, slept)
+        AdvanceElemLesion(undead, slept)
         int hd = 0
         While hd < 4
             AdvanceHitDz(hd, undead, slept)
@@ -940,14 +978,27 @@ Function AdvanceHunger(float dtHours, bool undead)
     StorageUtil.SetFloatValue(pl, K_HUNGER, v)
 EndFunction
 
-; Eaten food arrives here as equipping an ALCH.
+; Consumed food / potions arrive here as equipping an ALCH.
 Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
     If !ready
         return
     EndIf
 
     Potion food = akBaseObject as Potion
-    If !food || !food.IsFood()
+    If !food
+        return
+    EndIf
+
+    string eid = PO3_SKSEFunctions.GetFormEditorID(akBaseObject)
+
+    ; "Чистая льняная ткань" [RFAB] - patches elemental-lesion wounds. Not a
+    ; Food, so it must be caught before the IsFood gate.
+    If eid == "RFAB_Bandage"
+        NoteBandage()
+        return
+    EndIf
+
+    If !food.IsFood()
         return
     EndIf
 
@@ -955,7 +1006,6 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
     ; only VendorItemFood - no single keyword separates them from an apple.
     ; EditorID prefix catches all of them (incl. water); RFAB_SpecialDrink is a
     ; fallback for alcohol if GetFormEditorID comes back empty in this setup.
-    string eid = PO3_SKSEFunctions.GetFormEditorID(akBaseObject)
     If StringUtil.Find(eid, "RFAB_Drink_") == 0 \
        || (kwSpecialDrink && akBaseObject.HasKeyword(kwSpecialDrink))
         return   ; drinks carry no hunger effect
@@ -1415,42 +1465,86 @@ float Function ResistFactor(string av)
     return f
 EndFunction
 
-; A frost/fire damage effect landed on the player - queue a signed nudge to the
-; cold bar (frost raises, fire lowers), scaled by Frost/FireResist so a resisted
-; hit chills/warms less (and a weakness more). Rate-limited to one accepted hit
-; per ELEM_MIN_GAP real seconds, because a frost cloak / channelled stream fires
-; this event many times a second. Queued, not applied here: ApplyElemHits folds
-; it in on the tick so K_COLD has a single writer. Fire-warming is intentionally
-; usable - burning costs HP every tick, so it is a real trade.
+; An elemental damage effect landed on the player. Two systems, one rate-limit
+; gate (ELEM_MIN_GAP real seconds - a frost cloak / channelled stream fires this
+; event many times a second):
+;   - cold bar: frost raises, fire lowers, scaled by Frost/FireResist. Queued
+;     (K_ELEMACC), folded on the tick by ApplyElemHits so K_COLD has one writer.
+;     Fire-warming is intentionally usable - burning costs HP, a real trade.
+;   - elemental lesions: frost/fire/shock all damage P, scaled by the matching
+;     resist. Queued (K_ELPACC), folded by AdvanceElemLesion.
 float ELEM_MIN_GAP = 0.5
 
 Function NoteElemHit(MagicEffect eff)
     If gModEnabled.GetValue() < 0.5
         return
     EndIf
-    float d = 0.0
+
+    float rf = 0.0          ; ResistFactor for the matching element
+    float coldD = 0.0       ; cold-bar nudge (frost +, fire -); 0 for shock
+    bool elem = false
     If kwMagicDamageFrost && eff.HasKeyword(kwMagicDamageFrost)
-        d = GV(gFrostHitCold, 2.0) * ResistFactor("FrostResist")
+        rf = ResistFactor("FrostResist")
+        coldD = GV(gFrostHitCold, 2.0) * rf
+        elem = true
     ElseIf kwMagicDamageFire && eff.HasKeyword(kwMagicDamageFire)
-        d = -GV(gFireHitWarm, 2.0) * ResistFactor("FireResist")
+        rf = ResistFactor("FireResist")
+        coldD = -GV(gFireHitWarm, 2.0) * rf
+        elem = true
+    ElseIf kwMagicDamageShock && eff.HasKeyword(kwMagicDamageShock)
+        rf = ResistFactor("ElectricResist")
+        elem = true
     EndIf
-    If d == 0.0
+    If !elem
         return
     EndIf
+
     float now = Utility.GetCurrentRealTime()
     If now - StorageUtil.GetFloatValue(pl, K_ELEMT, 0.0) < ELEM_MIN_GAP
         return
     EndIf
     StorageUtil.SetFloatValue(pl, K_ELEMT, now)
 
-    float acc = StorageUtil.GetFloatValue(pl, K_ELEMACC, 0.0) + d
-    If acc > 20.0
-        acc = 20.0
-    ElseIf acc < -20.0
-        acc = -20.0
+    If coldD != 0.0
+        float acc = StorageUtil.GetFloatValue(pl, K_ELEMACC, 0.0) + coldD
+        If acc > 20.0
+            acc = 20.0
+        ElseIf acc < -20.0
+            acc = -20.0
+        EndIf
+        StorageUtil.SetFloatValue(pl, K_ELEMACC, acc)
     EndIf
-    StorageUtil.SetFloatValue(pl, K_ELEMACC, acc)
-    _RSL_Log.W("elemHit: " + eff.GetName() + " d=" + d + " accum=" + acc)
+
+    If GV(gElemLesionEnabled, 1.0) >= 0.5
+        float pd = StorageUtil.GetFloatValue(pl, K_ELPACC, 0.0) - GV(gElemLesionHitP, 4.0) * rf
+        If pd < -40.0
+            pd = -40.0
+        ElseIf pd > 40.0
+            pd = 40.0
+        EndIf
+        StorageUtil.SetFloatValue(pl, K_ELPACC, pd)
+    EndIf
+
+    _RSL_Log.W("elemHit: " + eff.GetName() + " coldD=" + coldD + " rf=" + rf)
+EndFunction
+
+; "Чистая льняная ткань" [RFAB] (RFAB_Bandage) consumed - nudge elemental-lesion
+; P up. Queued into K_ELPACC (shared with the hit damage), folded on the tick.
+Function NoteBandage()
+    If GV(gElemLesionEnabled, 1.0) < 0.5
+        return
+    EndIf
+    If _RSL_Disease.GetStage(pl, "EL") <= 0 && StorageUtil.GetFloatValue(pl, "_RSL_Dz_EL_Prog", 0.0) >= 0.0
+        return          ; nothing to patch
+    EndIf
+    float pd = StorageUtil.GetFloatValue(pl, K_ELPACC, 0.0) + GV(gElemLesionBandageP, 10.0)
+    If pd > 40.0
+        pd = 40.0
+    ElseIf pd < -40.0
+        pd = -40.0
+    EndIf
+    StorageUtil.SetFloatValue(pl, K_ELPACC, pd)
+    _RSL_Log.W("bandage: EL P acc -> " + pd)
 EndFunction
 
 ; Fold the queued frost/fire nudge into the cold bar. The rate limit + accum
@@ -1614,6 +1708,9 @@ Event OnMagicEffectApply(ObjectReference akCaster, MagicEffect akEffect)
     _RSL_Log.W("Dz: cure counted (" + akEffect.GetName() + ")")
     If _RSL_Disease.GetStage(pl, "CC") > 0
         _RSL_Disease.AddCure(pl, "CC")
+    EndIf
+    If _RSL_Disease.GetStage(pl, "EL") > 0
+        _RSL_Disease.AddCure(pl, "EL")
     EndIf
     int i = 0
     While i < 4
@@ -2129,6 +2226,127 @@ Function AdvanceColdDisease(bool undead, float dtHours)
     EndIf
 EndFunction
 
+Spell Function ELStageSpell(int s)
+    If s == 1
+        return sEL1
+    ElseIf s == 2
+        return sEL2
+    ElseIf s == 3
+        return sEL3
+    EndIf
+    return None
+EndFunction
+
+; Elemental lesions (frostbite/burns). Bespoke P model - NOT DzAnyAxisBad:
+;   worsen : cold >= ElemLesionColdThr, or a frost/fire/shock hit (P damage
+;            folded from K_ELPACC; a RFAB_Bandage folds in positive)
+;   frozen : any other bad axis (hungry / tired / mild cold) - no change
+;   heal   : every axis clear (!DzAnyAxisBad), same drift as a normal disease
+; Contract: P <= -ElemLesionContractP (sustained hits), or a roll at deep cold.
+; Disease-type SPEL - an engine Cure-Disease still walks it back one stage.
+Function AdvanceElemLesion(bool undead, float dtHours)
+    If !ready || !sEL1
+        return          ; records not in the plugin yet (pre-regen)
+    EndIf
+    int stage = _RSL_Disease.GetStage(pl, "EL")
+
+    bool on = gModEnabled.GetValue() >= 0.5 && GV(gElemLesionEnabled, 1.0) >= 0.5
+    If !on || undead
+        If stage > 0
+            _RSL_Disease.ClearStages(pl, "EL", sEL1, sEL2, sEL3)
+        EndIf
+        StorageUtil.SetFloatValue(pl, K_ELPACC, 0.0)
+        return
+    EndIf
+
+    ; fold pending elemental-hit / bandage P delta
+    float pd = StorageUtil.GetFloatValue(pl, K_ELPACC, 0.0)
+    If pd != 0.0
+        _RSL_Disease.AddP(pl, "EL", pd)
+        StorageUtil.SetFloatValue(pl, K_ELPACC, 0.0)
+    EndIf
+
+    float cold = StorageUtil.GetFloatValue(pl, K_COLD, 0.0)
+    bool coldDeep = cold >= GV(gElemLesionColdThr, 90.0)
+
+    float drift = 0.0
+    If coldDeep
+        drift = -(100.0 / GV(gDiseaseProgressHours, 24.0))
+    ElseIf !DzAnyAxisBad(undead)
+        drift = (100.0 / GV(gDiseaseDecayHours, 24.0)) * (1.0 + pl.GetActorValue("DiseaseResist") * 0.01)
+    EndIf
+
+    If stage > 0
+        int cures = _RSL_Disease.TakeCures(pl, "EL")
+        If cures == 0 && !(ELStageSpell(stage) && pl.HasSpell(ELStageSpell(stage)))
+            cures = 1
+        EndIf
+        If cures > 0
+            int t = stage - cures
+            If t < 0
+                t = 0
+            EndIf
+            _RSL_Disease.SetStage(pl, "EL", t, ELStageSpell(stage), ELStageSpell(t), 0.0, 0.0)
+            _RSL_Disease.HalveP(pl, "EL")
+            If t == 0
+                CCNotify(msgELCured)
+            EndIf
+            _RSL_Log.W("ElemLesion: " + cures + " cure(s), stage " + stage + " -> " + t)
+            return
+        EndIf
+    EndIf
+
+    If stage == 0
+        float prog = StorageUtil.GetFloatValue(pl, "_RSL_Dz_EL_Prog", 0.0) + drift * dtHours
+        If prog > 0.0
+            prog = 0.0
+        ElseIf prog < -100.0
+            prog = -100.0
+        EndIf
+        If prog <= -GV(gElemLesionContractP, 70.0)
+            _RSL_Disease.SetStage(pl, "EL", 1, None, sEL1, 0.0, 0.0)
+            _RSL_Disease.ResetP(pl, "EL")
+            CCNotify(msgEL1)
+            _RSL_Log.W("ElemLesion: contracted (P " + prog + ")")
+            return
+        EndIf
+        ; route B: a lasting after-effect of serious hypothermia (stage >= 2).
+        ; cold >= 90 by itself is too brief a window - hypothermia ends it fast.
+        If _RSL_Disease.GetStage(pl, "HY") >= 2 && _RSL_Disease.RollDue(pl, "EL", 1.0)
+            If Utility.RandomFloat(0.0, 100.0) < GV(gElemLesionHypoChance, 50.0)
+                _RSL_Disease.SetStage(pl, "EL", 1, None, sEL1, 0.0, 0.0)
+                _RSL_Disease.ResetP(pl, "EL")
+                CCNotify(msgEL1)
+                _RSL_Log.W("ElemLesion: contracted (hypothermia st." + _RSL_Disease.GetStage(pl, "HY") + ")")
+                return
+            EndIf
+        EndIf
+        StorageUtil.SetFloatValue(pl, "_RSL_Dz_EL_Prog", prog)
+        return
+    EndIf
+
+    ; stage >= 1: stochastic step on the shared roll machinery
+    int net = _RSL_Disease.StepPManual(pl, "EL", drift, dtHours)
+    If net != 0
+        int target = stage - net
+        If target < 0
+            target = 0
+        ElseIf target > 3
+            target = 3
+        EndIf
+        If target != stage
+            _RSL_Disease.SetStage(pl, "EL", target, ELStageSpell(stage), ELStageSpell(target), 0.0, 0.0)
+            If target == 0
+                CCNotify(msgELCured)
+            ElseIf target > stage && target == 3
+                CCNotify(msgEL3)
+            ElseIf target > stage
+                CCNotify(msgEL2)
+            EndIf
+        EndIf
+    EndIf
+EndFunction
+
 ; --- penalties -----------------------------------------------------------
 
 ; Axis fill 0..1 on a two-point linear ramp: zero up to `grace`, then linear
@@ -2311,6 +2529,7 @@ Function TeardownAll() global
     StorageUtil.SetFloatValue(p, "_RSL_HungerCounter", 0.0)
     StorageUtil.SetFloatValue(p, "_RSL_ColdExposure", 0.0)
     StorageUtil.SetFloatValue(p, "_RSL_ElemAccum", 0.0)   ; K_ELEMACC (literal - global fn)
+    StorageUtil.SetFloatValue(p, "_RSL_Dz_EL_PAcc", 0.0)  ; K_ELPACC (literal - global fn)
     StorageUtil.SetFloatValue(p, "_RSL_TierSleep", -1.0)
     StorageUtil.SetFloatValue(p, "_RSL_TierHunger", -1.0)
     StorageUtil.SetFloatValue(p, "_RSL_TierCold", -1.0)
@@ -2325,6 +2544,8 @@ Function TeardownAll() global
         _RSL_Forms.DiseaseGreenspore2(), _RSL_Forms.DiseaseGreenspore3())
     _RSL_Disease.ClearStages(p, "FP", _RSL_Forms.DiseaseFoodPoison1(), \
         _RSL_Forms.DiseaseFoodPoison2(), _RSL_Forms.DiseaseFoodPoison3())
+    _RSL_Disease.ClearStages(p, "EL", _RSL_Forms.DiseaseElemLesion1(), \
+        _RSL_Forms.DiseaseElemLesion2(), _RSL_Forms.DiseaseElemLesion3())
     _RSL_Disease.ClearStages(p, "HY", _RSL_Forms.AbHypo1(), \
         _RSL_Forms.AbHypo2(), _RSL_Forms.AbHypo3())
     ClearAllRfabWraps(p)
