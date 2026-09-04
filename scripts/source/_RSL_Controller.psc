@@ -25,7 +25,6 @@ string  K_TIER_HU   = "_RSL_TierHunger"
 string  K_TIER_CO   = "_RSL_TierCold"
 string  K_HYWAIT    = "_RSL_HypoWaitBlocked"   ; 1 while SetInChargen blocks rest
 string  K_ELEMACC   = "_RSL_ElemAccum"         ; signed cold nudge from frost/fire hits, pending fold
-string  K_ELEMT     = "_RSL_ElemLastT"         ; real seconds, last accepted frost/fire hit
 string  K_ELPACC    = "_RSL_Dz_EL_PAcc"        ; signed elemental-lesion P delta (hits -, bandage +), pending fold
 
 ; Form cache. Filled once so the tick does not call GetFormFromFile.
@@ -199,6 +198,12 @@ GlobalVariable gBonusRegenPct
 GlobalVariable gBonusThresholdPct
 
 bool ready = false
+
+; Session-only debounce for the hit events: a concentration hazard / cloak
+; fires OnMagicEffectApply + OnHit 10-30x/second and each one used to write to
+; the debug log and walk IsCureEffect - enough to starve the update queue.
+float elemEvtLast = 0.0
+bool  mHasDisease = false      ; cached each tick; gates the cure-effect walk
 
 ; --- lifecycle -------------------------------------------------------------
 
@@ -735,8 +740,6 @@ EndFunction
 ; for us (first run, save load).
 Function Touch()
     StorageUtil.SetFloatValue(pl, K_LASTTIME, Utility.GetCurrentGameTime())
-    ; real-time clock restarts each launch - drop a stale future elem-hit stamp
-    StorageUtil.SetFloatValue(pl, K_ELEMT, 0.0)
 EndFunction
 
 ; GLOB value with a fallback default. Needed on upgrade runs: until the
@@ -810,6 +813,8 @@ Event OnUpdate()
     EndWhile
     AdvanceHypothermia(dtHours, undead)
     SyncHypoWait()   ; follows the player in/out of warm shelter
+
+    mHasDisease = AnyDiseaseActive()   ; cheap gate for the cure-effect walk
 
     ApplyPenalties(undead)
     ApplyBonus(undead)
@@ -1546,15 +1551,28 @@ float Function ResistFactor(string av)
     return f
 EndFunction
 
-; An elemental damage effect landed on the player. Two systems, one rate-limit
-; gate (ELEM_MIN_GAP real seconds - a frost cloak / channelled stream fires this
-; event many times a second):
+; An elemental damage effect landed on the player. Two systems:
 ;   - cold bar: frost raises, fire lowers, scaled by Frost/FireResist. Queued
 ;     (K_ELEMACC), folded on the tick by ApplyElemHits so K_COLD has one writer.
 ;     Fire-warming is intentionally usable - burning costs HP, a real trade.
 ;   - elemental lesions: frost/fire/shock all damage P, scaled by the matching
 ;     resist. Queued (K_ELPACC), folded by AdvanceElemLesion.
-float ELEM_MIN_GAP = 0.5
+; Rate-limited by ElemEvtDue() at the call sites (a cloak / channelled stream
+; fires the hit events many times a second).
+float ELEM_EVT_GAP = 0.5
+
+; True at most once per ELEM_EVT_GAP real seconds. Cheap (one script-var read),
+; runs before any logging / keyword / effect-list work in the hit handlers.
+; Utility.GetCurrentRealTime resets to ~0 each launch; a stale future stamp
+; just means the first post-load hit is accepted.
+bool Function ElemEvtDue()
+    float now = Utility.GetCurrentRealTime()
+    If elemEvtLast <= now && now - elemEvtLast < ELEM_EVT_GAP
+        return false
+    EndIf
+    elemEvtLast = now
+    return true
+EndFunction
 
 ; 0 none / 1 frost / 2 fire / 3 shock. Vanilla keyword first; then, for a
 ; Detrimental effect, the resistance AV on the MGEF - RFAB's destruction
@@ -1641,16 +1659,7 @@ Function NoteElemHit(MagicEffect eff)
         return
     EndIf
 
-    ; Rate limit: one accepted hit per ELEM_MIN_GAP. Utility.GetCurrentRealTime
-    ; resets to ~0 each game launch but K_ELEMT persists in StorageUtil - a stale
-    ; value from a prior session sits in the future, so only gate when the last
-    ; stamp is actually in the past (else every hit was silently dropped forever).
-    float now = Utility.GetCurrentRealTime()
-    float lastT = StorageUtil.GetFloatValue(pl, K_ELEMT, 0.0)
-    If lastT <= now && now - lastT < ELEM_MIN_GAP
-        return
-    EndIf
-    StorageUtil.SetFloatValue(pl, K_ELEMT, now)
+    ; the call sites already passed ElemEvtDue()
 
     If coldD != 0.0
         float acc = StorageUtil.GetFloatValue(pl, K_ELEMACC, 0.0) + coldD
@@ -1832,7 +1841,6 @@ Function CureColdDisease() global
     ; queued elemental-hit accumulators + hypothermia lockdown / rest-block
     StorageUtil.SetFloatValue(p, "_RSL_ElemAccum", 0.0)     ; K_ELEMACC
     StorageUtil.SetFloatValue(p, "_RSL_Dz_EL_PAcc", 0.0)    ; K_ELPACC
-    StorageUtil.SetFloatValue(p, "_RSL_ElemLastT", 0.0)     ; K_ELEMT
     p.SetActorValue("Paralysis", 0.0)
     Game.SetInChargen(false, false, false)
     StorageUtil.SetIntValue(p, "_RSL_HypoWaitBlocked", 0)   ; K_HYWAIT
@@ -1862,15 +1870,21 @@ Event OnMagicEffectApply(ObjectReference akCaster, MagicEffect akEffect)
         return
     EndIf
 
-    If StorageUtil.GetIntValue(None, "_RSL_DbgLog", 0) > 0
-        _RSL_Log.W("MGEFApply: " + akEffect.GetName() + " (" + akEffect.GetFormID() \
-            + ") kind=" + ElemKind(akEffect) + " resAV=" + akEffect.GetResistance() \
-            + " caster=" + akCaster)
+    ; elemental hit -> temperature / lesions. Debounced HARD: a fire trap /
+    ; cloak fires this 10-30x/s and the logging + ElemKind below is not free.
+    If ElemEvtDue()
+        If StorageUtil.GetIntValue(None, "_RSL_DbgLog", 0) > 0
+            _RSL_Log.W("MGEFApply: " + akEffect.GetName() + " (" + akEffect.GetFormID() \
+                + ") kind=" + ElemKind(akEffect) + " resAV=" + akEffect.GetResistance() \
+                + " caster=" + akCaster)
+        EndIf
+        NoteElemHit(akEffect)
     EndIf
 
-    NoteElemHit(akEffect)
-
-    If !_RSL_Forms.IsCureEffect(akEffect as Form)
+    ; Cure-Disease counting. IsCureEffect walks a form list (7 GetFormFromFile).
+    ; Skip it unless the player is sick AND the effect is non-detrimental (a
+    ; cure is never Detrimental; this filters out every hazard/attack tick).
+    If !mHasDisease || akEffect.IsEffectFlagSet(0x00000004) || !_RSL_Forms.IsCureEffect(akEffect as Form)
         return
     EndIf
     _RSL_Log.W("Dz: cure counted (" + akEffect.GetName() + ")")
@@ -1902,20 +1916,23 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
     If !ready
         return
     EndIf
-    Actor agg = akAggressor as Actor
-    _RSL_Log.W("OnHit: agg=" + akAggressor + " actor=" + agg + " src=" + akSource + " proj=" + akProjectile)
 
     ; Elemental damage from a spell / rune / enchanted weapon - a fallback for
-    ; when OnMagicEffectApply does not deliver the hit (RFAB scripted damage,
-    ; keyword-stripped MGEFs). NoteElemHit's own 0.5s gate de-dupes.
-    MagicEffect em = ElemSourceEffect(akSource)
-    If em
-        NoteElemHit(em)
+    ; when OnMagicEffectApply does not deliver the hit. Debounced (a channelled
+    ; stream fires OnHit many times a second) and ElemSourceEffect walks the
+    ; source's effect list, so this must come before any per-hit work.
+    If ElemEvtDue()
+        MagicEffect em = ElemSourceEffect(akSource)
+        If em
+            NoteElemHit(em)
+        EndIf
     EndIf
 
+    Actor agg = akAggressor as Actor
     If !agg || akProjectile
         return
     EndIf
+    _RSL_Log.W("OnHit: agg=" + akAggressor + " src=" + akSource + " power=" + abPowerAttack)
     Race rc = agg.GetRace()
     If rc == raceDraugr
         HitContract(0, rc)
@@ -2306,6 +2323,31 @@ EndFunction
 ; through its penalty ramp. This is the shared "conditions are bad" test that
 ; drives every disease's accumulator: bad -> P falls, all-clear -> P rises.
 float DZ_AXIS_BAD = 0.5
+
+; Any of our diseases at stage > 0. Cached into mHasDisease each tick so the
+; OnMagicEffectApply cure-effect path can skip the IsCureEffect form-list walk
+; when there is nothing to cure.
+bool Function AnyDiseaseActive()
+    If _RSL_Disease.GetStage(pl, "CC") > 0 || _RSL_Disease.GetStage(pl, "EL") > 0 \
+       || _RSL_Disease.GetStage(pl, "HY") > 0
+        return true
+    EndIf
+    int i = 0
+    While i < 4
+        If _RSL_Disease.GetStage(pl, hdId[i]) > 0
+            return true
+        EndIf
+        i += 1
+    EndWhile
+    int j = 0
+    While j < 7
+        If _RSL_Disease.GetStage(pl, rdId[j]) > 0
+            return true
+        EndIf
+        j += 1
+    EndWhile
+    return false
+EndFunction
 
 bool Function DzAnyAxisBad(bool undead)
     If !undead
