@@ -34,6 +34,9 @@ Actor    pl
 Spell    abSleep
 Spell    abHunger
 Spell    abCold
+Spell    abBonusWarm        ; full-bar bonus: cold safe  -> +HealRateMult
+Spell    abBonusRest        ; full-bar bonus: sleep safe -> +MagickaRateMult
+Spell    abBonusFed         ; full-bar bonus: hunger safe -> +StaminaRateMult
 FormList fireSources
 FormList coldInteriors
 Keyword  kwUndead
@@ -190,6 +193,11 @@ GlobalVariable gHudWidgetAlpha
 GlobalVariable gHudWidgetHAnchor
 GlobalVariable gHudWidgetVAnchor
 
+; full-bar regen bonuses
+GlobalVariable gBonusEnabled
+GlobalVariable gBonusRegenPct
+GlobalVariable gBonusThresholdPct
+
 bool ready = false
 
 ; --- lifecycle -------------------------------------------------------------
@@ -221,7 +229,7 @@ EndEvent
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 35   ; v35: food restore is weight-scaled (HungerFoodPct / HungerSpecialFoodPct now % per kg)
+int SETTINGS_VERSION = 38   ; v38: DryMinutes is in-game minutes, default 15
 
 Function MigrateSettings()
     If !ready
@@ -275,6 +283,7 @@ Function SanitizeAbilities()
     ClearAxis(abSleep,  K_TIER_SL)
     ClearAxis(abHunger, K_TIER_HU)
     ClearAxis(abCold,   K_TIER_CO)
+    ClearBonus()
     ; re-sync hypothermia's lockdown + rest-block after a load
     int hySt = _RSL_Disease.GetStage(pl, "HY")
     HypoSetLock(hySt >= 3, false)
@@ -306,6 +315,7 @@ Function KickWidget()
     Quest q = _RSL_Forms.QstWidget()
     If q
         (q as _RSL_HUDWidget).Kick()
+        (q as _RSL_HUDWidget).SetMenuHidden(false)   ; clear any stuck menu-hide
         _RSL_Log.W("KickWidget: sent")
     Else
         _RSL_Log.W("KickWidget: QstWidget not found")
@@ -405,6 +415,9 @@ Function Bind()
     abSleep     = _RSL_Forms.AbSleep()
     abHunger    = _RSL_Forms.AbHunger()
     abCold      = _RSL_Forms.AbCold()
+    abBonusWarm = _RSL_Forms.AbBonusWarm()
+    abBonusRest = _RSL_Forms.AbBonusRest()
+    abBonusFed  = _RSL_Forms.AbBonusFed()
     fireSources   = _RSL_Forms.FireSources()
     coldInteriors = _RSL_Forms.ColdInteriors()
     kwUndead    = _RSL_Forms.ActorTypeUndead()
@@ -478,6 +491,9 @@ Function Bind()
     gHudWidgetAlpha      = _RSL_Forms.HudWidgetAlpha()
     gHudWidgetHAnchor    = _RSL_Forms.HudWidgetHAnchor()
     gHudWidgetVAnchor    = _RSL_Forms.HudWidgetVAnchor()
+    gBonusEnabled        = _RSL_Forms.BonusEnabled()
+    gBonusRegenPct       = _RSL_Forms.BonusRegenPct()
+    gBonusThresholdPct   = _RSL_Forms.BonusThresholdPct()
 
     gDiseaseEnabled      = _RSL_Forms.DiseaseEnabled()
     gDiseaseProgressHours = _RSL_Forms.DiseaseProgressHours()
@@ -637,9 +653,29 @@ Function Bind()
 
     If ready
         RegisterForMenu("Sleep/Wait Menu")
+        ; SkyUI's item menus never drive the widget .swf's own menu-hide path.
+        RegisterForMenu("InventoryMenu")
+        RegisterForMenu("ContainerMenu")
+        RegisterForMenu("BarterMenu")
+        RegisterForMenu("GiftMenu")
         _RSL_Log.W("Bind OK: forms resolved, ModEnabled=" + gModEnabled.GetValue())
     Else
         _RSL_Log.W("Bind FAILED: pl=" + pl + " abCold=" + abCold + " gModEnabled=" + gModEnabled)
+    EndIf
+EndFunction
+
+; SkyUI inventory/container/barter/gift share one "ItemMenu" .swf that does not
+; push a HUD mode the widget filters on, so it stays drawn over them (Magic /
+; Map / Journal hide it fine). Hide it by hand on open, restore in OnMenuClose.
+bool Function MenuHidesWidget(string m)
+    return m == "InventoryMenu" || m == "ContainerMenu" \
+        || m == "BarterMenu" || m == "GiftMenu"
+EndFunction
+
+Function SetWidgetMenuHidden(bool hidden)
+    _RSL_HUDWidget w = _RSL_Forms.QstWidget() as _RSL_HUDWidget
+    If w
+        w.SetMenuHidden(hidden)
     EndIf
 EndFunction
 
@@ -647,7 +683,14 @@ EndFunction
 ; warming (Severity < Mitigation): a warm shelter is exactly where you sleep it
 ; off. Ice caves keep a high Severity so they stay blocked.
 Event OnMenuOpen(string menuName)
-    If !ready || menuName != "Sleep/Wait Menu"
+    If !ready
+        return
+    EndIf
+    If MenuHidesWidget(menuName)
+        SetWidgetMenuHidden(true)
+        return
+    EndIf
+    If menuName != "Sleep/Wait Menu"
         return
     EndIf
     int hyStage = _RSL_Disease.GetStage(pl, "HY")
@@ -671,6 +714,12 @@ Event OnMenuOpen(string menuName)
     _RSL_Log.W("Hypothermia: blocked Sleep/Wait menu")
 EndEvent
 
+Event OnMenuClose(string menuName)
+    If ready && MenuHidesWidget(menuName)
+        SetWidgetMenuHidden(false)
+    EndIf
+EndEvent
+
 Function Schedule()
     float iv = 1.0
     If gPollInterval
@@ -686,6 +735,8 @@ EndFunction
 ; for us (first run, save load).
 Function Touch()
     StorageUtil.SetFloatValue(pl, K_LASTTIME, Utility.GetCurrentGameTime())
+    ; real-time clock restarts each launch - drop a stale future elem-hit stamp
+    StorageUtil.SetFloatValue(pl, K_ELEMT, 0.0)
 EndFunction
 
 ; GLOB value with a fallback default. Needed on upgrade runs: until the
@@ -761,6 +812,7 @@ Event OnUpdate()
     SyncHypoWait()   ; follows the player in/out of warm shelter
 
     ApplyPenalties(undead)
+    ApplyBonus(undead)
     PushWidget()
 
     ; per-tick diagnostics - skip the string building entirely unless logging is on
@@ -1122,14 +1174,20 @@ float Function WarmthPoints()
 EndFunction
 
 ; Wet clothing does not warm: slots are zeroed (not capped), so only the
-; actor's own FrostResist counts. Drying is linear.
+; actor's own FrostResist counts. Drying is linear over DryMinutes IN-GAME
+; minutes - K_WETUNTIL is the game-day the player is fully dry, so a Wait /
+; sleep dries you off too.
 float Function WetnessFactor()
     float now = Utility.GetCurrentGameTime()
+    float dryDays = gDryMinutes.GetValue() / 1440.0    ; in-game minutes -> game days
 
     If pl.IsSwimming()
-        float dryDays = gDryMinutes.GetValue() / (60.0 * 24.0)
         StorageUtil.SetFloatValue(pl, K_WETUNTIL, now + dryDays)
         return 0.0
+    EndIf
+
+    If dryDays <= 0.0
+        return 1.0
     EndIf
 
     float until = StorageUtil.GetFloatValue(pl, K_WETUNTIL, 0.0)
@@ -1137,15 +1195,10 @@ float Function WetnessFactor()
         return 1.0
     EndIf
 
-    float dryDays2 = gDryMinutes.GetValue() / (60.0 * 24.0)
-    If dryDays2 <= 0.0
-        return 1.0
-    EndIf
-
-    ; The closer to `until`, the drier.
-    float remaining = (until - now) / dryDays2
+    ; the closer to `until`, the drier
+    float remaining = (until - now) / dryDays
     If remaining > 1.0
-        remaining = 1.0
+        remaining = 1.0        ; stale deadline / time ran backwards -> just-wet
     EndIf
     return 1.0 - remaining
 EndFunction
@@ -1503,6 +1556,71 @@ EndFunction
 ;     resist. Queued (K_ELPACC), folded by AdvanceElemLesion.
 float ELEM_MIN_GAP = 0.5
 
+; 0 none / 1 frost / 2 fire / 3 shock. Vanilla keyword first; then, for a
+; Detrimental effect, the resistance AV on the MGEF - RFAB's destruction
+; effects can drop the MagicDamage* keyword but still resist to the element.
+int Function ElemKind(MagicEffect e)
+    If !e
+        return 0
+    EndIf
+    If kwMagicDamageFrost && e.HasKeyword(kwMagicDamageFrost)
+        return 1
+    ElseIf kwMagicDamageFire && e.HasKeyword(kwMagicDamageFire)
+        return 2
+    ElseIf kwMagicDamageShock && e.HasKeyword(kwMagicDamageShock)
+        return 3
+    EndIf
+    If e.IsEffectFlagSet(0x00000004)       ; Detrimental
+        string r = e.GetResistance()
+        If r == "ResistFrost" || r == "FrostResist"
+            return 1
+        ElseIf r == "ResistFire" || r == "FireResist"
+            return 2
+        ElseIf r == "ResistShock" || r == "ShockResist" || r == "ElectricResist"
+            return 3
+        EndIf
+    EndIf
+    return 0
+EndFunction
+
+; First elemental (frost/fire/shock) effect carried by a hit source - a Spell
+; (projectile / rune / cloak), an Enchantment, or a Weapon's enchantment.
+; Used by OnHit as a fallback when OnMagicEffectApply does not deliver the hit.
+MagicEffect Function ElemSourceEffect(Form src)
+    If !src
+        return None
+    EndIf
+    Spell sp = src as Spell
+    Enchantment en = src as Enchantment
+    If !en
+        Weapon wp = src as Weapon
+        If wp
+            en = wp.GetEnchantment()
+        EndIf
+    EndIf
+
+    int n = 0
+    If sp
+        n = sp.GetNumEffects()
+    ElseIf en
+        n = en.GetNumEffects()
+    EndIf
+    int i = 0
+    While i < n
+        MagicEffect e = None
+        If sp
+            e = sp.GetNthEffectMagicEffect(i)
+        Else
+            e = en.GetNthEffectMagicEffect(i)
+        EndIf
+        If ElemKind(e) != 0
+            return e
+        EndIf
+        i += 1
+    EndWhile
+    return None
+EndFunction
+
 Function NoteElemHit(MagicEffect eff)
     If gModEnabled.GetValue() < 0.5
         return
@@ -1510,25 +1628,26 @@ Function NoteElemHit(MagicEffect eff)
 
     float rf = 0.0          ; ResistFactor for the matching element
     float coldD = 0.0       ; cold-bar nudge (frost +, fire -); 0 for shock
-    bool elem = false
-    If kwMagicDamageFrost && eff.HasKeyword(kwMagicDamageFrost)
+    int kind = ElemKind(eff)
+    If kind == 1
         rf = ResistFactor("FrostResist")
         coldD = GV(gFrostHitCold, 2.0) * rf
-        elem = true
-    ElseIf kwMagicDamageFire && eff.HasKeyword(kwMagicDamageFire)
+    ElseIf kind == 2
         rf = ResistFactor("FireResist")
         coldD = -GV(gFireHitWarm, 2.0) * rf
-        elem = true
-    ElseIf kwMagicDamageShock && eff.HasKeyword(kwMagicDamageShock)
-        rf = ResistFactor("ElectricResist")
-        elem = true
-    EndIf
-    If !elem
+    ElseIf kind == 3
+        rf = ResistFactor("ElectricResist")   ; RFAB's shock resist AV; shock feeds lesions only, not the cold bar
+    Else
         return
     EndIf
 
+    ; Rate limit: one accepted hit per ELEM_MIN_GAP. Utility.GetCurrentRealTime
+    ; resets to ~0 each game launch but K_ELEMT persists in StorageUtil - a stale
+    ; value from a prior session sits in the future, so only gate when the last
+    ; stamp is actually in the past (else every hit was silently dropped forever).
     float now = Utility.GetCurrentRealTime()
-    If now - StorageUtil.GetFloatValue(pl, K_ELEMT, 0.0) < ELEM_MIN_GAP
+    float lastT = StorageUtil.GetFloatValue(pl, K_ELEMT, 0.0)
+    If lastT <= now && now - lastT < ELEM_MIN_GAP
         return
     EndIf
     StorageUtil.SetFloatValue(pl, K_ELEMT, now)
@@ -1704,7 +1823,22 @@ Function CureColdDisease() global
         _RSL_Forms.DiseaseGreenspore2(), _RSL_Forms.DiseaseGreenspore3())
     _RSL_Disease.ClearStages(p, "FP", _RSL_Forms.DiseaseFoodPoison1(), \
         _RSL_Forms.DiseaseFoodPoison2(), _RSL_Forms.DiseaseFoodPoison3())
+    _RSL_Disease.ClearStages(p, "EL", _RSL_Forms.DiseaseElemLesion1(), \
+        _RSL_Forms.DiseaseElemLesion2(), _RSL_Forms.DiseaseElemLesion3())
+    _RSL_Disease.ClearStages(p, "HY", _RSL_Forms.AbHypo1(), \
+        _RSL_Forms.AbHypo2(), _RSL_Forms.AbHypo3())
     ClearAllRfabWraps(p)
+
+    ; queued elemental-hit accumulators + hypothermia lockdown / rest-block
+    StorageUtil.SetFloatValue(p, "_RSL_ElemAccum", 0.0)     ; K_ELEMACC
+    StorageUtil.SetFloatValue(p, "_RSL_Dz_EL_PAcc", 0.0)    ; K_ELPACC
+    StorageUtil.SetFloatValue(p, "_RSL_ElemLastT", 0.0)     ; K_ELEMT
+    p.SetActorValue("Paralysis", 0.0)
+    Game.SetInChargen(false, false, false)
+    StorageUtil.SetIntValue(p, "_RSL_HypoWaitBlocked", 0)   ; K_HYWAIT
+    Game.EnablePlayerControls()
+
+    _RSL_Log.W("CureColdDisease: all diseases cleared (MCM button)")
 EndFunction
 
 ; Clear every RFAB-wrapper stage, base spell included. Used by the MCM "cure
@@ -1726,6 +1860,12 @@ EndFunction
 Event OnMagicEffectApply(ObjectReference akCaster, MagicEffect akEffect)
     If !ready || !akEffect
         return
+    EndIf
+
+    If StorageUtil.GetIntValue(None, "_RSL_DbgLog", 0) > 0
+        _RSL_Log.W("MGEFApply: " + akEffect.GetName() + " (" + akEffect.GetFormID() \
+            + ") kind=" + ElemKind(akEffect) + " resAV=" + akEffect.GetResistance() \
+            + " caster=" + akCaster)
     EndIf
 
     NoteElemHit(akEffect)
@@ -1764,6 +1904,15 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
     EndIf
     Actor agg = akAggressor as Actor
     _RSL_Log.W("OnHit: agg=" + akAggressor + " actor=" + agg + " src=" + akSource + " proj=" + akProjectile)
+
+    ; Elemental damage from a spell / rune / enchanted weapon - a fallback for
+    ; when OnMagicEffectApply does not deliver the hit (RFAB scripted damage,
+    ; keyword-stripped MGEFs). NoteElemHit's own 0.5s gate de-dupes.
+    MagicEffect em = ElemSourceEffect(akSource)
+    If em
+        NoteElemHit(em)
+    EndIf
+
     If !agg || akProjectile
         return
     EndIf
@@ -2302,6 +2451,10 @@ Function AdvanceElemLesion(bool undead, float dtHours)
         drift = -(100.0 / GV(gDiseaseProgressHours, 24.0))
     ElseIf !DzAnyAxisBad(undead)
         drift = (100.0 / GV(gDiseaseDecayHours, 24.0)) * (1.0 + pl.GetActorValue("DiseaseResist") * 0.01)
+        ; an established lesion heals ~3x faster than a fresh scratch settles
+        If stage >= 1
+            drift *= 3.0
+        EndIf
     EndIf
 
     If stage > 0
@@ -2353,26 +2506,53 @@ Function AdvanceElemLesion(bool undead, float dtHours)
         return
     EndIf
 
-    ; stage >= 1: stochastic step on the shared roll machinery
-    int net = _RSL_Disease.StepPManual(pl, "EL", drift, dtHours)
-    If net != 0
-        int target = stage - net
-        If target < 0
-            target = 0
-        ElseIf target > 3
-            target = 3
+    ; stage >= 1: deterministic. Folded hits (K_ELPACC -> AddP above) drive P
+    ; down; drift heals (all clear) or worsens (deep cold). Crossing +/- the
+    ; same threshold as the initial contract steps a stage and resets P - no
+    ; -100 clamp pinning, no stochastic roll.
+    float lim = GV(gElemLesionContractP, 70.0)
+    float prog = StorageUtil.GetFloatValue(pl, "_RSL_Dz_EL_Prog", 0.0)
+
+    ; worsen: test the post-hit value BEFORE drift, so a maxed-out barrage (P
+    ; slammed to the -100 clamp) still trips it instead of drift nudging it back.
+    If prog <= -lim
+        int tw = stage + 1
+        If tw > 3
+            tw = 3
         EndIf
-        If target != stage
-            _RSL_Disease.SetStage(pl, "EL", target, ELStageSpell(stage), ELStageSpell(target), 0.0, 0.0)
-            If target == 0
-                CCNotify(msgELCured)
-            ElseIf target > stage && target == 3
+        If tw != stage
+            _RSL_Disease.SetStage(pl, "EL", tw, ELStageSpell(stage), ELStageSpell(tw), 0.0, 0.0)
+            If tw == 3
                 CCNotify(msgEL3)
-            ElseIf target > stage
+            Else
                 CCNotify(msgEL2)
             EndIf
+            _RSL_Log.W("ElemLesion: worsened " + stage + " -> " + tw + " (P " + prog + ")")
         EndIf
+        _RSL_Disease.ResetP(pl, "EL")
+        return
     EndIf
+
+    prog += drift * dtHours
+    If prog < -100.0
+        prog = -100.0
+    ElseIf prog > 100.0
+        prog = 100.0
+    EndIf
+
+    ; heal: sustained recovery lifts P to +lim -> step one stage back
+    If prog >= lim
+        int th = stage - 1
+        _RSL_Disease.SetStage(pl, "EL", th, ELStageSpell(stage), ELStageSpell(th), 0.0, 0.0)
+        _RSL_Disease.ResetP(pl, "EL")
+        If th == 0
+            CCNotify(msgELCured)
+        EndIf
+        _RSL_Log.W("ElemLesion: healed " + stage + " -> " + th)
+        return
+    EndIf
+
+    StorageUtil.SetFloatValue(pl, "_RSL_Dz_EL_Prog", prog)
 EndFunction
 
 ; --- penalties -----------------------------------------------------------
@@ -2512,6 +2692,69 @@ float Function Clamp(float v, float cap)
     return v
 EndFunction
 
+; --- full-bar bonuses --------------------------------------------------
+; While a need's deprivation stays within BonusThresholdPct of its axis max,
+; a +BonusRegenPct% regen buff on the matching pool - same axis->pool mapping
+; as the penalties (cold->Health, sleep->Magicka, hunger->Stamina). Three
+; separate 1-effect abilities so only the earned ones show in the UI.
+; Undead have no sleep/hunger axis - only "warmed" can apply to them.
+Function ApplyBonus(bool undead)
+    If !abBonusWarm
+        return          ; records not in the plugin yet (pre-regen)
+    EndIf
+
+    bool on = gModEnabled.GetValue() >= 0.5 && GV(gBonusEnabled, 1.0) >= 0.5
+    float pct = GV(gBonusRegenPct, 5.0)
+    float thr = GV(gBonusThresholdPct, 10.0) * 0.01
+
+    bool warmed = on && StorageUtil.GetFloatValue(pl, K_COLD, 0.0) <= thr * 100.0
+    bool rested = on && !undead && StorageUtil.GetFloatValue(pl, K_SLEEP, 0.0) <= thr * gSleepMax.GetValue()
+    bool fed    = on && !undead && StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0) <= thr * gHungerMax.GetValue()
+
+    SetBonus(abBonusWarm, "_RSL_BonWarm", warmed, pct)
+    SetBonus(abBonusRest, "_RSL_BonRest", rested, pct)
+    SetBonus(abBonusFed,  "_RSL_BonFed",  fed,    pct)
+EndFunction
+
+; Add/remove one bonus ability. Dedup on (active, pct) so the SPEL form is
+; mutated only on a real change (SetNthEffectMagnitude = a save change).
+Function SetBonus(Spell ab, string tierKey, bool onNow, float pct)
+    If !ab
+        return
+    EndIf
+    int sig = 0
+    If onNow
+        sig = 1 + (pct as int) * 2
+    EndIf
+    If sig == (StorageUtil.GetFloatValue(pl, tierKey, -1.0) as int)
+        return
+    EndIf
+    StorageUtil.SetFloatValue(pl, tierKey, sig as float)
+
+    ab.SetNthEffectMagnitude(0, pct)
+    pl.RemoveSpell(ab)
+    If onNow
+        pl.AddSpell(ab, false)
+    EndIf
+    _RSL_Log.W("SetBonus " + tierKey + ": on=" + onNow + " pct=" + pct)
+EndFunction
+
+Function ClearBonus()
+    If !pl
+        pl = Game.GetPlayer()
+    EndIf
+    ClearOneBonus(abBonusWarm, "_RSL_BonWarm")
+    ClearOneBonus(abBonusRest, "_RSL_BonRest")
+    ClearOneBonus(abBonusFed,  "_RSL_BonFed")
+EndFunction
+
+Function ClearOneBonus(Spell ab, string tierKey)
+    If ab
+        pl.RemoveSpell(ab)
+        StorageUtil.SetFloatValue(pl, tierKey, -1.0)
+    EndIf
+EndFunction
+
 ; --- safe shutdown ------------------------------------------------------
 
 ; Without this, disabling an axis or the mod leaves penalties on the pools -
@@ -2524,6 +2767,7 @@ Function ClearAllPenalties()
     ClearAxis(abSleep,  K_TIER_SL)
     ClearAxis(abHunger, K_TIER_HU)
     ClearAxis(abCold,   K_TIER_CO)
+    ClearBonus()
 EndFunction
 
 Function ClearAxis(Spell ab, string tierKey)
@@ -2552,6 +2796,22 @@ Function TeardownAll() global
     ShutdownSpell(p, _RSL_Forms.AbSleep())
     ShutdownSpell(p, _RSL_Forms.AbHunger())
     ShutdownSpell(p, _RSL_Forms.AbCold())
+
+    Spell abBW = _RSL_Forms.AbBonusWarm()
+    Spell abBR = _RSL_Forms.AbBonusRest()
+    Spell abBF = _RSL_Forms.AbBonusFed()
+    If abBW
+        p.RemoveSpell(abBW)
+    EndIf
+    If abBR
+        p.RemoveSpell(abBR)
+    EndIf
+    If abBF
+        p.RemoveSpell(abBF)
+    EndIf
+    StorageUtil.SetFloatValue(p, "_RSL_BonWarm", -1.0)
+    StorageUtil.SetFloatValue(p, "_RSL_BonRest", -1.0)
+    StorageUtil.SetFloatValue(p, "_RSL_BonFed", -1.0)
 
     StorageUtil.SetFloatValue(p, "_RSL_SleepCounter", 0.0)
     StorageUtil.SetFloatValue(p, "_RSL_HungerCounter", 0.0)

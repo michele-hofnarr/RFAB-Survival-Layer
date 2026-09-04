@@ -401,7 +401,7 @@ begin
   AddGlobal(PFX + 'WarmupMult',          5.0,   'Float');   // warm-up N x faster than cooling
   AddGlobal(PFX + 'WarmthPerSlot',       7,     'Float');   // warmth per clothing slot (4 slots = 28)
   AddGlobal(PFX + 'ResistWeight',        50,    'Float');   // FrostResist x 50%
-  AddGlobal(PFX + 'DryMinutes',          5,     'Float');
+  AddGlobal(PFX + 'DryMinutes',          15,    'Float');   // IN-GAME minutes to dry off after water
   // Per-hit nudge on the cold bar (MagicDamageFrost / MagicDamageFire effects),
   // rate-limited to one hit per 0.5 s. 0 disables. Fire warming is deliberately
   // exploitable - burning costs HP.
@@ -415,6 +415,13 @@ begin
   AddGlobal(PFX + 'SpeedCap',            30,    'Float');   // total cap; RFAB burden already takes up to 50 SpeedMult
   AddGlobal(PFX + 'PenaltyCap',          85,    'Float');
   AddGlobal(PFX + 'TierStep',            5,     'Float');
+
+  // Full-bar bonuses: while a need's deprivation stays within BonusThresholdPct
+  // of its axis max, +BonusRegenPct% regen on the matching pool (cold->Health,
+  // sleep->Magicka, hunger->Stamina). Flat, not ramped.
+  AddGlobal(PFX + 'BonusEnabled',        1,     'Short');
+  AddGlobal(PFX + 'BonusRegenPct',       5,     'Float');
+  AddGlobal(PFX + 'BonusThresholdPct',   10,    'Float');
 
   // cold visual (character ice shader only; screen ISM dropped - no vanilla
   // IMAD holds visually)
@@ -838,6 +845,24 @@ begin
           + ' is not Detrimental. Got: ' + FlagsOf(rec));
 end;
 
+// ANDs out the Detrimental bit - turns a copied *RateMult drain into a buff
+// (non-detrimental Value Modifier + positive magnitude adds instead of subtracts).
+// Whole-integer write (clearing a flag by-name destroys its subelement).
+procedure ClearDetrimental(rec: IwbMainRecord);
+var
+  fl: IInterface;
+begin
+  if not Assigned(rec) then Exit;
+  fl := MgefFlags(rec);
+  if not Assigned(fl) then begin
+    Problem('no Flags on ' + EditorID(rec));
+    Exit;
+  end;
+  SetNativeValue(fl, GetNativeValue(fl) and not FLAG_DETRIMENTAL);
+  if Pos('Detrimental', FlagsOf(rec)) > 0 then
+    Problem('Detrimental still set on ' + EditorID(rec) + ': ' + FlagsOf(rec));
+end;
+
 // Copies the WHOLE flag set from the template as one integer. Per-name setting
 // fails: an unset flag has no subelement (cannot add Recover by name), and
 // clearing a flag destroys its subelement, leaving a dangling ref that crashes
@@ -1196,6 +1221,36 @@ begin
 
   Remember(edid, Result);
   if fresh then Inc(madeNew) else Inc(reused);
+end;
+
+// Full-bar regen bonuses: THREE separate 1-effect abilities so only the ones
+// currently earned show in the active-effects list (a single 3-effect ability
+// would render all 3 lines whenever any is active, even at magnitude 0).
+// Source MGEFs are the *RateMult drains the penalty lib already proves are
+// RateMult (not flat *Rate); ClearDetrimental flips them to a buff. Magnitude
+// (BonusRegenPct) is pushed at runtime by _RSL_Controller.SetBonus.
+procedure BuildBonusAbility;
+var
+  spelTpl    : IwbMainRecord;
+  mH, mM, mS : IwbMainRecord;
+begin
+  Say('');
+  Say('--- bonus abilities (full-bar regen) ---');
+
+  mH := CopyVanillaMgef('Skyrim.esm', 'AbDamageHealRateVisible',    PFX + 'MgefBonusHealRegen', False);
+  mM := CopyVanillaMgef('Skyrim.esm', 'AbDamageMagickaRate',        PFX + 'MgefBonusMagRegen',  False);
+  mS := CopyVanillaMgef('Skyrim.esm', 'AbDamageStaminaRateVisible', PFX + 'MgefBonusStamRegen', False);
+  ClearDetrimental(mH);  ClearDetrimental(mM);  ClearDetrimental(mS);
+  ShowInUI(mH);  ShowInUI(mM);  ShowInUI(mS);
+
+  spelTpl := FindAbilityTemplate;
+  if not Assigned(spelTpl) then begin
+    Say('  no ability template - skipping bonus abilities');
+    Exit;
+  end;
+  AddAbility1(spelTpl, PFX + 'AbBonusWarm', L('lib.BonusHealRegen.full'), mH);
+  AddAbility1(spelTpl, PFX + 'AbBonusRest', L('lib.BonusMagRegen.full'),  mM);
+  AddAbility1(spelTpl, PFX + 'AbBonusFed',  L('lib.BonusStamRegen.full'), mS);
 end;
 
 procedure BuildEffectsAndSpells;
@@ -2432,12 +2487,20 @@ begin
     EmitGlobalGetter(sl, 'ColdColdChanceMax');
     EmitGlobalGetter(sl, 'ColdColdChanceMaxAt');
 
+    // v3
+    EmitGlobalGetter(sl, 'BonusEnabled');
+    EmitGlobalGetter(sl, 'BonusRegenPct');
+    EmitGlobalGetter(sl, 'BonusThresholdPct');
+
     sl.Add('; --- abilities -----------------------------------------------------');
     sl.Add('');
     EmitFormGetter(sl, 'Spell', 'AbSleep',   PFX + 'AbSleep');
     EmitFormGetter(sl, 'Spell', 'AbHunger',  PFX + 'AbHunger');
-    EmitFormGetter(sl, 'Spell', 'AbCold',    PFX + 'AbCold');
-    EmitFormGetter(sl, 'Spell', 'AbMonitor', PFX + 'AbMonitor');
+    EmitFormGetter(sl, 'Spell', 'AbCold',      PFX + 'AbCold');
+    EmitFormGetter(sl, 'Spell', 'AbBonusWarm', PFX + 'AbBonusWarm');
+    EmitFormGetter(sl, 'Spell', 'AbBonusRest', PFX + 'AbBonusRest');
+    EmitFormGetter(sl, 'Spell', 'AbBonusFed',  PFX + 'AbBonusFed');
+    EmitFormGetter(sl, 'Spell', 'AbMonitor',   PFX + 'AbMonitor');
 
     sl.Add('; --- misc ----------------------------------------------------------');
     sl.Add('');
@@ -2872,6 +2935,10 @@ begin
     JsonSlider(sl, PFX + 'SpeedCap',       '0', '80',  '5');
     JsonSlider(sl, PFX + 'PenaltyCap',     '0', '95',  '5');
     JsonSlider(sl, PFX + 'TierStep',       '5', '25',  '5');
+    JsonHeader(sl, '_RSL_HdrBonus');
+    JsonToggle(sl, PFX + 'BonusEnabled');
+    JsonSlider(sl, PFX + 'BonusRegenPct',      '0', '25', '1');
+    JsonSlider(sl, PFX + 'BonusThresholdPct',  '0', '50', '5');
     TrimLastComma(sl);
     sl.Add('      ]');
     sl.Add('    },');
@@ -2942,6 +3009,7 @@ begin
   BuildColdInteriors;
   BuildEffectsAndSpells;
   BuildPenaltyLib;
+  BuildBonusAbility;
   BuildDiseases;
   BuildRfabWrappers;
   BuildHypothermia;

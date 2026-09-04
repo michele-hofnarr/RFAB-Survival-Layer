@@ -344,6 +344,18 @@ GlobalVariable Function ColdColdChanceMaxAt() global
     return Game.GetFormFromFile(0x0000087A, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
+GlobalVariable Function BonusEnabled() global
+    return Game.GetFormFromFile(0x00000D3E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function BonusRegenPct() global
+    return Game.GetFormFromFile(0x00000D3F, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function BonusThresholdPct() global
+    return Game.GetFormFromFile(0x00000D40, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
 ; --- abilities -----------------------------------------------------
 
 Spell Function AbSleep() global
@@ -356,6 +368,18 @@ EndFunction
 
 Spell Function AbCold() global
     return Game.GetFormFromFile(0x0000082C, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function AbBonusWarm() global
+    return Game.GetFormFromFile(0x00000D97, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function AbBonusRest() global
+    return Game.GetFormFromFile(0x00000D98, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function AbBonusFed() global
+    return Game.GetFormFromFile(0x00000D99, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbMonitor() global

@@ -53,6 +53,16 @@ function SetScale(float a_pct)
     EndIf
 endFunction
 
+; _RSL_Controller toggles this on OnMenuOpen/Close for the SkyUI item menus
+; (inventory / container / barter / gift), which never drive the .swf's own
+; menu-hide path. Container-level _visible, independent of the opacity/autohide
+; the tick pushes via setData.
+function SetMenuHidden(bool a_hidden)
+    If Ready
+        UI.InvokeBool(HUD_MENU, WidgetRoot + ".setMenuHidden", a_hidden)
+    EndIf
+endFunction
+
 function PushData(bool sleepShown, float sleepFill, float sleepSafe, \
                   bool hungerShown, float hungerFill, float hungerSafe, \
                   bool coldShown, float coldFill, float coldSafe, \

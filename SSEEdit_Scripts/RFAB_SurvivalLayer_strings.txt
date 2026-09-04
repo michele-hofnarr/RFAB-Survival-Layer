@@ -48,6 +48,12 @@ lib.BonusPoise.full=Устойчивость
 lib.BonusPoise.dnam=Устойчивость повышена.
 lib.BonusArmor.full=Броня
 lib.BonusArmor.dnam=Броня повышена.
+lib.BonusHealRegen.full=Согрет
+lib.BonusHealRegen.dnam=Согрет: восстановление здоровья ускорено на <mag>%.
+lib.BonusMagRegen.full=Выспался
+lib.BonusMagRegen.dnam=Выспался: восстановление магии ускорено на <mag>%.
+lib.BonusStamRegen.full=Сыт
+lib.BonusStamRegen.dnam=Сыт: восстановление запаса сил ускорено на <mag>%.
 
 # ---- axis abilities (sleep / hunger / cold) ----
 # %P / %C / %S are substituted with PenaltyPrimary / PenaltyCross / PenaltySpeed.

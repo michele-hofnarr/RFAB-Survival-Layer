@@ -1167,6 +1167,43 @@
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|81A"
           }
+        },
+        {
+          "text": "$_RSL_HdrBonus",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_BonusEnabled",
+          "help": "$_RSL_BonusEnabled_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|D3E"
+          }
+        },
+        {
+          "text": "$_RSL_BonusRegenPct",
+          "help": "$_RSL_BonusRegenPct_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 25,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|D3F"
+          }
+        },
+        {
+          "text": "$_RSL_BonusThresholdPct",
+          "help": "$_RSL_BonusThresholdPct_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 50,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|D40"
+          }
         }
       ]
     },

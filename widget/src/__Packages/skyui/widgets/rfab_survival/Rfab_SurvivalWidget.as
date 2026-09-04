@@ -62,6 +62,15 @@ class skyui.widgets.rfab_survival.Rfab_SurvivalWidget extends skyui.widgets.Widg
       this._widgetHolder._visible = !hide;
    }
 
+   // Papyrus (_RSL_Controller) drives this for the SkyUI item menus
+   // (inventory / container / barter / gift). Those never send an onModeChange
+   // the HUD filters on, so - unlike Magic / Map / Journal - the widget would
+   // otherwise stay drawn over them.
+   function setMenuHidden(a_hidden)
+   {
+      this._widgetHolder._visible = !a_hidden;
+   }
+
    function axisColor(a_i)
    {
       var C = skyui.widgets.rfab_survival.Rfab_SurvivalWidget;
