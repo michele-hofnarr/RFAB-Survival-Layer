@@ -1557,12 +1557,12 @@ EndFunction
 ;     Fire-warming is intentionally usable - burning costs HP, a real trade.
 ;   - elemental lesions: frost/fire/shock all damage P, scaled by the matching
 ;     resist. Queued (K_ELPACC), folded by AdvanceElemLesion.
-; Rate-limited by ElemEvtDue() at the call sites (a cloak / channelled stream
-; fires the hit events many times a second).
+; Rate-limited by ElemEvtDue() in OnMagicEffectApply (a cloak / channelled
+; stream fires that event many times a second).
 float ELEM_EVT_GAP = 0.5
 
 ; True at most once per ELEM_EVT_GAP real seconds. Cheap (one script-var read),
-; runs before any logging / keyword / effect-list work in the hit handlers.
+; runs before any logging / keyword work in OnMagicEffectApply.
 ; Utility.GetCurrentRealTime resets to ~0 each launch; a stale future stamp
 ; just means the first post-load hit is accepted.
 bool Function ElemEvtDue()
@@ -1599,44 +1599,6 @@ int Function ElemKind(MagicEffect e)
         EndIf
     EndIf
     return 0
-EndFunction
-
-; First elemental (frost/fire/shock) effect carried by a hit source - a Spell
-; (projectile / rune / cloak), an Enchantment, or a Weapon's enchantment.
-; Used by OnHit as a fallback when OnMagicEffectApply does not deliver the hit.
-MagicEffect Function ElemSourceEffect(Form src)
-    If !src
-        return None
-    EndIf
-    Spell sp = src as Spell
-    Enchantment en = src as Enchantment
-    If !en
-        Weapon wp = src as Weapon
-        If wp
-            en = wp.GetEnchantment()
-        EndIf
-    EndIf
-
-    int n = 0
-    If sp
-        n = sp.GetNumEffects()
-    ElseIf en
-        n = en.GetNumEffects()
-    EndIf
-    int i = 0
-    While i < n
-        MagicEffect e = None
-        If sp
-            e = sp.GetNthEffectMagicEffect(i)
-        Else
-            e = en.GetNthEffectMagicEffect(i)
-        EndIf
-        If ElemKind(e) != 0
-            return e
-        EndIf
-        i += 1
-    EndWhile
-    return None
 EndFunction
 
 Function NoteElemHit(MagicEffect eff)
@@ -1912,20 +1874,19 @@ EndEvent
 
 ; --- OnHit diseases: brown rot / gutworm / greenspore -------------------
 
+; NOTE: elemental hits are read from OnMagicEffectApply ONLY, not from here.
+; OnHit fires on raw impact detection - it does not know whether the magic
+; effect actually landed. A Ward (RFAB's included: Papyrus/AV-based, not the
+; vanilla Ward archetype, so the engine has no "warded" flag to expose here)
+; can swallow the spell entirely and OnHit still fires, which used to count a
+; fully-blocked hit as an elemental one (temperature nudge + lesion damage
+; with zero real damage taken). OnMagicEffectApply only fires when the effect
+; is actually applied to the target, so a warded/fully-resisted hit is
+; correctly silent there - and testing confirmed it alone reliably catches
+; every RFAB frost/fire/shock source (spells, enchant procs, a fire trap).
 Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile, bool abPowerAttack, bool abSneakAttack, bool abBashAttack, bool abHitBlocked)
     If !ready
         return
-    EndIf
-
-    ; Elemental damage from a spell / rune / enchanted weapon - a fallback for
-    ; when OnMagicEffectApply does not deliver the hit. Debounced (a channelled
-    ; stream fires OnHit many times a second) and ElemSourceEffect walks the
-    ; source's effect list, so this must come before any per-hit work.
-    If ElemEvtDue()
-        MagicEffect em = ElemSourceEffect(akSource)
-        If em
-            NoteElemHit(em)
-        EndIf
     EndIf
 
     Actor agg = akAggressor as Actor
