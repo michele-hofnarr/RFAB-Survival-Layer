@@ -34,7 +34,7 @@ Function ResetDefaults() global
     _RSL_Forms.NightMult().SetValue(170.0)
     _RSL_Forms.SwimMult().SetValue(220.0)
     _RSL_Forms.FireMult().SetValue(40.0)
-    _RSL_Forms.SevInterior().SetValue(25.0)
+    _RSL_Forms.SevInterior().SetValue(60.0)
     _RSL_Forms.SevColdInterior().SetValue(45.0)
     _RSL_Forms.AltitudeLow().SetValue(8000.0)
     _RSL_Forms.AltitudeHigh().SetValue(14000.0)

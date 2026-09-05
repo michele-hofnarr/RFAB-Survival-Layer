@@ -234,7 +234,7 @@ EndEvent
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 38   ; v38: DryMinutes is in-game minutes, default 15
+int SETTINGS_VERSION = 39   ; v39: SevInterior is now % of RegionBase (default 60), no NightMult indoors
 
 Function MigrateSettings()
     If !ready
@@ -1209,8 +1209,8 @@ float Function WetnessFactor()
 EndFunction
 
 ; sev = RegionBase x Weather x Night x Swim x Fire (interior: fire -> 0, else
-; SevInterior). Current weather classification is a free region proxy -
-; vanilla REGN already keeps snow out of the Rift and rain out of Winterhold.
+; RegionBase x SevInterior%). Current weather classification is a free region
+; proxy - vanilla REGN already keeps snow out of the Rift and rain out of Winterhold.
 float Function Severity()
     Cell c = pl.GetParentCell()
     bool interior = c && c.IsInterior()
@@ -1240,12 +1240,16 @@ float Function Severity()
         swimM = GV(gSwimMult, 220.0) / 100.0
     EndIf
 
-    ; interior. Ordinary house/cave: fire + not swimming -> 0, else SevInterior.
-    ; Ice cave / glacial ruin (ColdInteriors list): cold still bites - use
-    ; SevColdInterior and a campfire only helps by FireMult (like outdoors).
+    ; interior. Ordinary house/cave: fire + not swimming -> 0, else a fraction
+    ; (SevInterior %) of the hold's OUTDOOR base - RegionBase() walks the parent-
+    ; location chain, which resolves indoors too, so a Winterhold house is
+    ; colder than a Whiterun one. Weather / snow-climate / altitude do not apply
+    ; indoors, and neither does NightMult (a room is decoupled from the surface
+    ; day/night cycle). Ice cave / glacial ruin (ColdInteriors list): a flat
+    ; SevColdInterior, a campfire only helps by FireMult (like outdoors).
     If interior
         If ColdInteriorHere()
-            float ci = GV(gSevColdInterior, 45.0) * nightM * swimM
+            float ci = GV(gSevColdInterior, 45.0) * swimM
             If nearFire && !swim
                 ci *= GV(gFireMult, 40.0) / 100.0
             EndIf
@@ -1254,7 +1258,7 @@ float Function Severity()
         If nearFire && !swim
             return 0.0
         EndIf
-        return GV(gSevInterior, 25.0) * nightM * swimM
+        return RegionBase() * (GV(gSevInterior, 60.0) / 100.0) * swimM
     EndIf
 
     ; outdoors: sev = RegionBase x Weather x Night x Swim x Fire
@@ -2702,13 +2706,17 @@ EndFunction
 ; separate 1-effect abilities so only the earned ones show in the UI.
 ; Undead have no sleep/hunger axis - only "warmed" can apply to them.
 Function ApplyBonus(bool undead)
-    If !abBonusWarm
-        return          ; records not in the plugin yet (pre-regen)
+    If !abBonusWarm || !abBonusRest || !abBonusFed
+        _RSL_Log.W("ApplyBonus SKIP: ability form None (regenerate the plugin - _RSL_AbBonusWarm/Rest/Fed)")
+        return
     EndIf
 
     bool on = gModEnabled.GetValue() >= 0.5 && GV(gBonusEnabled, 1.0) >= 0.5
     float pct = GV(gBonusRegenPct, 5.0)
     float thr = GV(gBonusThresholdPct, 10.0) * 0.01
+    If thr <= 0.0
+        thr = 0.10       ; a misconfigured 0 would make the bonus unreachable
+    EndIf
 
     bool warmed = on && StorageUtil.GetFloatValue(pl, K_COLD, 0.0) <= thr * 100.0
     bool rested = on && !undead && StorageUtil.GetFloatValue(pl, K_SLEEP, 0.0) <= thr * gSleepMax.GetValue()
@@ -2739,7 +2747,8 @@ Function SetBonus(Spell ab, string tierKey, bool onNow, float pct)
     If onNow
         pl.AddSpell(ab, false)
     EndIf
-    _RSL_Log.W("SetBonus " + tierKey + ": on=" + onNow + " pct=" + pct)
+    _RSL_Log.W("SetBonus " + tierKey + ": on=" + onNow + " pct=" + pct \
+        + " has=" + pl.HasSpell(ab) + " mag0=" + ab.GetNthEffectMagnitude(0))
 EndFunction
 
 Function ClearBonus()

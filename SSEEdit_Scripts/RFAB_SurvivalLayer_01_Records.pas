@@ -390,7 +390,7 @@ begin
   AddGlobal(PFX + 'SwimMult',            220,   'Float');   // + clothing warmth off
   AddGlobal(PFX + 'FireMult',            40,    'Float');   // outdoor fire/torch (x0.4); interior+fire -> 0
 
-  AddGlobal(PFX + 'SevInterior',         25,    'Float');   // interior base, no fire
+  AddGlobal(PFX + 'SevInterior',         60,    'Float');   // ordinary interior, no fire: % of the hold's outdoor RegionBase
   AddGlobal(PFX + 'SevColdInterior',     45,    'Float');   // ice cave / frozen ruin: fire only partly warms (x FireMult)
   AddGlobal(PFX + 'AltitudeLow',         8000,  'Float');   // below -> hold base
   AddGlobal(PFX + 'AltitudeHigh',        14000, 'Float');   // above -> full RegionAltitude
@@ -845,24 +845,6 @@ begin
           + ' is not Detrimental. Got: ' + FlagsOf(rec));
 end;
 
-// ANDs out the Detrimental bit - turns a copied *RateMult drain into a buff
-// (non-detrimental Value Modifier + positive magnitude adds instead of subtracts).
-// Whole-integer write (clearing a flag by-name destroys its subelement).
-procedure ClearDetrimental(rec: IwbMainRecord);
-var
-  fl: IInterface;
-begin
-  if not Assigned(rec) then Exit;
-  fl := MgefFlags(rec);
-  if not Assigned(fl) then begin
-    Problem('no Flags on ' + EditorID(rec));
-    Exit;
-  end;
-  SetNativeValue(fl, GetNativeValue(fl) and not FLAG_DETRIMENTAL);
-  if Pos('Detrimental', FlagsOf(rec)) > 0 then
-    Problem('Detrimental still set on ' + EditorID(rec) + ': ' + FlagsOf(rec));
-end;
-
 // Copies the WHOLE flag set from the template as one integer. Per-name setting
 // fails: an unset flag has no subelement (cannot add Recover by name), and
 // clearing a flag destroys its subelement, leaving a dangling ref that crashes
@@ -1223,25 +1205,82 @@ begin
   if fresh then Inc(madeNew) else Inc(reused);
 end;
 
+// Edit-value of a vanilla MGEF's Actor Value - copied verbatim onto our record
+// so we never have to guess the enum string ("Health Rate Mult" vs ...).
+function VanillaAV(srcFile, srcEdid: string): string;
+var
+  r: IwbMainRecord;
+begin
+  Result := '';
+  r := RecordByEDID(FileByName(srcFile), 'MGEF', srcEdid);
+  if Assigned(r) then
+    Result := GetElementEditValues(r, 'Magic Effect Data\DATA\Actor Value');
+end;
+
+// A beneficial Value-Modifier MGEF: template = BladesAbBlessing (vanilla Fortify
+// Health - Recover / No Duration / No Area, NOT Detrimental, shown in UI), only
+// the Actor Value is repointed. STABLE FormID (reused by EDID) so a rerun never
+// dangles the SPEL EFID that references it - the bug that made the bonuses do
+// nothing (ability on the player, effect list empty at runtime).
+function AddBuffMgef(tpl: IwbMainRecord; edid, fullName, descr, avSourceEdid: string): IwbMainRecord;
+var
+  fresh: Boolean;
+  av   : string;
+begin
+  av := VanillaAV('Skyrim.esm', avSourceEdid);
+  if av = '' then begin
+    Problem('AddBuffMgef: не прочитался Actor Value из ' + avSourceEdid);
+    Exit;
+  end;
+
+  Result := RecordByEDID(tgt, 'MGEF', edid);
+  fresh := not Assigned(Result);
+  if fresh then begin
+    Result := wbCopyElementToFile(tpl, tgt, True, True);
+    if not Assigned(Result) then begin
+      Problem('не скопировался MGEF ' + edid);
+      Exit;
+    end;
+  end;
+
+  ScrubTemplate(Result);
+  PutEdit(Result, 'EDID', edid);
+  PutEdit(Result, 'FULL', fullName);
+  PutEdit(Result, 'DNAM', descr);
+  // force the shape in case a reused record was an earlier (different) copy
+  PutEdit(Result, 'Magic Effect Data\DATA\Archtype',     'Value Modifier');
+  PutEdit(Result, 'Magic Effect Data\DATA\Casting Type', 'Constant Effect');
+  PutEdit(Result, 'Magic Effect Data\DATA\Delivery',     'Self');
+  PutEdit(Result, 'Magic Effect Data\DATA\Actor Value',  av);
+  CopyFlagsFrom(Result, tpl);   // Recover + No Duration + No Area, NOT Detrimental
+  Say('  buff MGEF ' + edid + ' -> AV "' + av + '"  [' + FlagsOf(Result) + ']');
+
+  Remember(edid, Result);
+  if fresh then Inc(madeNew) else Inc(reused);
+end;
+
 // Full-bar regen bonuses: THREE separate 1-effect abilities so only the ones
 // currently earned show in the active-effects list (a single 3-effect ability
 // would render all 3 lines whenever any is active, even at magnitude 0).
-// Source MGEFs are the *RateMult drains the penalty lib already proves are
-// RateMult (not flat *Rate); ClearDetrimental flips them to a buff. Magnitude
-// (BonusRegenPct) is pushed at runtime by _RSL_Controller.SetBonus.
+// Magnitude (BonusRegenPct) is pushed at runtime by _RSL_Controller.SetBonus.
 procedure BuildBonusAbility;
 var
-  spelTpl    : IwbMainRecord;
-  mH, mM, mS : IwbMainRecord;
+  mgefTpl, spelTpl : IwbMainRecord;
+  mH, mM, mS       : IwbMainRecord;
 begin
   Say('');
   Say('--- bonus abilities (full-bar regen) ---');
 
-  mH := CopyVanillaMgef('Skyrim.esm', 'AbDamageHealRateVisible',    PFX + 'MgefBonusHealRegen', False);
-  mM := CopyVanillaMgef('Skyrim.esm', 'AbDamageMagickaRate',        PFX + 'MgefBonusMagRegen',  False);
-  mS := CopyVanillaMgef('Skyrim.esm', 'AbDamageStaminaRateVisible', PFX + 'MgefBonusStamRegen', False);
-  ClearDetrimental(mH);  ClearDetrimental(mM);  ClearDetrimental(mS);
-  ShowInUI(mH);  ShowInUI(mM);  ShowInUI(mS);
+  mgefTpl := FindValueModifierTemplate;
+  if not Assigned(mgefTpl) then begin
+    Say('  no Value-Modifier template - skipping bonus abilities');
+    Exit;
+  end;
+
+  mH := AddBuffMgef(mgefTpl, PFX + 'MgefBonusHealRegen', L('lib.BonusHealRegen.full'), L('lib.BonusHealRegen.dnam'), 'AbDamageHealRateVisible');
+  mM := AddBuffMgef(mgefTpl, PFX + 'MgefBonusMagRegen',  L('lib.BonusMagRegen.full'),  L('lib.BonusMagRegen.dnam'),  'AbDamageMagickaRate');
+  mS := AddBuffMgef(mgefTpl, PFX + 'MgefBonusStamRegen', L('lib.BonusStamRegen.full'), L('lib.BonusStamRegen.dnam'), 'AbDamageStaminaRateVisible');
+  if not Assigned(mH) or not Assigned(mM) or not Assigned(mS) then Exit;
 
   spelTpl := FindAbilityTemplate;
   if not Assigned(spelTpl) then begin
@@ -2098,33 +2137,32 @@ begin
   Problem('no vanilla MGEF (Script / Constant Effect / Self)');
 end;
 
-// Single-effect ability (AddAbility builds three).
+// Single-effect ability (AddAbility builds three). The effect is REBUILT on
+// every run, new or reused: CopyVanillaMgef churns the library MGEF FormIDs
+// each run, so a "reuse -> scrub -> exit" left the SPEL's EFID dangling (empty
+// effect list at runtime -> the ability does nothing). Same shape as AddAbility.
 function AddAbility1(tpl: IwbMainRecord; edid: string; fullName: string;
                      mgef: IwbMainRecord): IwbMainRecord;
 var
   effects, e: IInterface;
+  fresh     : Boolean;
 begin
-  Result := RecordByEDID(tgt, 'SPEL', edid);
-  if Assigned(Result) then begin
-    ScrubTemplate(Result);
-    Inc(reused);
-    Remember(edid, Result);
-    Exit;
-  end;
-
   if not Assigned(mgef) then begin
     Problem('нет эффекта для ' + edid);
     Exit;
   end;
 
-  Result := wbCopyElementToFile(tpl, tgt, True, True);
-  if not Assigned(Result) then begin
-    Problem('не скопировался SPEL ' + edid);
-    Exit;
+  Result := RecordByEDID(tgt, 'SPEL', edid);
+  fresh := not Assigned(Result);
+  if fresh then begin
+    Result := wbCopyElementToFile(tpl, tgt, True, True);
+    if not Assigned(Result) then begin
+      Problem('не скопировался SPEL ' + edid);
+      Exit;
+    end;
   end;
 
   ScrubTemplate(Result);
-
   PutEdit(Result, 'EDID', edid);
   PutEdit(Result, 'FULL', fullName);
 
@@ -2148,7 +2186,7 @@ begin
   PutNative(e, 'EFIT\Duration',  0);
 
   Remember(edid, Result);
-  Inc(madeNew);
+  if fresh then Inc(madeNew) else Inc(reused);
 end;
 
 procedure BuildMonitorAndQuest;
