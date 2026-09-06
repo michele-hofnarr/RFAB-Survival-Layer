@@ -13,455 +13,479 @@ GlobalVariable Function ModEnabled() global
 EndFunction
 
 GlobalVariable Function SleepGrace() global
-    return Game.GetFormFromFile(0x00000804, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000801, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function SleepMax() global
-    return Game.GetFormFromFile(0x00000805, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000802, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function SleepRestorePerHour() global
-    return Game.GetFormFromFile(0x00000806, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000803, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function SleepMinHours() global
-    return Game.GetFormFromFile(0x00000807, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000804, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function CombatFatigueMult() global
-    return Game.GetFormFromFile(0x00000BA4, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000805, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HungerGrace() global
-    return Game.GetFormFromFile(0x00000808, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000806, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HungerMax() global
-    return Game.GetFormFromFile(0x00000809, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000807, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HungerFoodPct() global
-    return Game.GetFormFromFile(0x00000848, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000808, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HungerSpecialFoodPct() global
-    return Game.GetFormFromFile(0x00000849, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000809, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionWinterhold() global
-    return Game.GetFormFromFile(0x00000856, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000080A, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionPale() global
-    return Game.GetFormFromFile(0x00000857, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000080B, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionEastmarch() global
-    return Game.GetFormFromFile(0x00000858, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000080C, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionReach() global
-    return Game.GetFormFromFile(0x00000859, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000080D, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionHjaalmarch() global
-    return Game.GetFormFromFile(0x0000085A, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000080E, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionHaafingar() global
-    return Game.GetFormFromFile(0x0000085B, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000080F, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionWhiterun() global
-    return Game.GetFormFromFile(0x0000085C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000810, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionFalkreath() global
-    return Game.GetFormFromFile(0x0000085D, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000811, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RegionRift() global
-    return Game.GetFormFromFile(0x0000085E, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function RegionDefault() global
-    return Game.GetFormFromFile(0x0000085F, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function RegionSnowFloor() global
-    return Game.GetFormFromFile(0x000008E3, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function RegionAltitude() global
-    return Game.GetFormFromFile(0x00000869, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function WeatherClear() global
-    return Game.GetFormFromFile(0x00000860, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function WeatherCloudy() global
-    return Game.GetFormFromFile(0x00000861, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function WeatherRain() global
-    return Game.GetFormFromFile(0x00000862, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function WeatherSnow() global
-    return Game.GetFormFromFile(0x00000863, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function NightMult() global
-    return Game.GetFormFromFile(0x00000864, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function SwimMult() global
-    return Game.GetFormFromFile(0x00000865, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function FireMult() global
-    return Game.GetFormFromFile(0x00000867, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function SevInterior() global
-    return Game.GetFormFromFile(0x00000855, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function SevColdInterior() global
-    return Game.GetFormFromFile(0x000008BD, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function AltitudeLow() global
-    return Game.GetFormFromFile(0x0000086A, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function AltitudeHigh() global
-    return Game.GetFormFromFile(0x0000086B, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function FireRadius() global
     return Game.GetFormFromFile(0x00000812, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function ColdRate() global
+GlobalVariable Function RegionDefault() global
     return Game.GetFormFromFile(0x00000813, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function WarmthPerSlot() global
+GlobalVariable Function RegionSnowFloor() global
     return Game.GetFormFromFile(0x00000814, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function ResistWeight() global
-    return Game.GetFormFromFile(0x00000868, "RFAB_SurvivalLayer.esp") as GlobalVariable
+GlobalVariable Function RegionAltitude() global
+    return Game.GetFormFromFile(0x00000815, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function DryMinutes() global
+GlobalVariable Function WeatherClear() global
     return Game.GetFormFromFile(0x00000816, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function FrostHitCold() global
-    return Game.GetFormFromFile(0x00000BA5, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function FireHitWarm() global
-    return Game.GetFormFromFile(0x00000BA6, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function ElemLesionEnabled() global
-    return Game.GetFormFromFile(0x00000C13, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function ElemLesionColdThr() global
-    return Game.GetFormFromFile(0x00000C14, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function ElemLesionHypoChance() global
-    return Game.GetFormFromFile(0x00000C15, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function ElemLesionHitP() global
-    return Game.GetFormFromFile(0x00000C16, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function ElemLesionContractP() global
-    return Game.GetFormFromFile(0x00000C17, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function ElemLesionBandageP() global
-    return Game.GetFormFromFile(0x00000C18, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function PenaltyPrimary() global
+GlobalVariable Function WeatherCloudy() global
     return Game.GetFormFromFile(0x00000817, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function PenaltyCross() global
+GlobalVariable Function WeatherRain() global
     return Game.GetFormFromFile(0x00000818, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function PenaltyCap() global
+GlobalVariable Function WeatherSnow() global
     return Game.GetFormFromFile(0x00000819, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function TierStep() global
+GlobalVariable Function NightMult() global
     return Game.GetFormFromFile(0x0000081A, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function ColdGrace() global
-    return Game.GetFormFromFile(0x0000084A, "RFAB_SurvivalLayer.esp") as GlobalVariable
+GlobalVariable Function SwimMult() global
+    return Game.GetFormFromFile(0x0000081B, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function WarmupMult() global
-    return Game.GetFormFromFile(0x0000086C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+GlobalVariable Function FireMult() global
+    return Game.GetFormFromFile(0x0000081C, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function HudWidget() global
-    return Game.GetFormFromFile(0x0000084C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+GlobalVariable Function SevInterior() global
+    return Game.GetFormFromFile(0x0000081D, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function HudColor() global
-    return Game.GetFormFromFile(0x00000CCB, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetAutoHide() global
-    return Game.GetFormFromFile(0x0000084D, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetX() global
-    return Game.GetFormFromFile(0x0000084E, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetY() global
-    return Game.GetFormFromFile(0x0000084F, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetScale() global
-    return Game.GetFormFromFile(0x00000850, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetAlpha() global
-    return Game.GetFormFromFile(0x00000851, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetHAnchor() global
-    return Game.GetFormFromFile(0x00000852, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function HudWidgetVAnchor() global
-    return Game.GetFormFromFile(0x00000853, "RFAB_SurvivalLayer.esp") as GlobalVariable
-EndFunction
-
-GlobalVariable Function PollInterval() global
+GlobalVariable Function SevColdInterior() global
     return Game.GetFormFromFile(0x0000081E, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function DebugLog() global
+GlobalVariable Function AltitudeLow() global
     return Game.GetFormFromFile(0x0000081F, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
+GlobalVariable Function AltitudeHigh() global
+    return Game.GetFormFromFile(0x00000820, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function FireRadius() global
+    return Game.GetFormFromFile(0x00000821, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdRate() global
+    return Game.GetFormFromFile(0x00000822, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function WarmthPerSlot() global
+    return Game.GetFormFromFile(0x00000825, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ResistWeight() global
+    return Game.GetFormFromFile(0x00000826, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function DryMinutes() global
+    return Game.GetFormFromFile(0x00000827, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function FrostHitCold() global
+    return Game.GetFormFromFile(0x00000828, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function FireHitWarm() global
+    return Game.GetFormFromFile(0x00000829, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionEnabled() global
+    return Game.GetFormFromFile(0x00000850, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionColdThr() global
+    return Game.GetFormFromFile(0x00000851, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionHypoChance() global
+    return Game.GetFormFromFile(0x00000852, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionHitP() global
+    return Game.GetFormFromFile(0x00000853, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionContractP() global
+    return Game.GetFormFromFile(0x00000854, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ElemLesionBandageP() global
+    return Game.GetFormFromFile(0x00000855, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function PenaltyPrimary() global
+    return Game.GetFormFromFile(0x0000082A, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function PenaltyCross() global
+    return Game.GetFormFromFile(0x0000082B, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function PenaltyCap() global
+    return Game.GetFormFromFile(0x0000082E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function TierStep() global
+    return Game.GetFormFromFile(0x0000082F, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdGrace() global
+    return Game.GetFormFromFile(0x00000823, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function WarmupMult() global
+    return Game.GetFormFromFile(0x00000824, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidget() global
+    return Game.GetFormFromFile(0x00000856, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudColor() global
+    return Game.GetFormFromFile(0x00000857, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetAutoHide() global
+    return Game.GetFormFromFile(0x00000858, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetX() global
+    return Game.GetFormFromFile(0x00000859, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetY() global
+    return Game.GetFormFromFile(0x0000085A, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetScale() global
+    return Game.GetFormFromFile(0x0000085B, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetAlpha() global
+    return Game.GetFormFromFile(0x0000085C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetHAnchor() global
+    return Game.GetFormFromFile(0x0000085D, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudWidgetVAnchor() global
+    return Game.GetFormFromFile(0x0000085E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function PollInterval() global
+    return Game.GetFormFromFile(0x0000085F, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function DebugLog() global
+    return Game.GetFormFromFile(0x00000860, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
 GlobalVariable Function PenaltySpeed() global
-    return Game.GetFormFromFile(0x00000831, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000082C, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function SpeedCap() global
-    return Game.GetFormFromFile(0x00000832, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000082D, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function ColdVisualShader() global
-    return Game.GetFormFromFile(0x0000083F, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000833, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function ColdVisualThreshold() global
-    return Game.GetFormFromFile(0x00000840, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000834, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function DiseaseEnabled() global
-    return Game.GetFormFromFile(0x00000841, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000083F, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function DiseaseProgressHours() global
-    return Game.GetFormFromFile(0x00000842, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000840, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function DiseaseDecayHours() global
-    return Game.GetFormFromFile(0x00000843, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000841, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function DiseaseHitChance() global
-    return Game.GetFormFromFile(0x0000087D, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000843, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function FoodPoisonChance() global
-    return Game.GetFormFromFile(0x0000089C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000844, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function RfabDzEnabled() global
-    return Game.GetFormFromFile(0x000008BE, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000842, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaEnabled() global
-    return Game.GetFormFromFile(0x000008A7, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000845, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaThreshold() global
-    return Game.GetFormFromFile(0x000008A8, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000846, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaRecoverThr() global
-    return Game.GetFormFromFile(0x000008A9, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000847, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaWorsenHours() global
-    return Game.GetFormFromFile(0x000008AA, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000848, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaRecoverHours() global
-    return Game.GetFormFromFile(0x000008AB, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000849, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaDrainPerSec() global
-    return Game.GetFormFromFile(0x000008AC, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000084A, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function HypothermiaDrainRamp() global
-    return Game.GetFormFromFile(0x000008BA, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000084B, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function ColdColdThreshold() global
-    return Game.GetFormFromFile(0x0000086D, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000084C, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function ColdColdChanceMin() global
-    return Game.GetFormFromFile(0x00000878, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000084D, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function ColdColdChanceMax() global
-    return Game.GetFormFromFile(0x00000879, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000084E, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function ColdColdChanceMaxAt() global
-    return Game.GetFormFromFile(0x0000087A, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000084F, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function BonusEnabled() global
-    return Game.GetFormFromFile(0x00000D3E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000830, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function BonusRegenPct() global
-    return Game.GetFormFromFile(0x00000D3F, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000831, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function BonusThresholdPct() global
-    return Game.GetFormFromFile(0x00000D40, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000832, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function WarmAnim() global
-    return Game.GetFormFromFile(0x00000E32, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000835, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function WarmAnimDelay() global
-    return Game.GetFormFromFile(0x00000E33, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000836, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function CampfireEnabled() global
-    return Game.GetFormFromFile(0x00000E34, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000837, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function CampfireBurnHours() global
-    return Game.GetFormFromFile(0x00000E35, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000838, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function CampfireFuel() global
-    return Game.GetFormFromFile(0x00000E36, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x00000839, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function CampfireCooldown() global
-    return Game.GetFormFromFile(0x00000E79, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000083A, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function WoodFromTrees() global
-    return Game.GetFormFromFile(0x00000E37, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000083B, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function TreeChopCooldownH() global
-    return Game.GetFormFromFile(0x00000E38, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000083C, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function TreeChopYield() global
-    return Game.GetFormFromFile(0x00000E39, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000083D, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function TreeChopRadius() global
-    return Game.GetFormFromFile(0x00000FD3, "RFAB_SurvivalLayer.esp") as GlobalVariable
+    return Game.GetFormFromFile(0x0000083E, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 ; --- abilities -----------------------------------------------------
 
 Spell Function AbSleep() global
-    return Game.GetFormFromFile(0x0000082A, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000086F, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbHunger() global
-    return Game.GetFormFromFile(0x0000082B, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000870, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbCold() global
-    return Game.GetFormFromFile(0x0000082C, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000871, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbBonusWarm() global
-    return Game.GetFormFromFile(0x00000D97, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000088B, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbBonusRest() global
-    return Game.GetFormFromFile(0x00000D98, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000088C, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbBonusFed() global
-    return Game.GetFormFromFile(0x00000D99, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000088D, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbMonitor() global
-    return Game.GetFormFromFile(0x0000082E, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000911, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function PowerCampfire() global
-    return Game.GetFormFromFile(0x00000E51, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000088F, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+MagicEffect Function MgefLightCampfire() global
+    return Game.GetFormFromFile(0x0000088E, "RFAB_SurvivalLayer.esp") as MagicEffect
+EndFunction
+
+Form Function CampfireLit() global
+    return Game.GetFormFromFile(0x0000099E, "RFAB_SurvivalLayer.esp") as Form
+EndFunction
+
+Form Function BedrollItem() global
+    return Game.GetFormFromFile(0x00000895, "RFAB_SurvivalLayer.esp") as Form
+EndFunction
+
+Furniture Function BedrollFurn() global
+    return Game.GetFormFromFile(0x00000896, "RFAB_SurvivalLayer.esp") as Furniture
 EndFunction
 
 Message Function MsgCampLit() global
-    return Game.GetFormFromFile(0x00000E52, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x00000890, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgCampOut() global
+    return Game.GetFormFromFile(0x00000891, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgCampConfirm() global
+    return Game.GetFormFromFile(0x00000A4A, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgCampNoFuel() global
-    return Game.GetFormFromFile(0x00000E53, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x00000892, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgCampNoPerk() global
-    return Game.GetFormFromFile(0x00000E54, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x00000893, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgTreeCooldown() global
-    return Game.GetFormFromFile(0x00000E55, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x00000894, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; --- misc ----------------------------------------------------------
 
 FormList Function FireSources() global
-    return Game.GetFormFromFile(0x00000820, "RFAB_SurvivalLayer.esp") as FormList
+    return Game.GetFormFromFile(0x00000861, "RFAB_SurvivalLayer.esp") as FormList
 EndFunction
 
 FormList Function ColdInteriors() global
-    return Game.GetFormFromFile(0x000008BF, "RFAB_SurvivalLayer.esp") as FormList
+    return Game.GetFormFromFile(0x00000862, "RFAB_SurvivalLayer.esp") as FormList
 EndFunction
 
 Quest Function QstMCM() global
-    return Game.GetFormFromFile(0x00000830, "RFAB_SurvivalLayer.esp") as Quest
+    return Game.GetFormFromFile(0x00000913, "RFAB_SurvivalLayer.esp") as Quest
 EndFunction
 
 Quest Function QstWidget() global
-    return Game.GetFormFromFile(0x00000854, "RFAB_SurvivalLayer.esp") as Quest
+    return Game.GetFormFromFile(0x00000914, "RFAB_SurvivalLayer.esp") as Quest
 EndFunction
 
 ; --- vanilla forms -----------------------------------------------
@@ -589,173 +613,173 @@ EndFunction
 ; --- diseases: common cold --------------------------------------
 
 Spell Function DiseaseColdCommon1() global
-    return Game.GetFormFromFile(0x00000871, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000898, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function DiseaseColdCommon2() global
-    return Game.GetFormFromFile(0x00000872, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000089A, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function DiseaseColdCommon3() global
-    return Game.GetFormFromFile(0x00000873, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x0000089C, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Message Function MsgColdCommon1() global
-    return Game.GetFormFromFile(0x00000874, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000089E, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgColdCommon2() global
-    return Game.GetFormFromFile(0x00000875, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000089F, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgColdCommon3() global
-    return Game.GetFormFromFile(0x00000876, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008A0, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgColdCommonCured() global
-    return Game.GetFormFromFile(0x00000877, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008A1, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; --- diseases: OnHit ------------------------------------------
 
 Spell Function DiseaseBrownRot1() global
-    return Game.GetFormFromFile(0x00000881, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseBrownRot2() global
-    return Game.GetFormFromFile(0x00000882, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseBrownRot3() global
-    return Game.GetFormFromFile(0x00000883, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgBrownRot1() global
-    return Game.GetFormFromFile(0x00000884, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgBrownRot2() global
-    return Game.GetFormFromFile(0x00000885, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgBrownRot3() global
-    return Game.GetFormFromFile(0x00000886, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgBrownRotCured() global
-    return Game.GetFormFromFile(0x00000887, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DiseaseGutworm1() global
-    return Game.GetFormFromFile(0x0000088B, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseGutworm2() global
-    return Game.GetFormFromFile(0x0000088C, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseGutworm3() global
-    return Game.GetFormFromFile(0x0000088D, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgGutworm1() global
-    return Game.GetFormFromFile(0x0000088E, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgGutworm2() global
-    return Game.GetFormFromFile(0x0000088F, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgGutworm3() global
-    return Game.GetFormFromFile(0x00000890, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgGutwormCured() global
-    return Game.GetFormFromFile(0x00000891, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DiseaseGreenspore1() global
-    return Game.GetFormFromFile(0x00000895, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseGreenspore2() global
-    return Game.GetFormFromFile(0x00000896, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseGreenspore3() global
-    return Game.GetFormFromFile(0x00000897, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgGreenspore1() global
-    return Game.GetFormFromFile(0x00000898, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgGreenspore2() global
-    return Game.GetFormFromFile(0x00000899, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgGreenspore3() global
-    return Game.GetFormFromFile(0x0000089A, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgGreensporeCured() global
-    return Game.GetFormFromFile(0x0000089B, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DiseaseFoodPoison1() global
-    return Game.GetFormFromFile(0x000008A0, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseFoodPoison2() global
-    return Game.GetFormFromFile(0x000008A1, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DiseaseFoodPoison3() global
     return Game.GetFormFromFile(0x000008A2, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
+Spell Function DiseaseBrownRot2() global
+    return Game.GetFormFromFile(0x000008A4, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseBrownRot3() global
+    return Game.GetFormFromFile(0x000008A6, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgBrownRot1() global
+    return Game.GetFormFromFile(0x000008A8, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgBrownRot2() global
+    return Game.GetFormFromFile(0x000008A9, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgBrownRot3() global
+    return Game.GetFormFromFile(0x000008AA, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgBrownRotCured() global
+    return Game.GetFormFromFile(0x000008AB, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DiseaseGutworm1() global
+    return Game.GetFormFromFile(0x000008AC, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseGutworm2() global
+    return Game.GetFormFromFile(0x000008AE, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseGutworm3() global
+    return Game.GetFormFromFile(0x000008B0, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgGutworm1() global
+    return Game.GetFormFromFile(0x000008B2, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgGutworm2() global
+    return Game.GetFormFromFile(0x000008B3, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgGutworm3() global
+    return Game.GetFormFromFile(0x000008B4, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgGutwormCured() global
+    return Game.GetFormFromFile(0x000008B5, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DiseaseGreenspore1() global
+    return Game.GetFormFromFile(0x000008B6, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseGreenspore2() global
+    return Game.GetFormFromFile(0x000008B8, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseGreenspore3() global
+    return Game.GetFormFromFile(0x000008BA, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgGreenspore1() global
+    return Game.GetFormFromFile(0x000008BC, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgGreenspore2() global
+    return Game.GetFormFromFile(0x000008BD, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgGreenspore3() global
+    return Game.GetFormFromFile(0x000008BE, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgGreensporeCured() global
+    return Game.GetFormFromFile(0x000008BF, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DiseaseFoodPoison1() global
+    return Game.GetFormFromFile(0x000008C0, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseFoodPoison2() global
+    return Game.GetFormFromFile(0x000008C2, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DiseaseFoodPoison3() global
+    return Game.GetFormFromFile(0x000008C4, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
 Message Function MsgFoodPoison1() global
-    return Game.GetFormFromFile(0x000008A3, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008C6, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgFoodPoison2() global
-    return Game.GetFormFromFile(0x000008A4, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008C7, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgFoodPoison3() global
-    return Game.GetFormFromFile(0x000008A5, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008C8, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgFoodPoisonCured() global
-    return Game.GetFormFromFile(0x000008A6, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008C9, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Spell Function DiseaseElemLesion1() global
-    return Game.GetFormFromFile(0x00000C3E, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x000008CA, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function DiseaseElemLesion2() global
-    return Game.GetFormFromFile(0x00000C40, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x000008CC, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function DiseaseElemLesion3() global
-    return Game.GetFormFromFile(0x00000C42, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x000008CE, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Message Function MsgElemLesion1() global
-    return Game.GetFormFromFile(0x00000C44, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008D0, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgElemLesion2() global
-    return Game.GetFormFromFile(0x00000C45, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008D1, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgElemLesion3() global
-    return Game.GetFormFromFile(0x00000C46, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008D2, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgElemLesionCured() global
-    return Game.GetFormFromFile(0x00000C47, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x000008D3, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; --- RFAB disease wrappers (stage 1 = RFAB, stages 2/3 = ours) --
@@ -817,177 +841,177 @@ MagicEffect Function RfabDzMarkDR() global
 EndFunction
 
 Spell Function DzAT2() global
-    return Game.GetFormFromFile(0x000008C0, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DzAT3() global
-    return Game.GetFormFromFile(0x000008C1, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgDzAT2() global
-    return Game.GetFormFromFile(0x000008C2, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzAT3() global
-    return Game.GetFormFromFile(0x000008C3, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzATCured() global
-    return Game.GetFormFromFile(0x000008C4, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DzRJ2() global
-    return Game.GetFormFromFile(0x000008C5, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DzRJ3() global
-    return Game.GetFormFromFile(0x000008C6, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgDzRJ2() global
-    return Game.GetFormFromFile(0x000008C7, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzRJ3() global
-    return Game.GetFormFromFile(0x000008C8, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzRJCured() global
-    return Game.GetFormFromFile(0x000008C9, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DzWB2() global
-    return Game.GetFormFromFile(0x000008CA, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DzWB3() global
-    return Game.GetFormFromFile(0x000008CB, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgDzWB2() global
-    return Game.GetFormFromFile(0x000008CC, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzWB3() global
-    return Game.GetFormFromFile(0x000008CD, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzWBCured() global
-    return Game.GetFormFromFile(0x000008CE, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DzRA2() global
-    return Game.GetFormFromFile(0x000008CF, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DzRA3() global
-    return Game.GetFormFromFile(0x000008D0, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgDzRA2() global
-    return Game.GetFormFromFile(0x000008D1, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzRA3() global
-    return Game.GetFormFromFile(0x000008D2, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzRACured() global
-    return Game.GetFormFromFile(0x000008D3, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Spell Function DzBF2() global
     return Game.GetFormFromFile(0x000008D4, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
-Spell Function DzBF3() global
-    return Game.GetFormFromFile(0x000008D5, "RFAB_SurvivalLayer.esp") as Spell
+Spell Function DzAT3() global
+    return Game.GetFormFromFile(0x000008D6, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
-Message Function MsgDzBF2() global
-    return Game.GetFormFromFile(0x000008D6, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzBF3() global
-    return Game.GetFormFromFile(0x000008D7, "RFAB_SurvivalLayer.esp") as Message
-EndFunction
-
-Message Function MsgDzBFCured() global
+Message Function MsgDzAT2() global
     return Game.GetFormFromFile(0x000008D8, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
-Spell Function DzBRR2() global
-    return Game.GetFormFromFile(0x000008D9, "RFAB_SurvivalLayer.esp") as Spell
+Message Function MsgDzAT3() global
+    return Game.GetFormFromFile(0x000008D9, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
-Spell Function DzBRR3() global
-    return Game.GetFormFromFile(0x000008DA, "RFAB_SurvivalLayer.esp") as Spell
+Message Function MsgDzATCured() global
+    return Game.GetFormFromFile(0x000008DA, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
-Message Function MsgDzBRR2() global
-    return Game.GetFormFromFile(0x000008DB, "RFAB_SurvivalLayer.esp") as Message
+Spell Function DzRJ2() global
+    return Game.GetFormFromFile(0x000008DB, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
-Message Function MsgDzBRR3() global
-    return Game.GetFormFromFile(0x000008DC, "RFAB_SurvivalLayer.esp") as Message
+Spell Function DzRJ3() global
+    return Game.GetFormFromFile(0x000008DD, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
-Message Function MsgDzBRRCured() global
-    return Game.GetFormFromFile(0x000008DD, "RFAB_SurvivalLayer.esp") as Message
+Message Function MsgDzRJ2() global
+    return Game.GetFormFromFile(0x000008DF, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
-Spell Function DzDR2() global
-    return Game.GetFormFromFile(0x000008DE, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Spell Function DzDR3() global
-    return Game.GetFormFromFile(0x000008DF, "RFAB_SurvivalLayer.esp") as Spell
-EndFunction
-
-Message Function MsgDzDR2() global
+Message Function MsgDzRJ3() global
     return Game.GetFormFromFile(0x000008E0, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
-Message Function MsgDzDR3() global
+Message Function MsgDzRJCured() global
     return Game.GetFormFromFile(0x000008E1, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
+Spell Function DzWB2() global
+    return Game.GetFormFromFile(0x000008E2, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DzWB3() global
+    return Game.GetFormFromFile(0x000008E4, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgDzWB2() global
+    return Game.GetFormFromFile(0x000008E6, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzWB3() global
+    return Game.GetFormFromFile(0x000008E7, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzWBCured() global
+    return Game.GetFormFromFile(0x000008E8, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DzRA2() global
+    return Game.GetFormFromFile(0x000008E9, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DzRA3() global
+    return Game.GetFormFromFile(0x000008EB, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgDzRA2() global
+    return Game.GetFormFromFile(0x000008ED, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzRA3() global
+    return Game.GetFormFromFile(0x000008EE, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzRACured() global
+    return Game.GetFormFromFile(0x000008EF, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DzBF2() global
+    return Game.GetFormFromFile(0x000008F0, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DzBF3() global
+    return Game.GetFormFromFile(0x000008F2, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgDzBF2() global
+    return Game.GetFormFromFile(0x000008F4, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzBF3() global
+    return Game.GetFormFromFile(0x000008F5, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzBFCured() global
+    return Game.GetFormFromFile(0x000008F6, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DzBRR2() global
+    return Game.GetFormFromFile(0x000008F7, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DzBRR3() global
+    return Game.GetFormFromFile(0x000008F9, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgDzBRR2() global
+    return Game.GetFormFromFile(0x000008FB, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzBRR3() global
+    return Game.GetFormFromFile(0x000008FC, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzBRRCured() global
+    return Game.GetFormFromFile(0x000008FD, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Spell Function DzDR2() global
+    return Game.GetFormFromFile(0x000008FE, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function DzDR3() global
+    return Game.GetFormFromFile(0x00000900, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgDzDR2() global
+    return Game.GetFormFromFile(0x00000902, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgDzDR3() global
+    return Game.GetFormFromFile(0x00000903, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
 Message Function MsgDzDRCured() global
-    return Game.GetFormFromFile(0x000008E2, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x00000904, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; --- hypothermia ---------------------------------------------
 
 Spell Function AbHypo1() global
-    return Game.GetFormFromFile(0x000008B0, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000905, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbHypo2() global
-    return Game.GetFormFromFile(0x000008B1, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000907, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Spell Function AbHypo3() global
-    return Game.GetFormFromFile(0x000008B2, "RFAB_SurvivalLayer.esp") as Spell
+    return Game.GetFormFromFile(0x00000909, "RFAB_SurvivalLayer.esp") as Spell
 EndFunction
 
 Message Function MsgHypo1() global
-    return Game.GetFormFromFile(0x000008B3, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000090B, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgHypo2() global
-    return Game.GetFormFromFile(0x000008B4, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000090C, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgHypo3() global
-    return Game.GetFormFromFile(0x000008B5, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000090D, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgHypoCured() global
-    return Game.GetFormFromFile(0x000008B6, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000090E, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 Message Function MsgHypoNoRest() global
-    return Game.GetFormFromFile(0x000008B7, "RFAB_SurvivalLayer.esp") as Message
+    return Game.GetFormFromFile(0x0000090F, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; cure-disease effects (from ScanCureEffects). No FLST -> no master.

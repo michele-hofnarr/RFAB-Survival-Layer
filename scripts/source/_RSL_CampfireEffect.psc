@@ -1,38 +1,41 @@
 Scriptname _RSL_CampfireEffect extends ActiveMagicEffect
 {Feature 5/6: the "Развести костёр" lesser power (_RSL_PowerCampfire).
 
- Perk-gated (RFAB "Основы выживания"), real-time cooldown, consumes
- _RSL_CampfireFuel x Firewood01. Places a burning campfire in front of the
- player - plus a cooking spit + pot when the player also has RFAB "Кулинар".
- Every placed ref is snapped to the nearest navmesh so it sits on the ground.
+ The work is in the global LightCampfire() so it can be driven two ways:
+   - this MGEF's OnEffectStart (the clean path), and
+   - _RSL_Controller.OnMagicEffectApply as a fallback (that hook is known to
+     fire; a scripted VMAD on a cast power's MGEF is not always reliable).
+ The real-time cooldown stamp de-dupes the two.
 
- Refs and the burn deadline are tracked in StorageUtil (_RSL_CampRef /
- _RSL_CampSpitRef / _RSL_CampCookRef / _RSL_CampUntil); the deadline and all
- cleanup live in _RSL_Controller (RemovePrevCampfire + the tick / teardown) so
- re-light, expiry, load and teardown share one path.
-
- The campfire is a vanilla Campfire01Burning whose EditorID matches the
- fire-source scan, so Severity() already treats it as a heat source.}
+ Perk-gated (RFAB "Основы выживания"), consumes _RSL_CampfireFuel x Firewood01.
+ Places _RSL_CampfireLit (an ACTI wearing the Campfire01Burning model, carrying
+ _RSL_CampfirePlaced for activate-to-extinguish) in front of the player - plus a
+ cook spit + pot with RFAB "Кулинар". Refs and the burn deadline live in
+ StorageUtil; cleanup / expiry are in _RSL_Controller.}
 
 Event OnEffectStart(Actor akTarget, Actor akCaster)
-    Actor p = Game.GetPlayer()
+    LightCampfire(Game.GetPlayer())
+    Dispel()          ; Constant Effect - remove ourselves so this is a one-shot
+EndEvent
 
+Function LightCampfire(Actor p) global
+    If !p
+        return
+    EndIf
     GlobalVariable ge = _RSL_Forms.CampfireEnabled()
     If ge && ge.GetValue() < 0.5
         return
     EndIf
 
-    ; cooldown - also rate-limits the "no fuel/perk" notifications.
-    ; GetCurrentRealTime() resets to ~0 each launch; a persisted stamp from a
-    ; prior session reads larger than now -> ignore it (else stuck "on cooldown").
+    ; cooldown - also de-dupes OnEffectStart vs the controller fallback, and
+    ; rate-limits the "no fuel/perk" notifications. GetCurrentRealTime() resets
+    ; to ~0 each launch; a stamp from a prior session reads larger than now.
     float nowRT = Utility.GetCurrentRealTime()
     float lastRT = StorageUtil.GetFloatValue(p, "_RSL_CampCastRT", -999.0)
     If lastRT > nowRT
         lastRT = -999.0
     EndIf
-    _RSL_Log.W("CampfireEffect OnEffectStart: nowRT=" + nowRT + " lastRT=" + lastRT + " cd=" + Cooldown())
     If nowRT - lastRT < Cooldown()
-        _RSL_Log.W("CampfireEffect: on cooldown, ignored")
         return
     EndIf
     StorageUtil.SetFloatValue(p, "_RSL_CampCastRT", nowRT)
@@ -50,31 +53,25 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
         return
     EndIf
 
-    Form base = _RSL_Forms.BaseCampfire()
+    Form base = _RSL_Forms.CampfireLit()
     If !base
-        _RSL_Log.W("CampfireEffect: BaseCampfire is None - _RSL_Forms stale")
+        base = _RSL_Forms.BaseCampfire()   ; fallback if the plugin lacks _RSL_CampfireLit
+    EndIf
+    If !base
+        _RSL_Log.W("LightCampfire: no campfire base - _RSL_Forms stale")
         return
     EndIf
 
     p.RemoveItem(wood, need)
 
     ; grab the previous set BEFORE placing the new one - it is cleaned up only
-    ; AFTER the new campfire is up, so a cleanup stall can never leave the player
-    ; with no campfire and spent firewood.
+    ; AFTER the new campfire is up (see _RSL_Controller.CampfireGC).
     ObjectReference oldFire = StorageUtil.GetFormValue(p, "_RSL_CampRef") as ObjectReference
     ObjectReference oldSpit = StorageUtil.GetFormValue(p, "_RSL_CampSpitRef") as ObjectReference
     ObjectReference oldPot  = StorageUtil.GetFormValue(p, "_RSL_CampCookRef") as ObjectReference
 
     float a = p.GetAngleZ()
-    float dist = 110.0
-    float px = p.GetPositionX() + Math.Sin(a) * dist
-    float py = p.GetPositionY() + Math.Cos(a) * dist
-    float pz = p.GetPositionZ()
-
-    ObjectReference r = PlaceGrounded(p, base, px, py, pz, a)
-    float fx = r.GetPositionX()
-    float fy = r.GetPositionY()
-    float fz = r.GetPositionZ()
+    ObjectReference r = PlaceRel(p, base, p, Math.Sin(a) * 110.0, Math.Cos(a) * 110.0, 0.0, a)
 
     ObjectReference rs = None
     ObjectReference rp = None
@@ -82,18 +79,13 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
     Form spitBase = _RSL_Forms.BaseCookSpit()
     Form potBase  = _RSL_Forms.BaseCookPot()
     If chef && p.HasPerk(chef) && spitBase && potBase
-        rs = PlaceGrounded(p, spitBase, fx, fy, fz, a)
-        ; pot hangs on the spit - NOT grounded. Hardcoded offset compensates the
-        ; off-centre CraftingCookingPotSm mesh pivot. fwd/side in the facing frame.
+        rs = PlaceRel(p, spitBase, r, 0.0, 0.0, 0.0, a)
         float fwd  = -47.0
         float side = 0.0
         float up   = -13.3
-        rp = p.PlaceAtMe(potBase, 1, false, true)
-        rp.SetPosition(fx + Math.Sin(a) * fwd + Math.Cos(a) * side, \
-                       fy + Math.Cos(a) * fwd - Math.Sin(a) * side, \
-                       fz + up)
-        rp.SetAngle(0.0, 0.0, a)
-        rp.Enable()
+        rp = PlaceRel(p, potBase, r, \
+            Math.Sin(a) * fwd + Math.Cos(a) * side, \
+            Math.Cos(a) * fwd - Math.Sin(a) * side, up, a)
     EndIf
 
     StorageUtil.SetFormValue(p, "_RSL_CampRef", r)
@@ -103,34 +95,31 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
         Utility.GetCurrentGameTime() + BurnHours() / 24.0)
 
     ShowMsg(_RSL_Forms.MsgCampLit())
-    _RSL_Log.W("CampfireEffect: lit " + r + " until day " \
+    _RSL_Log.W("LightCampfire: lit " + r + " until day " \
         + StorageUtil.GetFloatValue(p, "_RSL_CampUntil", 0.0))
 
-    ; new set is up and tracked - now retire the old set
-    KillRef(oldFire)
-    KillRef(oldSpit)
-    KillRef(oldPot)
-EndEvent
-
-Function KillRef(ObjectReference r)
-    If r
-        r.DisableNoWait()
-        r.Delete()
+    If oldFire
+        StorageUtil.FormListAdd(p, "_RSL_CampGC", oldFire, false)
+    EndIf
+    If oldSpit
+        StorageUtil.FormListAdd(p, "_RSL_CampGC", oldSpit, false)
+    EndIf
+    If oldPot
+        StorageUtil.FormListAdd(p, "_RSL_CampGC", oldPot, false)
     EndIf
 EndFunction
 
-; Place disabled at (x,y,z), snap to the nearest navmesh (drops it onto the
-; ground), then enable. Returns the ref.
-ObjectReference Function PlaceGrounded(Actor p, Form base, float x, float y, float z, float angZ)
+; Place (disabled), MoveTo anchor + world offset, set heading, player-own, enable.
+ObjectReference Function PlaceRel(Actor p, Form base, ObjectReference anchor, float ox, float oy, float oz, float angZ) global
     ObjectReference o = p.PlaceAtMe(base, 1, false, true)
-    o.SetPosition(x, y, z)
     o.SetAngle(0.0, 0.0, angZ)
-    PO3_SKSEFunctions.MoveToNearestNavmeshLocation(o)
+    o.MoveTo(anchor, ox, oy, oz, false)
+    o.SetActorOwner(p.GetActorBase())
     o.Enable()
     return o
 EndFunction
 
-float Function Cooldown()
+float Function Cooldown() global
     GlobalVariable g = _RSL_Forms.CampfireCooldown()
     If g && g.GetValue() >= 0.0
         return g.GetValue()
@@ -138,7 +127,7 @@ float Function Cooldown()
     return 5.0
 EndFunction
 
-int Function FuelNeeded()
+int Function FuelNeeded() global
     GlobalVariable g = _RSL_Forms.CampfireFuel()
     int n = 1
     If g
@@ -150,7 +139,7 @@ int Function FuelNeeded()
     return n
 EndFunction
 
-float Function BurnHours()
+float Function BurnHours() global
     GlobalVariable g = _RSL_Forms.CampfireBurnHours()
     If g && g.GetValue() > 0.0
         return g.GetValue()
@@ -158,7 +147,7 @@ float Function BurnHours()
     return 4.0
 EndFunction
 
-Function ShowMsg(Message m)
+Function ShowMsg(Message m) global
     If m
         m.Show()
     EndIf

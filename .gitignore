@@ -21,5 +21,8 @@ meta.ini
 #   .swf   <- build_widget.sh (FFDec) from widget/*.as; _base_* is an SDK input
 scripts/*.pex
 RFAB_SurvivalLayer.esp
+*.esp.old
+*.esp.save*
+*.bak
 Interface/**/*.swf
 widget/*.swf

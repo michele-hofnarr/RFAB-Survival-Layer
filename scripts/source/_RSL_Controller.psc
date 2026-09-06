@@ -51,6 +51,7 @@ Form    fwFirewood        ; Firewood01
 Weapon  woodAxe           ; Axe01 / RFAB wood axe
 Armor   backpack          ; RFAB "Рюкзак авантюриста"
 Spell   powCampfire       ; _RSL_PowerCampfire (granted with the perk)
+MagicEffect mgefLightCampfire   ; its effect - watched in OnMagicEffectApply
 
 Spell    sCC1
 Spell    sCC2
@@ -267,7 +268,7 @@ EndEvent
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 44   ; v44: cook-pot offset debug sliders
+int SETTINGS_VERSION = 46   ; v46: TreeChopRadius back to 100
 
 Function MigrateSettings()
     If !ready
@@ -477,6 +478,7 @@ Function Bind()
     woodAxe     = _RSL_Forms.WoodAxe()
     backpack    = _RSL_Forms.Backpack()
     powCampfire = _RSL_Forms.PowerCampfire()
+    mgefLightCampfire = _RSL_Forms.MgefLightCampfire()
 
     gModEnabled          = _RSL_Forms.ModEnabled()
     gSleepGrace          = _RSL_Forms.SleepGrace()
@@ -1895,27 +1897,43 @@ Function CampfireTick()
         RemovePrevCampfire(pl)
         _RSL_Log.W("CampfireTick: campfire burned out")
     EndIf
+    CampfireGC(pl)
 EndFunction
 
-; Disable+Delete the tracked campfire (and its cook pot) and clear the keys.
-; Global so _RSL_CampfireEffect (re-light) and TeardownAll share it. One
-; tracked ref per kind; always Delete(), not just Disable() - no save bloat.
+; Retire the tracked campfire set. Global so _RSL_CampfireEffect (re-light) and
+; TeardownAll share it.
 Function RemovePrevCampfire(Actor p) global
     DropCampRef(p, "_RSL_CampRef")
     DropCampRef(p, "_RSL_CampSpitRef")
     DropCampRef(p, "_RSL_CampCookRef")
     StorageUtil.UnsetFloatValue(p, "_RSL_CampUntil")
+    CampfireGC(p)
 EndFunction
 
+; Queue a placed ref for deletion instead of deleting it inline: Disable/Delete
+; do NOT process on a ref whose cell is unloaded (light a campfire outside, go
+; into a cave, light another - the outdoor one would never die). CampfireGC
+; retries every tick and clears entries once the cell loads and the ref is gone.
 Function DropCampRef(Actor p, string storeKey) global
     ObjectReference r = StorageUtil.GetFormValue(p, storeKey) as ObjectReference
-    ; clear the key FIRST - if the disable/delete below ever misbehaves, the next
-    ; cast must not retry the same broken ref.
     StorageUtil.UnsetFormValue(p, storeKey)
     If r
-        r.DisableNoWait()   ; NOT Disable() - that is latent and can stall the caster's thread
-        r.Delete()
+        StorageUtil.FormListAdd(p, "_RSL_CampGC", r, false)
     EndIf
+EndFunction
+
+Function CampfireGC(Actor p) global
+    int i = StorageUtil.FormListCount(p, "_RSL_CampGC") - 1
+    While i >= 0
+        ObjectReference r = StorageUtil.FormListGet(p, "_RSL_CampGC", i) as ObjectReference
+        If !r || r.IsDeleted()
+            StorageUtil.FormListRemoveAt(p, "_RSL_CampGC", i)
+        Else
+            r.DisableNoWait()
+            r.Delete()          ; queues if the cell is loaded; harmless to repeat
+        EndIf
+        i -= 1
+    EndWhile
 EndFunction
 
 ; 1 - AV/100, clamped [0, 2]: full resist -> 0 (no effect), no resist -> 1,
@@ -2208,6 +2226,16 @@ EndFunction
 ; Disease spells" with our re-add in the same frame).
 Event OnMagicEffectApply(ObjectReference akCaster, MagicEffect akEffect)
     If !ready || !akEffect
+        return
+    EndIf
+
+    ; The campfire power's effect: light it from here. The MGEF's own VMAD script
+    ; (_RSL_CampfireEffect.OnEffectStart) is the primary path, but a scripted
+    ; effect on a cast power does not always run; LightCampfire's cooldown stamp
+    ; de-dupes if both fire.
+    If mgefLightCampfire && akEffect == mgefLightCampfire
+        _RSL_Log.W("MGEFApply: campfire effect -> LightCampfire")
+        _RSL_CampfireEffect.LightCampfire(pl)
         return
     EndIf
 

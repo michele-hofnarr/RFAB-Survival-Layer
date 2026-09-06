@@ -585,7 +585,9 @@ begin
   fid := GetLoadOrderFormID(r);
   if (fid = 0) or ((fid and $00FFFFFF) = 0) then Exit;
   if FlstHasFid(items, fid) then Exit;
-  AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(r))));
+  // never add tgt as its own master (self-master -> a recursive / broken esp)
+  if not SameText(GetFileName(GetFile(MasterOrSelf(r))), GetFileName(tgt)) then
+    AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(r))));
   el := ElementAssign(items, HighInteger, nil, False);
   if not Assigned(el) then Exit;
   SetNativeValue(el, fid);
@@ -1465,6 +1467,65 @@ begin
   Inc(madeNew);
 end;
 
+// A vanilla 2-button Message Box MESG to copy (adding the Menu Buttons array
+// from scratch is fragile). MessageBox.Show() returns the button index.
+function FindMsgBoxTemplate: IwbMainRecord;
+var
+  grp: IwbGroupRecord;
+  r  : IwbMainRecord;
+  i  : Integer;
+  btns: IInterface;
+begin
+  Result := nil;
+  grp := GroupBySignature(FileByName('Skyrim.esm'), 'MESG');
+  if not Assigned(grp) then Exit;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    if (GetNativeValue(ElementByPath(r, 'DNAM')) and 1) = 1 then begin
+      btns := ElementByName(r, 'Menu Buttons');
+      if Assigned(btns) and (ElementCount(btns) >= 2) then begin
+        Result := r;
+        Say('  message-box template: ' + EditorID(r));
+        Exit;
+      end;
+    end;
+  end;
+  Problem('no 2-button Message Box MESG in Skyrim.esm');
+end;
+
+// A yes/no confirm box: copy a message-box template, retarget DESC + button 0/1.
+function AddMsgConfirm(tpl: IwbMainRecord; edid, body, btn0, btn1: string): IwbMainRecord;
+var
+  btns: IInterface;
+  i: Integer;
+begin
+  if not Assigned(tpl) then Exit;
+  Result := RecordByEDID(tgt, 'MESG', edid);
+  if not Assigned(Result) then begin
+    Result := wbCopyElementToFile(tpl, tgt, True, True);
+    if not Assigned(Result) then begin Problem('MESG confirm not copied ' + edid); Exit; end;
+    PutEdit(Result, 'EDID', edid);
+    Inc(madeNew);
+  end else
+    Inc(reused);
+  DropElement(Result, 'ITXT');            // no full-screen title
+  DropElement(Result, 'INAM');            // no icon
+  PutEdit(Result, 'DESC', body);
+  PutNative(Result, 'DNAM', 1);           // Message Box
+  btns := ElementByName(Result, 'Menu Buttons');
+  if Assigned(btns) then begin
+    while ElementCount(btns) > 2 do RemoveByIndex(btns, 2, True);
+    for i := 0 to Pred(ElementCount(btns)) do
+      DropElement(ElementByIndex(btns, i), 'Conditions');
+    if ElementCount(btns) > 0 then PutEdit(ElementByIndex(btns, 0), 'ITXT', btn0);
+    if ElementCount(btns) > 1 then PutEdit(ElementByIndex(btns, 1), 'ITXT', btn1);
+    Say('  confirm MESG ' + edid + ' buttons=[' + GetElementEditValues(ElementByIndex(btns, 0), 'ITXT')
+      + ', ' + GetElementEditValues(ElementByIndex(btns, 1), 'ITXT') + ']');
+  end else
+    Problem('no Menu Buttons in ' + edid);
+  Remember(edid, Result);
+end;
+
 // A stage SPEL built from the penalty library. `effSpec` is a comma list of
 // "MgefStem=mag" (mag = integer: % for RateMult/school-cost, points for
 // SpeedMult/Sneak/CarryWeight/max-pool). Effects appended in order. Empty
@@ -2081,8 +2142,11 @@ begin
   vmad := ElementByPath(rec, 'VMAD');
   if not Assigned(vmad) then
     vmad := Add(rec, 'VMAD', True);
+  if not Assigned(vmad) then
+    vmad := Add(rec, 'VMAD - Virtual Machine Adapter', True);   // MSTT needs the full name
   if not Assigned(vmad) then begin
-    Problem('VMAD not created in ' + EditorID(rec));
+    Problem('VMAD not created in ' + EditorID(rec)
+      + ' - add it by hand (right-click -> Add -> VMAD) and rerun');
     Exit;
   end;
 
@@ -2275,6 +2339,30 @@ begin
   Say('  no Fire-and-Forget script MGEF in Skyrim.esm - using constant-effect one');
 end;
 
+// First Skyrim.esm ACTI that has a Model and no script / destruction data - a
+// clean structural template to copy (a from-scratch ACTI has no Model struct
+// and PutEdit cannot create the nested Model\MODL).
+function FindActiTemplate: IwbMainRecord;
+var
+  grp: IwbGroupRecord;
+  r  : IwbMainRecord;
+  i  : Integer;
+begin
+  Result := nil;
+  grp := GroupBySignature(FileByName('Skyrim.esm'), 'ACTI');
+  if not Assigned(grp) then Exit;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    if Assigned(ElementByName(r, 'Model'))
+       and not Assigned(ElementByPath(r, 'VMAD'))
+       and not Assigned(ElementByName(r, 'Destructible')) then begin
+      Result := r;
+      Say('  ACTI template: ' + EditorID(r));
+      Exit;
+    end;
+  end;
+end;
+
 // Set an enum sub-field by label without logging a PROBLEM on a bad label -
 // returns whether the value now reads back as `v`. Lets BuildCampfire probe
 // which label string this xEdit build accepts.
@@ -2299,16 +2387,63 @@ end;
 // v0.3.0 notifications.
 procedure BuildCampfire;
 var
-  mgefTpl, spelTpl, mgef, spel: IwbMainRecord;
-  effects, e, mfl: IInterface;
+  mgefTpl, spelTpl, mgef, spel, cfLit, cfSrc, flst: IwbMainRecord;
+  effects, e, mfl, flstItems, srcEl: IInterface;
   poweredTpl, ffTpl: Boolean;
 begin
   Say('');
   Say('--- campfire lesser power ---');
 
-  mgefTpl := FindScriptFFTemplate;
-  ffTpl := Assigned(mgefTpl);
-  if not ffTpl then mgefTpl := FindScriptArchetypeTemplate;
+  // _RSL_CampfireLit: an ACTIVATOR wearing the Campfire01Burning model, so it
+  // renders fire + light AND carries _RSL_CampfirePlaced (activate -> put it
+  // out). ACTI takes a VMAD from the generator (MSTT would not) and, unlike the
+  // vanilla MSTT campfire, an activator responds to the activate key.
+  cfLit := RecordByEDID(tgt, 'ACTI', PFX + 'CampfireLit');
+  // a from-scratch ACTI (or a prior broken one) has no Model - drop it and copy
+  // a template that does
+  if Assigned(cfLit) and (GetElementEditValues(cfLit, 'Model\MODL') = '') then begin
+    Say('  _RSL_CampfireLit has no model - recreating from a template');
+    Remove(cfLit);
+    cfLit := nil;
+  end;
+  if not Assigned(cfLit) then begin
+    cfSrc := FindActiTemplate;
+    if not Assigned(cfSrc) then Problem('no ACTI template with a Model in Skyrim.esm')
+    else begin
+      cfLit := wbCopyElementToFile(cfSrc, tgt, True, True);
+      if not Assigned(cfLit) then Problem('_RSL_CampfireLit ACTI not copied')
+      else begin
+        ScrubTemplate(cfLit);
+        PutEdit(cfLit, 'EDID', PFX + 'CampfireLit');
+        Inc(madeNew);
+      end;
+    end;
+  end else
+    Inc(reused);
+  if Assigned(cfLit) then begin
+    PutEdit(cfLit, 'FULL', L('camp.name'));
+    PutEdit(cfLit, 'Model\MODL', 'Clutter\WoodFires\Campfire01Burning.nif');
+    PutNative(cfLit, 'SNAM', $0003F204);   // FXFireCampfireLPSD looping sound
+    if GetElementEditValues(cfLit, 'Model\MODL') <> 'Clutter\WoodFires\Campfire01Burning.nif' then
+      Problem('_RSL_CampfireLit ACTI: MODL still wrong ("'
+        + GetElementEditValues(cfLit, 'Model\MODL') + '")');
+    AttachScript(cfLit, '_RSL_CampfirePlaced');
+    Remember(PFX + 'CampfireLit', cfLit);
+    flst := RecordByEDID(tgt, 'FLST', PFX + 'FireSources');
+    if Assigned(flst) then begin
+      flstItems := ElementByName(flst, 'FormIDs');
+      if Assigned(flstItems) then FlstAddRecord(flstItems, cfLit);
+    end;
+    Say('  _RSL_CampfireLit ACTI ready ["' + GetElementEditValues(cfLit, 'Model\MODL')
+      + '"], added to fire list');
+  end;
+
+  // proven-working template: the same Constant-Effect script MGEF the monitor
+  // uses (its _RSL_Controller script runs fine). The campfire script self-
+  // Dispel()s after it fires, so it is still a one-shot. A "Fire and Forget"
+  // script template (VoiceDragonrendBlank...) does NOT run its VMAD script.
+  mgefTpl := FindScriptArchetypeTemplate;
+  ffTpl := False;
   spelTpl := FindLesserPowerTemplate;
   poweredTpl := Assigned(spelTpl);
   if not poweredTpl then spelTpl := FindAbilityTemplate;
@@ -2330,8 +2465,7 @@ begin
     PutEdit(mgef, 'FULL', L('power.campfire.full'));
     Inc(madeNew);
   end;
-  if not ffTpl then
-    PutEdit(mgef, 'Magic Effect Data\DATA\Casting Type', 'Fire and Forget');
+  // keep the template's Casting Type = Constant Effect (script self-dispels)
   PutEdit(mgef, 'Magic Effect Data\DATA\Delivery', 'Self');   // proven label (AddBuffMgef)
   // known-good flags: Hide in UI only - a clean self effect, not hostile /
   // detrimental (the template may carry other bits).
@@ -2343,6 +2477,10 @@ begin
     + '" Deliv="' + GetElementEditValues(mgef, 'Magic Effect Data\DATA\Delivery')
     + '" flags=[' + FlagsOf(mgef) + ']');
   AttachScript(mgef, '_RSL_CampfireEffect');
+  Say('  campfire MGEF VMAD script[0] = "'
+    + GetElementEditValues(mgef, 'VMAD\Scripts\[0]\scriptName') + '"');
+  if not SameText(GetElementEditValues(mgef, 'VMAD\Scripts\[0]\scriptName'), '_RSL_CampfireEffect') then
+    Problem('_RSL_MgefLightCampfire VMAD did not bind _RSL_CampfireEffect');
   Remember(PFX + 'MgefLightCampfire', mgef);
 
   // lesser-power spell
@@ -2364,16 +2502,13 @@ begin
     + '" ETYP="' + GetElementEditValues(spel, 'ETYP') + '"');
   // Keep the template's ETYP (Voice) - that is what slots it as a power.
   // Only coerce SPIT if we fell back to a non-power template.
-  if not poweredTpl then begin
+  if not poweredTpl then
     if not SetSpitField(spel, 'SPIT\Type', 'Lesser Power') then
-      if not SetSpitField(spel, 'SPIT\Type', 'Power') then
-        Problem('PowerCampfire: cannot set SPIT Type, got "'
-              + GetElementEditValues(spel, 'SPIT\Type') + '"');
-    if not SetSpitField(spel, 'SPIT\Cast Type', 'Fire and Forget') then
-      SetSpitField(spel, 'SPIT\Cast Type', 'Fire And Forget');
-  end;
-  // Self delivery either way - the script places the campfire in front, no aim.
-  SetSpitField(spel, 'SPIT\Target Type', 'Self');
+      SetSpitField(spel, 'SPIT\Type', 'Power');
+  // Constant Effect / Self, to match the MGEF (script self-dispels). PutEdit
+  // with 'Constant Effect' is the proven path (NormalizeSpit uses it).
+  PutEdit(spel, 'SPIT\Cast Type',   'Constant Effect');
+  PutEdit(spel, 'SPIT\Target Type', 'Self');
   // ETYP = Voice (Skyrim.esm 00025BEE) - set unconditionally: a reused
   // _RSL_PowerCampfire from an older run never gets the new template's ETYP,
   // and an empty ETYP is exactly what makes the RFAB menu hand-cast it.
@@ -2392,16 +2527,209 @@ begin
   PutNative(e, 'EFID', GetLoadOrderFormID(mgef));
   PutNative(e, 'EFIT\Magnitude', 0.0);
   PutNative(e, 'EFIT\Area',      0);
-  PutNative(e, 'EFIT\Duration',  1);   // >0 so OnEffectStart fires reliably
+  PutNative(e, 'EFIT\Duration',  0);   // Constant Effect - ignored; script Dispel()s
   Remember(PFX + 'PowerCampfire', spel);
 
   // notifications (feature 5/6/7)
   AddMsg(PFX + 'MsgCampLit',      L('msg.camp.lit'));
+  AddMsg(PFX + 'MsgCampOut',      L('msg.camp.out'));
   AddMsg(PFX + 'MsgCampNoFuel',   L('msg.camp.nofuel'));
   AddMsg(PFX + 'MsgCampNoPerk',   L('msg.camp.noperk'));
+  AddMsgConfirm(FindMsgBoxTemplate, PFX + 'MsgCampConfirm',
+    L('msg.camp.confirm'), L('phrase.yes'), L('phrase.no'));
   AddMsg(PFX + 'MsgTreeCooldown', L('msg.tree.cooldown'));
 
   Say('  campfire: PowerCampfire (Lesser Power) + MgefLightCampfire + 4 MESG');
+end;
+
+// True if the FURN's KWDA holds a keyword whose EditorID contains `kwStem`.
+function FurnHasKwdStem(r: IwbMainRecord; kwStem: string): Boolean;
+var
+  kwda, k: IInterface;
+  i: Integer;
+begin
+  Result := False;
+  kwda := ElementByName(r, 'KWDA');
+  if not Assigned(kwda) then Exit;
+  for i := 0 to Pred(ElementCount(kwda)) do begin
+    k := LinksTo(ElementByIndex(kwda, i));
+    if Assigned(k) and (Pos(LowerCase(kwStem), LowerCase(EditorID(k))) > 0) then begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+// A Skyrim.esm bedroll FURN to copy (furniture markers + sleep keyword carry
+// over). Tries: EditorID contains "bedroll"; then KWDA has a "bedroll" keyword;
+// then EditorID contains "bedroll"/"bed" + a FurnitureBed* keyword. Logs the
+// 'bed' FURN it sees so a miss can be diagnosed.
+function FindBedrollFurn: IwbMainRecord;
+var
+  grp: IwbGroupRecord;
+  r  : IwbMainRecord;
+  i, seen: Integer;
+  ed : string;
+begin
+  Result := nil;
+  grp := GroupBySignature(FileByName('Skyrim.esm'), 'FURN');
+  if not Assigned(grp) then Exit;
+  seen := 0;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    ed := LowerCase(EditorID(r));
+    if Pos('bed', ed) > 0 then begin
+      if seen < 20 then Say('    FURN bed?: ' + EditorID(r));
+      Inc(seen);
+    end;
+    if Pos('bedroll', ed) > 0 then begin
+      Result := r;
+      Say('  bedroll FURN template (edid): ' + EditorID(r));
+      Exit;
+    end;
+  end;
+  // second pass: any FURN whose keywords say bedroll / furniture-bed
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    if FurnHasKwdStem(r, 'bedroll') then begin
+      Result := r;
+      Say('  bedroll FURN template (kwd bedroll): ' + EditorID(r));
+      Exit;
+    end;
+  end;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    if (Pos('bed', LowerCase(EditorID(r))) > 0) and FurnHasKwdStem(r, 'furniturebed') then begin
+      Result := r;
+      Say('  bedroll FURN template (bed + kwd): ' + EditorID(r));
+      Exit;
+    end;
+  end;
+  Problem('no bedroll FURN found in Skyrim.esm - see the "FURN bed?" list above');
+end;
+
+// A Skyrim.esm tanning-rack recipe to use as a COBJ template. Prefer
+// RecipeLeather01, else the first COBJ whose workbench keyword is
+// CraftingTanningRack.
+function FindTanningRecipe: IwbMainRecord;
+var
+  grp: IwbGroupRecord;
+  r, kwd: IwbMainRecord;
+  i  : Integer;
+begin
+  Result := RecordByEDID(FileByName('Skyrim.esm'), 'COBJ', 'RecipeLeather01');
+  if Assigned(Result) then Exit;
+  kwd := RecordByEDID(FileByName('Skyrim.esm'), 'KYWD', 'CraftingTanningRack');
+  if not Assigned(kwd) then Exit;
+  grp := GroupBySignature(FileByName('Skyrim.esm'), 'COBJ');
+  if not Assigned(grp) then Exit;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    if GetNativeValue(ElementByPath(r, 'BNAM')) = GetLoadOrderFormID(kwd) then begin
+      Result := r;
+      Say('  tanning recipe template: ' + EditorID(r));
+      Exit;
+    end;
+  end;
+end;
+
+// Portable bedroll (feature 8): _RSL_BedrollItem MISC (craft at a tanning rack)
+// <-> _RSL_BedrollFurn FURN (drop to place, grab to reclaim). Vanilla assets,
+// scripts are our own. See _RSL_BedrollItem.psc for the pattern note.
+procedure BuildBedroll;
+var
+  miscTpl, furnTpl, cobjTpl, mi, fu, co, kwd, leather: IwbMainRecord;
+  items, ci, cond: IInterface;
+begin
+  Say('');
+  Say('--- portable bedroll ---');
+
+  // MISC item - template Firewood01 (a plain, weightless-ish MISC)
+  mi := RecordByEDID(tgt, 'MISC', PFX + 'BedrollItem');
+  if Assigned(mi) then begin
+    ScrubTemplate(mi); Inc(reused);
+  end else begin
+    miscTpl := RecordByEDID(FileByName('Skyrim.esm'), 'MISC', 'Firewood01');
+    if not Assigned(miscTpl) then begin Problem('Firewood01 MISC template missing'); Exit; end;
+    mi := wbCopyElementToFile(miscTpl, tgt, True, True);
+    if not Assigned(mi) then begin Problem('BedrollItem MISC not copied'); Exit; end;
+    ScrubTemplate(mi);
+    PutEdit(mi, 'EDID', PFX + 'BedrollItem');
+    Inc(madeNew);
+  end;
+  PutEdit(mi, 'FULL', L('bedroll.full'));
+  PutEdit(mi, 'Model\MODL', 'Furniture\Bedroll\Bedroll01.nif');
+  PutNative(mi, 'DATA\Value',  25);
+  PutNative(mi, 'DATA\Weight', 4.0);
+  AttachScript(mi, '_RSL_BedrollItem');
+  Remember(PFX + 'BedrollItem', mi);
+
+  // FURN - a vanilla bedroll furniture, re-modelled to Bedroll01
+  fu := RecordByEDID(tgt, 'FURN', PFX + 'BedrollFurn');
+  if Assigned(fu) then begin
+    Inc(reused);
+  end else begin
+    furnTpl := FindBedrollFurn;
+    if not Assigned(furnTpl) then Exit;
+    fu := wbCopyElementToFile(furnTpl, tgt, True, True);
+    if not Assigned(fu) then begin Problem('BedrollFurn FURN not copied'); Exit; end;
+    PutEdit(fu, 'EDID', PFX + 'BedrollFurn');
+    Inc(madeNew);
+  end;
+  DropElement(fu, 'VMAD');
+  PutEdit(fu, 'FULL', L('bedroll.full'));
+  PutEdit(fu, 'Model\MODL', 'Furniture\Bedroll\Bedroll01.nif');
+  AttachScript(fu, '_RSL_BedrollFurn');
+  Remember(PFX + 'BedrollFurn', fu);
+
+  // COBJ - tanning rack recipe: 4 Leather01 -> 1 BedrollItem
+  co := RecordByEDID(tgt, 'COBJ', PFX + 'RecipeBedroll');
+  if Assigned(co) then begin
+    Inc(reused);
+  end else begin
+    cobjTpl := FindTanningRecipe;
+    if not Assigned(cobjTpl) then begin Problem('no tanning-rack COBJ template found'); Exit; end;
+    co := wbCopyElementToFile(cobjTpl, tgt, True, True);
+    if not Assigned(co) then begin Problem('RecipeBedroll COBJ not copied'); Exit; end;
+    PutEdit(co, 'EDID', PFX + 'RecipeBedroll');
+    Inc(madeNew);
+  end;
+  // wipe the template's conditions (RecipeLeather01 needs an AnimalHide) - keep
+  // the container, remove entries, so our recipe is always available
+  cond := ElementByName(co, 'Conditions');
+  if Assigned(cond) then
+    while ElementCount(cond) > 0 do RemoveByIndex(cond, 0, True);
+
+  PutNative(co, 'CNAM', GetLoadOrderFormID(mi));   // created object -> our item
+  PutNative(co, 'NAM1', 1);
+
+  // component: Leather01 x4 (resolve by EditorID, not a hardcoded FormID)
+  leather := RecordByEDID(FileByName('Skyrim.esm'), 'MISC', 'Leather01');
+  if not Assigned(leather) then leather := RecordByEDID(FileByName('Skyrim.esm'), 'MISC', 'Leather');
+  items := ElementByName(co, 'Items');
+  if Assigned(items) and Assigned(leather) then begin
+    while ElementCount(items) > 0 do RemoveByIndex(items, 0, True);
+    ci := ElementAssign(items, HighInteger, nil, False);
+    PutNative(ci, 'CNTO\Item',  GetLoadOrderFormID(leather));
+    PutNative(ci, 'CNTO\Count', 4);
+    PutNative(co, 'COCT', 1);
+  end else
+    Problem('RecipeBedroll: no Items container / Leather01 not found');
+
+  // workbench keyword
+  kwd := RecordByEDID(FileByName('Skyrim.esm'), 'KYWD', 'CraftingTanningRack');
+  if Assigned(kwd) then
+    PutNative(co, 'BNAM', GetLoadOrderFormID(kwd));
+  Remember(PFX + 'RecipeBedroll', co);
+
+  Say('  bedroll COBJ: BNAM="' + GetElementEditValues(co, 'BNAM')
+    + '" CNAM="' + GetElementEditValues(co, 'CNAM')
+    + '" NAM1=' + GetElementEditValues(co, 'NAM1')
+    + ' COCT=' + GetElementEditValues(co, 'COCT')
+    + ' comp="' + GetElementEditValues(co, 'Items\[0]\CNTO\Item')
+    + '" x' + GetElementEditValues(co, 'Items\[0]\CNTO\Count'));
+  Say('  bedroll: MISC ' + IntToHex(LocalID(mi), 6) + ' / FURN ' + IntToHex(LocalID(fu), 6)
+    + ' / COBJ ' + IntToHex(LocalID(co), 6));
 end;
 
 procedure BuildMonitorAndQuest;
@@ -2797,7 +3125,13 @@ begin
     EmitFormGetter(sl, 'Spell', 'AbBonusFed',  PFX + 'AbBonusFed');
     EmitFormGetter(sl, 'Spell', 'AbMonitor',   PFX + 'AbMonitor');
     EmitFormGetter(sl, 'Spell', 'PowerCampfire', PFX + 'PowerCampfire');
+    EmitFormGetter(sl, 'MagicEffect', 'MgefLightCampfire', PFX + 'MgefLightCampfire');
+    EmitFormGetter(sl, 'Form',  'CampfireLit',   PFX + 'CampfireLit');
+    EmitFormGetter(sl, 'Form',      'BedrollItem', PFX + 'BedrollItem');
+    EmitFormGetter(sl, 'Furniture', 'BedrollFurn', PFX + 'BedrollFurn');
     EmitFormGetter(sl, 'Message', 'MsgCampLit',     PFX + 'MsgCampLit');
+    EmitFormGetter(sl, 'Message', 'MsgCampOut',     PFX + 'MsgCampOut');
+    EmitFormGetter(sl, 'Message', 'MsgCampConfirm', PFX + 'MsgCampConfirm');
     EmitFormGetter(sl, 'Message', 'MsgCampNoFuel',  PFX + 'MsgCampNoFuel');
     EmitFormGetter(sl, 'Message', 'MsgCampNoPerk',  PFX + 'MsgCampNoPerk');
     EmitFormGetter(sl, 'Message', 'MsgTreeCooldown', PFX + 'MsgTreeCooldown');
@@ -3338,6 +3672,7 @@ begin
   BuildPenaltyLib;
   BuildBonusAbility;
   BuildCampfire;
+  BuildBedroll;
   BuildDiseases;
   BuildRfabWrappers;
   BuildHypothermia;

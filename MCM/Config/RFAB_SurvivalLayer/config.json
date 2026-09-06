@@ -186,7 +186,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|84C"
+            "sourceForm": "RFAB_SurvivalLayer.esp|856"
           }
         },
         {
@@ -195,7 +195,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|CCB"
+            "sourceForm": "RFAB_SurvivalLayer.esp|857"
           }
         },
         {
@@ -204,7 +204,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|84D"
+            "sourceForm": "RFAB_SurvivalLayer.esp|858"
           }
         },
         {
@@ -220,7 +220,7 @@
             "max": 1280,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|84E"
+            "sourceForm": "RFAB_SurvivalLayer.esp|859"
           }
         },
         {
@@ -232,7 +232,7 @@
             "max": 720,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|84F"
+            "sourceForm": "RFAB_SurvivalLayer.esp|85A"
           }
         },
         {
@@ -244,7 +244,7 @@
             "max": 200,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|850"
+            "sourceForm": "RFAB_SurvivalLayer.esp|85B"
           }
         },
         {
@@ -256,7 +256,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|851"
+            "sourceForm": "RFAB_SurvivalLayer.esp|85C"
           }
         },
         {
@@ -268,7 +268,7 @@
             "max": 2,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|852"
+            "sourceForm": "RFAB_SurvivalLayer.esp|85D"
           }
         },
         {
@@ -280,7 +280,7 @@
             "max": 2,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|853"
+            "sourceForm": "RFAB_SurvivalLayer.esp|85E"
           }
         }
       ]
@@ -302,7 +302,7 @@
             "max": 48,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|804"
+            "sourceForm": "RFAB_SurvivalLayer.esp|801"
           }
         },
         {
@@ -314,7 +314,7 @@
             "max": 168,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|805"
+            "sourceForm": "RFAB_SurvivalLayer.esp|802"
           }
         },
         {
@@ -330,7 +330,7 @@
             "max": 24,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|806"
+            "sourceForm": "RFAB_SurvivalLayer.esp|803"
           }
         },
         {
@@ -342,7 +342,7 @@
             "max": 8,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|807"
+            "sourceForm": "RFAB_SurvivalLayer.esp|804"
           }
         },
         {
@@ -358,7 +358,7 @@
             "max": 15,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|BA4"
+            "sourceForm": "RFAB_SurvivalLayer.esp|805"
           }
         }
       ]
@@ -380,7 +380,7 @@
             "max": 48,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|808"
+            "sourceForm": "RFAB_SurvivalLayer.esp|806"
           }
         },
         {
@@ -392,7 +392,7 @@
             "max": 168,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|809"
+            "sourceForm": "RFAB_SurvivalLayer.esp|807"
           }
         },
         {
@@ -408,7 +408,7 @@
             "max": 200,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|848"
+            "sourceForm": "RFAB_SurvivalLayer.esp|808"
           }
         },
         {
@@ -420,7 +420,7 @@
             "max": 300,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|849"
+            "sourceForm": "RFAB_SurvivalLayer.esp|809"
           }
         }
       ]
@@ -442,7 +442,7 @@
             "max": 3,
             "step": 0.25,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|813"
+            "sourceForm": "RFAB_SurvivalLayer.esp|822"
           }
         },
         {
@@ -454,7 +454,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|84A"
+            "sourceForm": "RFAB_SurvivalLayer.esp|823"
           }
         },
         {
@@ -466,7 +466,7 @@
             "max": 10,
             "step": 0.5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|86C"
+            "sourceForm": "RFAB_SurvivalLayer.esp|824"
           }
         },
         {
@@ -478,7 +478,7 @@
             "max": 30,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|814"
+            "sourceForm": "RFAB_SurvivalLayer.esp|825"
           }
         },
         {
@@ -490,7 +490,7 @@
             "max": 200,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|868"
+            "sourceForm": "RFAB_SurvivalLayer.esp|826"
           }
         },
         {
@@ -502,7 +502,7 @@
             "max": 30,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|816"
+            "sourceForm": "RFAB_SurvivalLayer.esp|827"
           }
         },
         {
@@ -514,7 +514,7 @@
             "max": 20,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|BA5"
+            "sourceForm": "RFAB_SurvivalLayer.esp|828"
           }
         },
         {
@@ -526,7 +526,7 @@
             "max": 20,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|BA6"
+            "sourceForm": "RFAB_SurvivalLayer.esp|829"
           }
         },
         {
@@ -542,7 +542,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|856"
+            "sourceForm": "RFAB_SurvivalLayer.esp|80A"
           }
         },
         {
@@ -554,7 +554,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|857"
+            "sourceForm": "RFAB_SurvivalLayer.esp|80B"
           }
         },
         {
@@ -566,7 +566,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|858"
+            "sourceForm": "RFAB_SurvivalLayer.esp|80C"
           }
         },
         {
@@ -578,7 +578,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|859"
+            "sourceForm": "RFAB_SurvivalLayer.esp|80D"
           }
         },
         {
@@ -590,7 +590,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85A"
+            "sourceForm": "RFAB_SurvivalLayer.esp|80E"
           }
         },
         {
@@ -602,7 +602,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85B"
+            "sourceForm": "RFAB_SurvivalLayer.esp|80F"
           }
         },
         {
@@ -614,7 +614,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85C"
+            "sourceForm": "RFAB_SurvivalLayer.esp|810"
           }
         },
         {
@@ -626,7 +626,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85D"
+            "sourceForm": "RFAB_SurvivalLayer.esp|811"
           }
         },
         {
@@ -638,7 +638,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85E"
+            "sourceForm": "RFAB_SurvivalLayer.esp|812"
           }
         },
         {
@@ -650,7 +650,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85F"
+            "sourceForm": "RFAB_SurvivalLayer.esp|813"
           }
         },
         {
@@ -662,7 +662,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8E3"
+            "sourceForm": "RFAB_SurvivalLayer.esp|814"
           }
         },
         {
@@ -674,7 +674,7 @@
             "max": 200,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|869"
+            "sourceForm": "RFAB_SurvivalLayer.esp|815"
           }
         },
         {
@@ -690,7 +690,7 @@
             "max": 400,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|860"
+            "sourceForm": "RFAB_SurvivalLayer.esp|816"
           }
         },
         {
@@ -702,7 +702,7 @@
             "max": 400,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|861"
+            "sourceForm": "RFAB_SurvivalLayer.esp|817"
           }
         },
         {
@@ -714,7 +714,7 @@
             "max": 400,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|862"
+            "sourceForm": "RFAB_SurvivalLayer.esp|818"
           }
         },
         {
@@ -726,7 +726,7 @@
             "max": 400,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|863"
+            "sourceForm": "RFAB_SurvivalLayer.esp|819"
           }
         },
         {
@@ -738,7 +738,7 @@
             "max": 400,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|864"
+            "sourceForm": "RFAB_SurvivalLayer.esp|81A"
           }
         },
         {
@@ -750,7 +750,7 @@
             "max": 500,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|865"
+            "sourceForm": "RFAB_SurvivalLayer.esp|81B"
           }
         },
         {
@@ -762,7 +762,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|867"
+            "sourceForm": "RFAB_SurvivalLayer.esp|81C"
           }
         },
         {
@@ -774,7 +774,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|855"
+            "sourceForm": "RFAB_SurvivalLayer.esp|81D"
           }
         },
         {
@@ -786,7 +786,7 @@
             "max": 150,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8BD"
+            "sourceForm": "RFAB_SurvivalLayer.esp|81E"
           }
         },
         {
@@ -798,7 +798,7 @@
             "max": 25000,
             "step": 500,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|86A"
+            "sourceForm": "RFAB_SurvivalLayer.esp|81F"
           }
         },
         {
@@ -810,7 +810,7 @@
             "max": 30000,
             "step": 500,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|86B"
+            "sourceForm": "RFAB_SurvivalLayer.esp|820"
           }
         },
         {
@@ -822,7 +822,7 @@
             "max": 2000,
             "step": 50,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|812"
+            "sourceForm": "RFAB_SurvivalLayer.esp|821"
           }
         },
         {
@@ -835,7 +835,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|83F"
+            "sourceForm": "RFAB_SurvivalLayer.esp|833"
           }
         },
         {
@@ -847,7 +847,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|840"
+            "sourceForm": "RFAB_SurvivalLayer.esp|834"
           }
         },
         {
@@ -860,7 +860,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E32"
+            "sourceForm": "RFAB_SurvivalLayer.esp|835"
           }
         },
         {
@@ -872,7 +872,7 @@
             "max": 20,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E33"
+            "sourceForm": "RFAB_SurvivalLayer.esp|836"
           }
         },
         {
@@ -885,7 +885,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E34"
+            "sourceForm": "RFAB_SurvivalLayer.esp|837"
           }
         },
         {
@@ -897,7 +897,7 @@
             "max": 24,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E35"
+            "sourceForm": "RFAB_SurvivalLayer.esp|838"
           }
         },
         {
@@ -909,7 +909,7 @@
             "max": 5,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E36"
+            "sourceForm": "RFAB_SurvivalLayer.esp|839"
           }
         },
         {
@@ -921,7 +921,7 @@
             "max": 30,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E79"
+            "sourceForm": "RFAB_SurvivalLayer.esp|83A"
           }
         }
       ]
@@ -940,7 +940,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|841"
+            "sourceForm": "RFAB_SurvivalLayer.esp|83F"
           }
         },
         {
@@ -952,7 +952,7 @@
             "max": 120,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|842"
+            "sourceForm": "RFAB_SurvivalLayer.esp|840"
           }
         },
         {
@@ -964,7 +964,7 @@
             "max": 240,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|843"
+            "sourceForm": "RFAB_SurvivalLayer.esp|841"
           }
         },
         {
@@ -976,7 +976,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|87D"
+            "sourceForm": "RFAB_SurvivalLayer.esp|843"
           }
         },
         {
@@ -988,7 +988,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|89C"
+            "sourceForm": "RFAB_SurvivalLayer.esp|844"
           }
         },
         {
@@ -997,7 +997,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8BE"
+            "sourceForm": "RFAB_SurvivalLayer.esp|842"
           }
         },
         {
@@ -1006,7 +1006,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8A7"
+            "sourceForm": "RFAB_SurvivalLayer.esp|845"
           }
         },
         {
@@ -1018,7 +1018,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8A8"
+            "sourceForm": "RFAB_SurvivalLayer.esp|846"
           }
         },
         {
@@ -1030,7 +1030,7 @@
             "max": 24,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8AA"
+            "sourceForm": "RFAB_SurvivalLayer.esp|848"
           }
         },
         {
@@ -1042,7 +1042,7 @@
             "max": 24,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8AB"
+            "sourceForm": "RFAB_SurvivalLayer.esp|849"
           }
         },
         {
@@ -1054,7 +1054,7 @@
             "max": 10,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8AC"
+            "sourceForm": "RFAB_SurvivalLayer.esp|84A"
           }
         },
         {
@@ -1066,7 +1066,7 @@
             "max": 120,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|8BA"
+            "sourceForm": "RFAB_SurvivalLayer.esp|84B"
           }
         },
         {
@@ -1078,7 +1078,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|86D"
+            "sourceForm": "RFAB_SurvivalLayer.esp|84C"
           }
         },
         {
@@ -1090,7 +1090,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|878"
+            "sourceForm": "RFAB_SurvivalLayer.esp|84D"
           }
         },
         {
@@ -1102,7 +1102,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|879"
+            "sourceForm": "RFAB_SurvivalLayer.esp|84E"
           }
         },
         {
@@ -1114,7 +1114,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|87A"
+            "sourceForm": "RFAB_SurvivalLayer.esp|84F"
           }
         },
         {
@@ -1123,7 +1123,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|C13"
+            "sourceForm": "RFAB_SurvivalLayer.esp|850"
           }
         },
         {
@@ -1135,7 +1135,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|C15"
+            "sourceForm": "RFAB_SurvivalLayer.esp|852"
           }
         },
         {
@@ -1147,7 +1147,7 @@
             "max": 20,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|C16"
+            "sourceForm": "RFAB_SurvivalLayer.esp|853"
           }
         },
         {
@@ -1179,7 +1179,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|817"
+            "sourceForm": "RFAB_SurvivalLayer.esp|82A"
           }
         },
         {
@@ -1191,7 +1191,7 @@
             "max": 100,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|818"
+            "sourceForm": "RFAB_SurvivalLayer.esp|82B"
           }
         },
         {
@@ -1203,7 +1203,7 @@
             "max": 50,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|831"
+            "sourceForm": "RFAB_SurvivalLayer.esp|82C"
           }
         },
         {
@@ -1215,7 +1215,7 @@
             "max": 80,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|832"
+            "sourceForm": "RFAB_SurvivalLayer.esp|82D"
           }
         },
         {
@@ -1227,7 +1227,7 @@
             "max": 95,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|819"
+            "sourceForm": "RFAB_SurvivalLayer.esp|82E"
           }
         },
         {
@@ -1239,7 +1239,7 @@
             "max": 25,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|81A"
+            "sourceForm": "RFAB_SurvivalLayer.esp|82F"
           }
         },
         {
@@ -1252,7 +1252,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|D3E"
+            "sourceForm": "RFAB_SurvivalLayer.esp|830"
           }
         },
         {
@@ -1264,7 +1264,7 @@
             "max": 25,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|D3F"
+            "sourceForm": "RFAB_SurvivalLayer.esp|831"
           }
         },
         {
@@ -1276,7 +1276,7 @@
             "max": 50,
             "step": 5,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|D40"
+            "sourceForm": "RFAB_SurvivalLayer.esp|832"
           }
         },
         {
@@ -1289,7 +1289,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E37"
+            "sourceForm": "RFAB_SurvivalLayer.esp|83B"
           }
         },
         {
@@ -1301,7 +1301,7 @@
             "max": 72,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E38"
+            "sourceForm": "RFAB_SurvivalLayer.esp|83C"
           }
         },
         {
@@ -1313,7 +1313,7 @@
             "max": 5,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|E39"
+            "sourceForm": "RFAB_SurvivalLayer.esp|83D"
           }
         }
       ]
@@ -1340,7 +1340,7 @@
             "max": 30,
             "step": 1,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|81E"
+            "sourceForm": "RFAB_SurvivalLayer.esp|85F"
           }
         },
         {
@@ -1349,7 +1349,7 @@
           "type": "toggle",
           "valueOptions": {
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|81F"
+            "sourceForm": "RFAB_SurvivalLayer.esp|860"
           }
         },
         {
@@ -1361,7 +1361,7 @@
             "max": 400,
             "step": 10,
             "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|FD3"
+            "sourceForm": "RFAB_SurvivalLayer.esp|83E"
           }
         },
         {
