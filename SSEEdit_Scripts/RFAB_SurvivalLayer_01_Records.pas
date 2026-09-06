@@ -428,6 +428,29 @@ begin
   AddGlobal(PFX + 'ColdVisualShader',    1,     'Short');   // ice crust on character (on)
   AddGlobal(PFX + 'ColdVisualThreshold', 90,    'Float');   // cold >= 90 -> ice crust
 
+  // warm-hands-by-fire idle: after WarmAnimDelay seconds standing still near a
+  // heat source, play the vanilla IdleWarmHandsStanding on the player. Best-
+  // effort - any input cancels it, and PlayIdle on the player is fragile.
+  AddGlobal(PFX + 'WarmAnim',            1,     'Short');
+  AddGlobal(PFX + 'WarmAnimDelay',       5,     'Float');   // seconds still before it plays
+
+  // campfire lesser power (RFAB "Основы выживания" perk gates the power; RFAB
+  // "Кулинар" adds a cooking pot). Consumes CampfireFuel x Firewood01, burns
+  // CampfireBurnHours in-game hours, a new one replaces the old.
+  AddGlobal(PFX + 'CampfireEnabled',     1,     'Short');
+  AddGlobal(PFX + 'CampfireBurnHours',   4,     'Float');   // in-game hours before it burns out
+  AddGlobal(PFX + 'CampfireFuel',        1,     'Short');    // Firewood01 consumed per light
+  AddGlobal(PFX + 'CampfireCooldown',    5,     'Float');    // real seconds between casts
+  // cook-pot offset from the campfire is hardcoded in _RSL_CampfireEffect
+  // (the CraftingCookingPotSm mesh pivot is off-centre): fwd -47, up -13.3.
+
+  // wood from trees: Activate on a tree yields 1 Firewood01 if carrying the
+  // wood axe, or (RFAB "Рюкзак авантюриста" + "Основы выживания" perk).
+  AddGlobal(PFX + 'WoodFromTrees',       1,     'Short');
+  AddGlobal(PFX + 'TreeChopCooldownH',   12,    'Float');   // in-game hours a tree needs before it yields again
+  AddGlobal(PFX + 'TreeChopYield',       1,     'Short');
+  AddGlobal(PFX + 'TreeChopRadius',      100,   'Float');   // scan-around fallback range (crosshair misses most TREE refs)
+
   // diseases. Progress = worsen, Decay = improve; 24 game-hours each for now.
   AddGlobal(PFX + 'DiseaseEnabled',      1,     'Short');
   AddGlobal(PFX + 'DiseaseProgressHours', 24,   'Float');
@@ -2189,6 +2212,198 @@ begin
   if fresh then Inc(madeNew) else Inc(reused);
 end;
 
+// Template for the campfire power. Prefer RFAB_Spell_BecomeTank (RFAB.esp): it
+// is a known-working Lesser Power in this pack and carries ETYP = Voice, which
+// the RFAB talents menu needs to slot a power (without it the spell hand-casts).
+// Falls back to the first vanilla Lesser Power, then the ability template.
+function FindLesserPowerTemplate: IwbMainRecord;
+var
+  src : IwbFile;
+  grp : IwbGroupRecord;
+  r   : IwbMainRecord;
+  i   : Integer;
+  styp: string;
+begin
+  Result := RecordByEDID(FileByName('RFAB.esp'), 'SPEL', 'RFAB_Spell_BecomeTank');
+  if Assigned(Result) then begin
+    AddMasterIfMissing(tgt, 'RFAB.esp');
+    Say('  lesser-power template: RFAB_Spell_BecomeTank (RFAB.esp) - has Voice ETYP');
+    Exit;
+  end;
+  src := FileByName('Skyrim.esm');
+  if not Assigned(src) then Exit;
+  grp := GroupBySignature(src, 'SPEL');
+  if not Assigned(grp) then Exit;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    styp := GetElementEditValues(r, 'SPIT\Type');
+    if (Pos('lesser', LowerCase(styp)) > 0) and (Pos('power', LowerCase(styp)) > 0) then begin
+      Result := r;
+      Say('  lesser-power SPEL template: ' + EditorID(r) + '  SPIT Type="' + styp + '"');
+      Exit;
+    end;
+  end;
+  Say('  no Lesser Power SPEL found - using ability template + PutEdit');
+end;
+
+// A Script-archetype MGEF that is already Fire and Forget (so its Casting Type
+// need not be set by enum label). Falls back to the Constant-Effect script
+// template + an explicit PutEdit.
+function FindScriptFFTemplate: IwbMainRecord;
+var
+  src : IwbFile;
+  grp : IwbGroupRecord;
+  r   : IwbMainRecord;
+  i   : Integer;
+  arch, cast: string;
+begin
+  Result := nil;
+  src := FileByName('Skyrim.esm');
+  if not Assigned(src) then Exit;
+  grp := GroupBySignature(src, 'MGEF');
+  if not Assigned(grp) then Exit;
+  for i := 0 to Pred(ElementCount(grp)) do begin
+    r := ElementByIndex(grp, i);
+    arch := GetElementEditValues(r, 'Magic Effect Data\DATA\Archtype');
+    cast := GetElementEditValues(r, 'Magic Effect Data\DATA\Casting Type');
+    if SameText(arch, 'Script') and (Pos('Fire', cast) > 0) then begin
+      Result := r;
+      Say('  script-FF MGEF template: ' + EditorID(r) + '  [' + arch + ' / ' + cast + ']');
+      Exit;
+    end;
+  end;
+  Say('  no Fire-and-Forget script MGEF in Skyrim.esm - using constant-effect one');
+end;
+
+// Set an enum sub-field by label without logging a PROBLEM on a bad label -
+// returns whether the value now reads back as `v`. Lets BuildCampfire probe
+// which label string this xEdit build accepts.
+function SetSpitField(rec: IwbMainRecord; path, v: string): Boolean;
+var el: IInterface;
+begin
+  Result := False;
+  el := ElementByPath(rec, path);
+  if not Assigned(el) then Exit;
+  try
+    SetEditValue(el, v);
+  except
+    Exit;
+  end;
+  Result := SameText(GetElementEditValues(rec, path), v);
+end;
+
+// Campfire lesser power (feature 5/6). A script-archetype MGEF (Fire and Forget
+// / Self, hidden) carrying _RSL_CampfireEffect, on a Lesser Power SPEL. Runtime
+// (the script) does the perk / fuel / cooldown checks, PlaceAtMe, navmesh snap
+// and lifetime tracking; the generator just builds the forms. Also emits the
+// v0.3.0 notifications.
+procedure BuildCampfire;
+var
+  mgefTpl, spelTpl, mgef, spel: IwbMainRecord;
+  effects, e, mfl: IInterface;
+  poweredTpl, ffTpl: Boolean;
+begin
+  Say('');
+  Say('--- campfire lesser power ---');
+
+  mgefTpl := FindScriptFFTemplate;
+  ffTpl := Assigned(mgefTpl);
+  if not ffTpl then mgefTpl := FindScriptArchetypeTemplate;
+  spelTpl := FindLesserPowerTemplate;
+  poweredTpl := Assigned(spelTpl);
+  if not poweredTpl then spelTpl := FindAbilityTemplate;
+  if not Assigned(mgefTpl) or not Assigned(spelTpl) then begin
+    Say('  no templates - skipping campfire');
+    Exit;
+  end;
+
+  // script effect
+  mgef := RecordByEDID(tgt, 'MGEF', PFX + 'MgefLightCampfire');
+  if Assigned(mgef) then begin
+    ScrubTemplate(mgef);
+    Inc(reused);
+  end else begin
+    mgef := wbCopyElementToFile(mgefTpl, tgt, True, True);
+    if not Assigned(mgef) then begin Problem('campfire MGEF not copied'); Exit; end;
+    ScrubTemplate(mgef);
+    PutEdit(mgef, 'EDID', PFX + 'MgefLightCampfire');
+    PutEdit(mgef, 'FULL', L('power.campfire.full'));
+    Inc(madeNew);
+  end;
+  if not ffTpl then
+    PutEdit(mgef, 'Magic Effect Data\DATA\Casting Type', 'Fire and Forget');
+  PutEdit(mgef, 'Magic Effect Data\DATA\Delivery', 'Self');   // proven label (AddBuffMgef)
+  // known-good flags: Hide in UI only - a clean self effect, not hostile /
+  // detrimental (the template may carry other bits).
+  mfl := MgefFlags(mgef);
+  if Assigned(mfl) then
+    SetNativeValue(mfl, $00008000);
+  Say('  campfire MGEF: Arch="' + GetElementEditValues(mgef, 'Magic Effect Data\DATA\Archtype')
+    + '" Cast="' + GetElementEditValues(mgef, 'Magic Effect Data\DATA\Casting Type')
+    + '" Deliv="' + GetElementEditValues(mgef, 'Magic Effect Data\DATA\Delivery')
+    + '" flags=[' + FlagsOf(mgef) + ']');
+  AttachScript(mgef, '_RSL_CampfireEffect');
+  Remember(PFX + 'MgefLightCampfire', mgef);
+
+  // lesser-power spell
+  spel := RecordByEDID(tgt, 'SPEL', PFX + 'PowerCampfire');
+  if Assigned(spel) then begin
+    ScrubTemplate(spel);
+    Inc(reused);
+  end else begin
+    spel := wbCopyElementToFile(spelTpl, tgt, True, True);
+    if not Assigned(spel) then begin Problem('campfire SPEL not copied'); Exit; end;
+    ScrubTemplate(spel);
+    Inc(madeNew);
+  end;
+  PutEdit(spel, 'EDID', PFX + 'PowerCampfire');
+  PutEdit(spel, 'FULL', L('power.campfire.full'));
+  PutEdit(spel, 'DESC', L('power.campfire.desc'));
+  Say('  PowerCampfire SPIT before: Type="' + GetElementEditValues(spel, 'SPIT\Type')
+    + '" Cast="' + GetElementEditValues(spel, 'SPIT\Cast Type')
+    + '" ETYP="' + GetElementEditValues(spel, 'ETYP') + '"');
+  // Keep the template's ETYP (Voice) - that is what slots it as a power.
+  // Only coerce SPIT if we fell back to a non-power template.
+  if not poweredTpl then begin
+    if not SetSpitField(spel, 'SPIT\Type', 'Lesser Power') then
+      if not SetSpitField(spel, 'SPIT\Type', 'Power') then
+        Problem('PowerCampfire: cannot set SPIT Type, got "'
+              + GetElementEditValues(spel, 'SPIT\Type') + '"');
+    if not SetSpitField(spel, 'SPIT\Cast Type', 'Fire and Forget') then
+      SetSpitField(spel, 'SPIT\Cast Type', 'Fire And Forget');
+  end;
+  // Self delivery either way - the script places the campfire in front, no aim.
+  SetSpitField(spel, 'SPIT\Target Type', 'Self');
+  // ETYP = Voice (Skyrim.esm 00025BEE) - set unconditionally: a reused
+  // _RSL_PowerCampfire from an older run never gets the new template's ETYP,
+  // and an empty ETYP is exactly what makes the RFAB menu hand-cast it.
+  PutNative(spel, 'ETYP', $00025BEE);
+  Say('  PowerCampfire SPIT after:  Type="' + GetElementEditValues(spel, 'SPIT\Type')
+    + '" Cast="' + GetElementEditValues(spel, 'SPIT\Cast Type')
+    + '" Target="' + GetElementEditValues(spel, 'SPIT\Target Type')
+    + '" ETYP="' + GetElementEditValues(spel, 'ETYP') + '"');
+
+  effects := ElementByName(spel, 'Effects');
+  if not Assigned(effects) then begin Problem('no Effects container in PowerCampfire'); Exit; end;
+  while ElementCount(effects) > 0 do
+    RemoveByIndex(effects, 0, True);
+  e := ElementAssign(effects, HighInteger, nil, False);
+  if not Assigned(e) then begin Problem('effect not added to PowerCampfire'); Exit; end;
+  PutNative(e, 'EFID', GetLoadOrderFormID(mgef));
+  PutNative(e, 'EFIT\Magnitude', 0.0);
+  PutNative(e, 'EFIT\Area',      0);
+  PutNative(e, 'EFIT\Duration',  1);   // >0 so OnEffectStart fires reliably
+  Remember(PFX + 'PowerCampfire', spel);
+
+  // notifications (feature 5/6/7)
+  AddMsg(PFX + 'MsgCampLit',      L('msg.camp.lit'));
+  AddMsg(PFX + 'MsgCampNoFuel',   L('msg.camp.nofuel'));
+  AddMsg(PFX + 'MsgCampNoPerk',   L('msg.camp.noperk'));
+  AddMsg(PFX + 'MsgTreeCooldown', L('msg.tree.cooldown'));
+
+  Say('  campfire: PowerCampfire (Lesser Power) + MgefLightCampfire + 4 MESG');
+end;
+
 procedure BuildMonitorAndQuest;
 var
   mgefTpl, spelTpl: IwbMainRecord;
@@ -2400,6 +2615,36 @@ begin
   sl.Add('');
 end;
 
+// A Skyrim.esm world object by EditorID, trying the signatures a placeable
+// clutter record could be (STAT / MSTT / FURN / ACTI). Baked at generate time.
+function SkyrimRecByEdidAnySig(edid: string): IwbMainRecord;
+var
+  f: IwbFile;
+begin
+  f := FileByName('Skyrim.esm');
+  Result := RecordByEDID(f, 'STAT', edid);
+  if not Assigned(Result) then Result := RecordByEDID(f, 'MSTT', edid);
+  if not Assigned(Result) then Result := RecordByEDID(f, 'FURN', edid);
+  if not Assigned(Result) then Result := RecordByEDID(f, 'ACTI', edid);
+end;
+
+procedure EmitSkyrimForm(sl: TStringList; fname, edid: string);
+var
+  r  : IwbMainRecord;
+  hex: string;
+begin
+  hex := '000000';
+  r := SkyrimRecByEdidAnySig(edid);
+  if Assigned(r) then
+    hex := IntToHex(GetLoadOrderFormID(r) and $00FFFFFF, 6)
+  else
+    Problem('форма ' + edid + ' не найдена в Skyrim.esm (STAT/MSTT/FURN/ACTI)');
+  sl.Add('Form Function ' + fname + '() global');
+  sl.Add('    return Game.GetFormFromFile(0x00' + hex + ', "Skyrim.esm") as Form');
+  sl.Add('EndFunction');
+  sl.Add('');
+end;
+
 procedure WriteFormsScript;
 var
   sl  : TStringList;
@@ -2530,6 +2775,18 @@ begin
     EmitGlobalGetter(sl, 'BonusRegenPct');
     EmitGlobalGetter(sl, 'BonusThresholdPct');
 
+    // v4
+    EmitGlobalGetter(sl, 'WarmAnim');
+    EmitGlobalGetter(sl, 'WarmAnimDelay');
+    EmitGlobalGetter(sl, 'CampfireEnabled');
+    EmitGlobalGetter(sl, 'CampfireBurnHours');
+    EmitGlobalGetter(sl, 'CampfireFuel');
+    EmitGlobalGetter(sl, 'CampfireCooldown');
+    EmitGlobalGetter(sl, 'WoodFromTrees');
+    EmitGlobalGetter(sl, 'TreeChopCooldownH');
+    EmitGlobalGetter(sl, 'TreeChopYield');
+    EmitGlobalGetter(sl, 'TreeChopRadius');
+
     sl.Add('; --- abilities -----------------------------------------------------');
     sl.Add('');
     EmitFormGetter(sl, 'Spell', 'AbSleep',   PFX + 'AbSleep');
@@ -2539,6 +2796,11 @@ begin
     EmitFormGetter(sl, 'Spell', 'AbBonusRest', PFX + 'AbBonusRest');
     EmitFormGetter(sl, 'Spell', 'AbBonusFed',  PFX + 'AbBonusFed');
     EmitFormGetter(sl, 'Spell', 'AbMonitor',   PFX + 'AbMonitor');
+    EmitFormGetter(sl, 'Spell', 'PowerCampfire', PFX + 'PowerCampfire');
+    EmitFormGetter(sl, 'Message', 'MsgCampLit',     PFX + 'MsgCampLit');
+    EmitFormGetter(sl, 'Message', 'MsgCampNoFuel',  PFX + 'MsgCampNoFuel');
+    EmitFormGetter(sl, 'Message', 'MsgCampNoPerk',  PFX + 'MsgCampNoPerk');
+    EmitFormGetter(sl, 'Message', 'MsgTreeCooldown', PFX + 'MsgTreeCooldown');
 
     sl.Add('; --- misc ----------------------------------------------------------');
     sl.Add('');
@@ -2564,6 +2826,20 @@ begin
     EmitVanillaGetter(sl, 'Location', 'LocReach',      '016769', 'Skyrim.esm');
     // cold visual: FrostIceFormFXShader (character ice shader)
     EmitVanillaGetter(sl, 'EffectShader', 'FxColdShader', '0DC20D', 'Skyrim.esm');
+    // warm-hands-by-fire idle (IdleWarmHandsStanding)
+    EmitVanillaGetter(sl, 'Idle', 'IdleWarmHands', '0E8642', 'Skyrim.esm');
+    // v0.3.0 survival extras: perks (RFAB.esp originals), items, placement bases
+    EmitVanillaGetter(sl, 'Perk',       'PerkSurvivalBasics', '0CE266', 'RFAB.esp');
+    EmitVanillaGetter(sl, 'Perk',       'PerkCook',           '0CE264', 'RFAB.esp');
+    EmitVanillaGetter(sl, 'Form',       'Firewood',           '06F993', 'Skyrim.esm');
+    EmitVanillaGetter(sl, 'Weapon',     'WoodAxe',             '02F2F4', 'Skyrim.esm');
+    EmitVanillaGetter(sl, 'Armor',      'Backpack',            '0CD955', 'RFAB.esp');
+    // placed by _RSL_CampfireEffect: burning campfire, and (both perks) a cook
+    // spit + pot pair. Resolved by EditorID from Skyrim.esm at generate time.
+    // Campfire01Burning (no ground decal, unlike ...LandBurning).
+    EmitSkyrimForm(sl, 'BaseCampfire', 'Campfire01Burning');
+    EmitSkyrimForm(sl, 'BaseCookSpit', 'CookingSpitSm01');
+    EmitSkyrimForm(sl, 'BaseCookPot',  'CraftingCookingPotSm');
     // OnHit disease carriers (Skyrim.esm)
     EmitVanillaGetter(sl, 'Race',    'RaceDraugr',        '000D53', 'Skyrim.esm');
     EmitVanillaGetter(sl, 'Race',    'RaceSlaughterfish', '013203', 'Skyrim.esm');
@@ -2918,6 +3194,14 @@ begin
     JsonHeader(sl, '_RSL_HdrColdVisual');
     JsonToggle(sl, PFX + 'ColdVisualShader');
     JsonSlider(sl, PFX + 'ColdVisualThreshold', '0', '100', '5');
+    JsonHeader(sl, '_RSL_HdrWarmAnim');
+    JsonToggle(sl, PFX + 'WarmAnim');
+    JsonSlider(sl, PFX + 'WarmAnimDelay', '2', '20', '1');
+    JsonHeader(sl, '_RSL_HdrCampfire');
+    JsonToggle(sl, PFX + 'CampfireEnabled');
+    JsonSlider(sl, PFX + 'CampfireBurnHours', '1', '24', '1');
+    JsonSlider(sl, PFX + 'CampfireFuel',      '1', '5',  '1');
+    JsonSlider(sl, PFX + 'CampfireCooldown',  '0', '30', '1');
     TrimLastComma(sl);
     sl.Add('      ]');
     sl.Add('    },');
@@ -2977,6 +3261,10 @@ begin
     JsonToggle(sl, PFX + 'BonusEnabled');
     JsonSlider(sl, PFX + 'BonusRegenPct',      '0', '25', '1');
     JsonSlider(sl, PFX + 'BonusThresholdPct',  '0', '50', '5');
+    JsonHeader(sl, '_RSL_HdrWood');
+    JsonToggle(sl, PFX + 'WoodFromTrees');
+    JsonSlider(sl, PFX + 'TreeChopCooldownH', '0', '72', '1');
+    JsonSlider(sl, PFX + 'TreeChopYield',     '1', '5',  '1');
     TrimLastComma(sl);
     sl.Add('      ]');
     sl.Add('    },');
@@ -2989,6 +3277,7 @@ begin
     JsonToggle(sl, PFX + 'ModEnabled');
     JsonSlider(sl, PFX + 'PollInterval', '1', '30', '1');
     JsonToggle(sl, PFX + 'DebugLog');
+    JsonSlider(sl, PFX + 'TreeChopRadius', '50', '400', '10');
     sl.Add('        {');
     sl.Add('          "text": "$_RSL_BtnReset",');
     sl.Add('          "help": "$_RSL_BtnReset_help",');
@@ -3048,6 +3337,7 @@ begin
   BuildEffectsAndSpells;
   BuildPenaltyLib;
   BuildBonusAbility;
+  BuildCampfire;
   BuildDiseases;
   BuildRfabWrappers;
   BuildHypothermia;

@@ -116,6 +116,14 @@ begin
   sl.Add('RFAB.esp|#0CD63D|KYWD|KwSpecialFood (75% hunger restore)');
   sl.Add('RFAB.esp|#0CE2AD|KYWD|KwSpecialDrink (drinks carry no hunger)');
   sl.Add('RFAB.esp|RFAB_Bandage|ALCH|Clean linen cloth - heals elemental-lesion P');
+
+  // --- v0.3.0: warm-hands idle, survival perks / items ---
+  sl.Add('Skyrim.esm|#0E8642|IDLE|IdleWarmHandsStanding (warm-hands idle)');
+  sl.Add('RFAB.esp|#0CE266|PERK|RFAB_Perk_Survival_BaseSurvival (campfire power, wood axe)');
+  sl.Add('RFAB.esp|#0CE264|PERK|RFAB_Perk_Survival_Chef (cook-pot campfire)');
+  sl.Add('Skyrim.esm|#06F993|MISC|Firewood01 (campfire fuel / tree yield)');
+  sl.Add('Skyrim.esm|#02F2F4|WEAP|Axe01 / RFAB wood axe (tree chopping)');
+  sl.Add('RFAB.esp|#0CD955|ARMO|RFAB_Skin_Leather_AdventurerBackPack (tree chopping)');
 end;
 
 // A record in `sig` group of `fileName` whose EditorID or local FormID matches

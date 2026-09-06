@@ -213,3 +213,11 @@ phrase.unit.perSec= ед/сек
 phrase.unit.percent=%
 phrase.costAll=Стоимость заклинаний всех школ повышена на
 phrase.on= на
+
+# ---- v0.3.0: campfire power + tree chopping ----
+power.campfire.full=Развести костёр
+msg.camp.lit=Костёр разведён.
+msg.camp.nofuel=Нужно полено, чтобы развести костёр.
+msg.camp.noperk=Нужен навык «Основы выживания».
+msg.tree.cooldown=Это дерево пока не даёт древесину.
+power.campfire.desc=Разводит небольшой костёр перед вами. Нужно полено; горит несколько часов. Новый костёр гасит предыдущий.

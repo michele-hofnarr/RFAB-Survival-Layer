@@ -42,6 +42,15 @@ Keyword  kwUndead
 Keyword  kwMagicDamageFrost
 Keyword  kwMagicDamageFire
 Keyword  kwMagicDamageShock
+Idle     idleWarm           ; warm-hands-by-fire idle (IdleWarmHandsStanding)
+
+; v0.3.0: campfire power + wood-from-trees
+Perk    pkSurvival        ; RFAB "Основы выживания"
+Perk    pkCook            ; RFAB "Кулинар"
+Form    fwFirewood        ; Firewood01
+Weapon  woodAxe           ; Axe01 / RFAB wood axe
+Armor   backpack          ; RFAB "Рюкзак авантюриста"
+Spell   powCampfire       ; _RSL_PowerCampfire (granted with the perk)
 
 Spell    sCC1
 Spell    sCC2
@@ -197,6 +206,20 @@ GlobalVariable gBonusEnabled
 GlobalVariable gBonusRegenPct
 GlobalVariable gBonusThresholdPct
 
+; warm-hands-by-fire idle
+GlobalVariable gWarmAnim
+GlobalVariable gWarmAnimDelay
+
+; campfire power + wood-from-trees
+GlobalVariable gCampfireEnabled
+GlobalVariable gCampfireBurnHours
+GlobalVariable gCampfireFuel
+GlobalVariable gCampfireCooldown
+GlobalVariable gWoodFromTrees
+GlobalVariable gTreeChopCooldownH
+GlobalVariable gTreeChopYield
+GlobalVariable gTreeChopRadius
+
 bool ready = false
 
 ; Session-only debounce for the hit events: a concentration hazard / cloak
@@ -204,6 +227,16 @@ bool ready = false
 ; the debug log and walk IsCureEffect - enough to starve the update queue.
 float elemEvtLast = 0.0
 bool  mHasDisease = false      ; cached each tick; gates the cure-effect walk
+
+; warm-hands-by-fire idle: best-effort, cancelled on any input. Session only -
+; a reload starts clean (no animation survives it) and the tick re-arms.
+float warmLastActiveRT = 0.0
+bool  warmIdleOn = false
+float warmLastPX = 0.0
+float warmLastPY = 0.0
+
+; wood-from-tree: real-time spam guard (per-tree cooldown is on the tree ref)
+float chopRT = 0.0
 
 ; --- lifecycle -------------------------------------------------------------
 
@@ -234,7 +267,7 @@ EndEvent
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 39   ; v39: SevInterior is now % of RegionBase (default 60), no NightMult indoors
+int SETTINGS_VERSION = 44   ; v44: cook-pot offset debug sliders
 
 Function MigrateSettings()
     If !ready
@@ -417,6 +450,14 @@ EndEvent
 Function Bind()
     pl = Game.GetPlayer()
 
+    ; real-time session timers: these AME member vars persist in the save, but
+    ; Utility.GetCurrentRealTime() resets to ~0 each launch - a stale value reads
+    ; larger than "now" and the guards ("now - t < gap") block forever. Bind runs
+    ; on every load, so zero them here.
+    chopRT = 0.0
+    warmLastActiveRT = 0.0
+    elemEvtLast = 0.0
+
     abSleep     = _RSL_Forms.AbSleep()
     abHunger    = _RSL_Forms.AbHunger()
     abCold      = _RSL_Forms.AbCold()
@@ -429,6 +470,13 @@ Function Bind()
     kwMagicDamageFrost = _RSL_Forms.KwMagicDamageFrost()
     kwMagicDamageFire  = _RSL_Forms.KwMagicDamageFire()
     kwMagicDamageShock = _RSL_Forms.KwMagicDamageShock()
+    idleWarm    = _RSL_Forms.IdleWarmHands()
+    pkSurvival  = _RSL_Forms.PerkSurvivalBasics()
+    pkCook      = _RSL_Forms.PerkCook()
+    fwFirewood  = _RSL_Forms.Firewood()
+    woodAxe     = _RSL_Forms.WoodAxe()
+    backpack    = _RSL_Forms.Backpack()
+    powCampfire = _RSL_Forms.PowerCampfire()
 
     gModEnabled          = _RSL_Forms.ModEnabled()
     gSleepGrace          = _RSL_Forms.SleepGrace()
@@ -499,6 +547,16 @@ Function Bind()
     gBonusEnabled        = _RSL_Forms.BonusEnabled()
     gBonusRegenPct       = _RSL_Forms.BonusRegenPct()
     gBonusThresholdPct   = _RSL_Forms.BonusThresholdPct()
+    gWarmAnim            = _RSL_Forms.WarmAnim()
+    gWarmAnimDelay       = _RSL_Forms.WarmAnimDelay()
+    gCampfireEnabled     = _RSL_Forms.CampfireEnabled()
+    gCampfireBurnHours   = _RSL_Forms.CampfireBurnHours()
+    gCampfireFuel        = _RSL_Forms.CampfireFuel()
+    gCampfireCooldown    = _RSL_Forms.CampfireCooldown()
+    gWoodFromTrees       = _RSL_Forms.WoodFromTrees()
+    gTreeChopCooldownH   = _RSL_Forms.TreeChopCooldownH()
+    gTreeChopYield       = _RSL_Forms.TreeChopYield()
+    gTreeChopRadius      = _RSL_Forms.TreeChopRadius()
 
     gDiseaseEnabled      = _RSL_Forms.DiseaseEnabled()
     gDiseaseProgressHours = _RSL_Forms.DiseaseProgressHours()
@@ -663,10 +721,57 @@ Function Bind()
         RegisterForMenu("ContainerMenu")
         RegisterForMenu("BarterMenu")
         RegisterForMenu("GiftMenu")
+        RegisterInputs()
         _RSL_Log.W("Bind OK: forms resolved, ModEnabled=" + gModEnabled.GetValue())
     Else
         _RSL_Log.W("Bind FAILED: pl=" + pl + " abCold=" + abCold + " gModEnabled=" + gModEnabled)
     EndIf
+EndFunction
+
+; RegisterForControl notifies (never blocks) on the control regardless of key /
+; gamepad binding. Movement + action controls cancel the warm-hands idle;
+; "Activate" also drives the tree chop (feature 7). Survives keybind remaps,
+; which RegisterForKey did not - and OnKeyDown was not firing at all in testing.
+Function RegisterInputs()
+    RegisterForControl("Forward")
+    RegisterForControl("Back")
+    RegisterForControl("Strafe Left")
+    RegisterForControl("Strafe Right")
+    RegisterForControl("Sprint")
+    RegisterForControl("Jump")
+    RegisterForControl("Sneak")
+    RegisterForControl("Ready Weapon")
+    RegisterForControl("Activate")
+    _RSL_Log.W("RegisterInputs: controls registered")
+EndFunction
+
+Event OnControlDown(string control)
+    If !ready
+        return
+    EndIf
+    If StorageUtil.GetIntValue(None, "_RSL_DbgLog", 0) > 0
+        _RSL_Log.W("OnControlDown: " + control)
+    EndIf
+    ; any registered control = the player is doing something -> drop the idle
+    warmLastActiveRT = Utility.GetCurrentRealTime()
+    CancelWarmIdle()
+    If control == "Activate"
+        TryChopWood()
+    EndIf
+EndEvent
+
+bool Function HasSurvivalPerk()
+    return pkSurvival && pl.HasPerk(pkSurvival)
+EndFunction
+
+bool Function CanChopWood()
+    If woodAxe && pl.GetItemCount(woodAxe) > 0
+        return true
+    EndIf
+    If backpack && pl.GetItemCount(backpack) > 0 && HasSurvivalPerk()
+        return true
+    EndIf
+    return false
 EndFunction
 
 ; SkyUI inventory/container/barter/gift share one "ItemMenu" .swf that does not
@@ -691,6 +796,7 @@ Event OnMenuOpen(string menuName)
     If !ready
         return
     EndIf
+    CancelWarmIdle()
     If MenuHidesWidget(menuName)
         SetWidgetMenuHidden(true)
         return
@@ -724,6 +830,141 @@ Event OnMenuClose(string menuName)
         SetWidgetMenuHidden(false)
     EndIf
 EndEvent
+
+; Feature 7: Activate on a tree -> firewood, if carrying the wood axe or
+; (RFAB backpack + "Основы выживания"). Called from OnControlDown("Activate").
+; Never blocks activation - only acts on a tree the player can chop; everything
+; else falls through to the game untouched.
+Function TryChopWood()
+    bool dbg = StorageUtil.GetIntValue(None, "_RSL_DbgLog", 0) > 0
+    If GV(gWoodFromTrees, 1.0) < 0.5
+        If dbg
+            _RSL_Log.W("chop: WoodFromTrees off")
+        EndIf
+        return
+    EndIf
+    If Utility.GetCurrentRealTime() - chopRT < 2.0
+        return
+    EndIf
+    If !CanChopWood()
+        If dbg
+            _RSL_Log.W("chop: no tool (axe=" + AxeCnt() + " backpack=" + BackpackCnt() \
+                + " perk=" + HasSurvivalPerk() + ")")
+        EndIf
+        return
+    EndIf
+
+    ObjectReference t = TargetTree(dbg)
+    If !t
+        If dbg
+            _RSL_Log.W("chop: no choppable tree (crosshair or ahead)")
+        EndIf
+        return
+    EndIf
+
+    float now = Utility.GetCurrentGameTime()
+    If now - StorageUtil.GetFloatValue(t, "_RSL_Chopped", -999.0) < GV(gTreeChopCooldownH, 12.0) / 24.0
+        Message mc = _RSL_Forms.MsgTreeCooldown()
+        If mc
+            mc.Show()
+        EndIf
+        return
+    EndIf
+
+    int amount = GV(gTreeChopYield, 1.0) as int
+    If amount < 1
+        amount = 1
+    EndIf
+    If fwFirewood
+        pl.AddItem(fwFirewood, amount, true)
+    EndIf
+    StorageUtil.SetFloatValue(t, "_RSL_Chopped", now)
+    chopRT = Utility.GetCurrentRealTime()
+    _RSL_Log.W("wood: +" + amount + " firewood from " + t)
+EndFunction
+
+int Function AxeCnt()
+    If woodAxe
+        return pl.GetItemCount(woodAxe)
+    EndIf
+    return -1
+EndFunction
+
+int Function BackpackCnt()
+    If backpack
+        return pl.GetItemCount(backpack)
+    EndIf
+    return -1
+EndFunction
+
+; True if the base object is a Tree (38) or Flora (39). Logs the type on a miss.
+bool Function LooksLikeTree(ObjectReference r, bool dbg)
+    Form b = r.GetBaseObject()
+    If !b
+        return false
+    EndIf
+    int bt = b.GetType()
+    If bt == 38 || bt == 39
+        return true
+    EndIf
+    If dbg
+        _RSL_Log.W("chop: ref " + r + " base type=" + bt + " (" + b + ") - not a tree")
+    EndIf
+    return false
+EndFunction
+
+; The tree to chop: the crosshair ref if it is a tree, else the nearest tree the
+; player faces within 45 deg and TreeChopRadius units (crosshair picking misses
+; most TREE refs, so the scan is the path that actually works).
+ObjectReference Function TargetTree(bool dbg)
+    ObjectReference c = Game.GetCurrentCrosshairRef()
+    If c && LooksLikeTree(c, dbg) && pl.GetDistance(c) <= 400.0
+        return c
+    EndIf
+
+    float rad = GV(gTreeChopRadius, 100.0)
+    ObjectReference[] near = PO3_SKSEFunctions.FindAllReferencesOfFormType(pl, 38, rad)
+    If !near || near.Length == 0
+        near = PO3_SKSEFunctions.FindAllReferencesOfFormType(pl, 39, rad)
+    EndIf
+    If dbg
+        int n = 0
+        If near
+            n = near.Length
+        EndIf
+        _RSL_Log.W("chop: crosshair=" + c + " scan(r=" + rad + ")=" + n)
+    EndIf
+    If !near
+        return None
+    EndIf
+
+    float pa = pl.GetAngleZ()
+    ObjectReference best = None
+    float bestD = 999999.0
+    int i = 0
+    While i < near.Length
+        ObjectReference o = near[i]
+        If o && LooksLikeTree(o, false)
+            float d = pl.GetDistance(o)
+            float da = HeadingTo(o) - pa
+            While da > 180.0
+                da -= 360.0
+            EndWhile
+            While da < -180.0
+                da += 360.0
+            EndWhile
+            If da < 0.0
+                da = -da
+            EndIf
+            If da < 45.0 && d < bestD
+                bestD = d
+                best = o
+            EndIf
+        EndIf
+        i += 1
+    EndWhile
+    return best
+EndFunction
 
 Function Schedule()
     float iv = 1.0
@@ -819,6 +1060,8 @@ Event OnUpdate()
     ApplyPenalties(undead)
     ApplyBonus(undead)
     PushWidget()
+    WarmAnimTick()
+    CampfireTick()
 
     ; per-tick diagnostics - skip the string building entirely unless logging is on
     If StorageUtil.GetIntValue(None, "_RSL_DbgLog", 0) > 0
@@ -965,6 +1208,7 @@ Event OnSleepStart(float afSleepStartTime, float afDesiredSleepEndTime)
     If !ready
         return
     EndIf
+    CancelWarmIdle()
     StorageUtil.SetFloatValue(pl, K_SLEEPING, 1.0)
     StorageUtil.SetFloatValue(pl, K_SLEEPFROM, afSleepStartTime)
 EndEvent
@@ -1058,6 +1302,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
     If !ready
         return
     EndIf
+    CancelWarmIdle()
 
     Potion food = akBaseObject as Potion
     If !food
@@ -1208,6 +1453,46 @@ float Function WetnessFactor()
     return 1.0 - remaining
 EndFunction
 
+; Nearest _RSL_FireSources ref (campfire/forge/smelter/oven, and a campfire lit
+; by the player) within FireRadius, else None.
+ObjectReference Function NearestHeatRef()
+    If fireSources
+        return Game.FindClosestReferenceOfAnyTypeInListFromRef(fireSources, pl, gFireRadius.GetValue())
+    EndIf
+    return None
+EndFunction
+
+; A world heat source within FireRadius, or - when includeTorch - a lit torch in
+; either hand. Severity() counts the torch; the warm-hands idle does not.
+bool Function NearHeatSource(bool includeTorch)
+    If NearestHeatRef()
+        return true
+    EndIf
+    If includeTorch && (pl.GetEquippedItemType(0) == 11 || pl.GetEquippedItemType(1) == 11)
+        return true
+    EndIf
+    return false
+EndFunction
+
+; Skyrim Z-heading (deg, 0 = +Y) from the player to a target. Math has no atan2.
+float Function HeadingTo(ObjectReference target)
+    float dx = target.GetPositionX() - pl.GetPositionX()
+    float dy = target.GetPositionY() - pl.GetPositionY()
+    If dy == 0.0
+        If dx >= 0.0
+            return 90.0
+        EndIf
+        return 270.0
+    EndIf
+    float ang = Math.Atan(dx / dy)
+    If dy < 0.0
+        ang += 180.0
+    ElseIf dx < 0.0
+        ang += 360.0
+    EndIf
+    return ang
+EndFunction
+
 ; sev = RegionBase x Weather x Night x Swim x Fire (interior: fire -> 0, else
 ; RegionBase x SevInterior%). Current weather classification is a free region
 ; proxy - vanilla REGN already keeps snow out of the Rift and rain out of Winterhold.
@@ -1216,17 +1501,7 @@ float Function Severity()
     bool interior = c && c.IsInterior()
     bool swim = pl.IsSwimming()
 
-    ; Heat source: a world object from the list (campfire/forge/smelter/oven)
-    ; OR a torch in hand.
-    bool nearFire = false
-    If fireSources
-        If Game.FindClosestReferenceOfAnyTypeInListFromRef(fireSources, pl, gFireRadius.GetValue())
-            nearFire = true
-        EndIf
-    EndIf
-    If !nearFire && (pl.GetEquippedItemType(0) == 11 || pl.GetEquippedItemType(1) == 11)
-        nearFire = true
-    EndIf
+    bool nearFire = NearHeatSource(true)
 
     ; Shared multipliers, stored as percent, divided by 100.
     float nightM = 1.0
@@ -1541,6 +1816,106 @@ Function ClearColdVisual()
         sh.Stop(pl)
     EndIf
     StorageUtil.SetIntValue(pl, "_RSL_SHon", 0)
+EndFunction
+
+; Warm hands by a fire. After WarmAnimDelay seconds of the player standing
+; still (no movement, no combat, weapon sheathed, not sneaking/swimming/
+; sprinting/sleeping) near a heat source, play the vanilla warm-hands idle.
+; Purely cosmetic and best-effort: PlayIdle on the player is fragile (1st
+; person, mid-action) and CancelWarmIdle drops it on the first input.
+Function WarmAnimTick()
+    If !idleWarm
+        return          ; getter not in the plugin yet (pre-regen)
+    EndIf
+    float x = pl.GetPositionX()
+    float y = pl.GetPositionY()
+    bool moved = (Math.Abs(x - warmLastPX) + Math.Abs(y - warmLastPY)) > 4.0
+    warmLastPX = x
+    warmLastPY = y
+
+    ; IsInMenuMode() is false for real-time menus (crafting/cooking), so also
+    ; test the control state - movement controls are off in any menu.
+    bool busy = moved || Utility.IsInMenuMode() || !Game.IsMovementControlsEnabled() \
+        || UI.IsMenuOpen("Crafting Menu") || pl.GetCombatState() != 0 \
+        || pl.IsWeaponDrawn() || pl.IsSneaking() || pl.IsSwimming() || pl.IsSprinting() \
+        || StorageUtil.GetFloatValue(pl, K_SLEEPING, 0.0) > 0.0
+    If busy
+        warmLastActiveRT = Utility.GetCurrentRealTime()
+        CancelWarmIdle()
+        return
+    EndIf
+
+    If GV(gWarmAnim, 1.0) < 0.5 || warmIdleOn
+        return
+    EndIf
+    ObjectReference fire = NearestHeatRef()
+    If !fire
+        return
+    EndIf
+    If Utility.GetCurrentRealTime() - warmLastActiveRT >= GV(gWarmAnimDelay, 5.0)
+        ; only if the player already faces the fire (within 45 deg) - no turning
+        float d = HeadingTo(fire) - pl.GetAngleZ()
+        While d > 180.0
+            d -= 360.0
+        EndWhile
+        While d < -180.0
+            d += 360.0
+        EndWhile
+        If Math.Abs(d) > 45.0
+            return
+        EndIf
+        pl.PlayIdle(idleWarm)
+        warmIdleOn = true
+    EndIf
+EndFunction
+
+Function CancelWarmIdle()
+    If warmIdleOn
+        Debug.SendAnimationEvent(pl, "IdleForceDefaultState")
+        warmIdleOn = false
+    EndIf
+EndFunction
+
+; Feature 5/6: grant/revoke the "Развести костёр" lesser power with the perk,
+; and burn down a campfire past its deadline. The lit campfire itself is placed
+; by _RSL_CampfireEffect (the power's magic effect); this is only lifecycle.
+Function CampfireTick()
+    If powCampfire
+        If HasSurvivalPerk() && GV(gCampfireEnabled, 1.0) >= 0.5
+            If !pl.HasSpell(powCampfire)
+                pl.AddSpell(powCampfire, false)
+            EndIf
+        ElseIf pl.HasSpell(powCampfire)
+            pl.RemoveSpell(powCampfire)
+        EndIf
+    EndIf
+
+    If StorageUtil.GetFormValue(pl, "_RSL_CampRef") \
+       && Utility.GetCurrentGameTime() >= StorageUtil.GetFloatValue(pl, "_RSL_CampUntil", 0.0)
+        RemovePrevCampfire(pl)
+        _RSL_Log.W("CampfireTick: campfire burned out")
+    EndIf
+EndFunction
+
+; Disable+Delete the tracked campfire (and its cook pot) and clear the keys.
+; Global so _RSL_CampfireEffect (re-light) and TeardownAll share it. One
+; tracked ref per kind; always Delete(), not just Disable() - no save bloat.
+Function RemovePrevCampfire(Actor p) global
+    DropCampRef(p, "_RSL_CampRef")
+    DropCampRef(p, "_RSL_CampSpitRef")
+    DropCampRef(p, "_RSL_CampCookRef")
+    StorageUtil.UnsetFloatValue(p, "_RSL_CampUntil")
+EndFunction
+
+Function DropCampRef(Actor p, string storeKey) global
+    ObjectReference r = StorageUtil.GetFormValue(p, storeKey) as ObjectReference
+    ; clear the key FIRST - if the disable/delete below ever misbehaves, the next
+    ; cast must not retry the same broken ref.
+    StorageUtil.UnsetFormValue(p, storeKey)
+    If r
+        r.DisableNoWait()   ; NOT Disable() - that is latent and can stall the caster's thread
+        r.Delete()
+    EndIf
 EndFunction
 
 ; 1 - AV/100, clamped [0, 2]: full resist -> 0 (no effect), no resist -> 1,
@@ -1892,6 +2267,7 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
     If !ready
         return
     EndIf
+    CancelWarmIdle()
 
     Actor agg = akAggressor as Actor
     If !agg || akProjectile
@@ -2859,6 +3235,12 @@ Function TeardownAll() global
         shd.Stop(p)
     EndIf
     StorageUtil.SetIntValue(p, "_RSL_SHon", 0)
+
+    RemovePrevCampfire(p)
+    Spell pc = _RSL_Forms.PowerCampfire()
+    If pc
+        p.RemoveSpell(pc)
+    EndIf
 EndFunction
 
 Function ShutdownSpell(Actor p, Spell ab) global

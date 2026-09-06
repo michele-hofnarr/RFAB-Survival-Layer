@@ -356,6 +356,46 @@ GlobalVariable Function BonusThresholdPct() global
     return Game.GetFormFromFile(0x00000D40, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
+GlobalVariable Function WarmAnim() global
+    return Game.GetFormFromFile(0x00000E32, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function WarmAnimDelay() global
+    return Game.GetFormFromFile(0x00000E33, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function CampfireEnabled() global
+    return Game.GetFormFromFile(0x00000E34, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function CampfireBurnHours() global
+    return Game.GetFormFromFile(0x00000E35, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function CampfireFuel() global
+    return Game.GetFormFromFile(0x00000E36, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function CampfireCooldown() global
+    return Game.GetFormFromFile(0x00000E79, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function WoodFromTrees() global
+    return Game.GetFormFromFile(0x00000E37, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function TreeChopCooldownH() global
+    return Game.GetFormFromFile(0x00000E38, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function TreeChopYield() global
+    return Game.GetFormFromFile(0x00000E39, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function TreeChopRadius() global
+    return Game.GetFormFromFile(0x00000FD3, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
 ; --- abilities -----------------------------------------------------
 
 Spell Function AbSleep() global
@@ -384,6 +424,26 @@ EndFunction
 
 Spell Function AbMonitor() global
     return Game.GetFormFromFile(0x0000082E, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Spell Function PowerCampfire() global
+    return Game.GetFormFromFile(0x00000E51, "RFAB_SurvivalLayer.esp") as Spell
+EndFunction
+
+Message Function MsgCampLit() global
+    return Game.GetFormFromFile(0x00000E52, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgCampNoFuel() global
+    return Game.GetFormFromFile(0x00000E53, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgCampNoPerk() global
+    return Game.GetFormFromFile(0x00000E54, "RFAB_SurvivalLayer.esp") as Message
+EndFunction
+
+Message Function MsgTreeCooldown() global
+    return Game.GetFormFromFile(0x00000E55, "RFAB_SurvivalLayer.esp") as Message
 EndFunction
 
 ; --- misc ----------------------------------------------------------
@@ -444,6 +504,42 @@ EndFunction
 
 EffectShader Function FxColdShader() global
     return Game.GetFormFromFile(0x000DC20D, "Skyrim.esm") as EffectShader
+EndFunction
+
+Idle Function IdleWarmHands() global
+    return Game.GetFormFromFile(0x000E8642, "Skyrim.esm") as Idle
+EndFunction
+
+Perk Function PerkSurvivalBasics() global
+    return Game.GetFormFromFile(0x000CE266, "RFAB.esp") as Perk
+EndFunction
+
+Perk Function PerkCook() global
+    return Game.GetFormFromFile(0x000CE264, "RFAB.esp") as Perk
+EndFunction
+
+Form Function Firewood() global
+    return Game.GetFormFromFile(0x0006F993, "Skyrim.esm") as Form
+EndFunction
+
+Weapon Function WoodAxe() global
+    return Game.GetFormFromFile(0x0002F2F4, "Skyrim.esm") as Weapon
+EndFunction
+
+Armor Function Backpack() global
+    return Game.GetFormFromFile(0x000CD955, "RFAB.esp") as Armor
+EndFunction
+
+Form Function BaseCampfire() global
+    return Game.GetFormFromFile(0x00035F49, "Skyrim.esm") as Form
+EndFunction
+
+Form Function BaseCookSpit() global
+    return Game.GetFormFromFile(0x001018E3, "Skyrim.esm") as Form
+EndFunction
+
+Form Function BaseCookPot() global
+    return Game.GetFormFromFile(0x001010B3, "Skyrim.esm") as Form
 EndFunction
 
 Race Function RaceDraugr() global

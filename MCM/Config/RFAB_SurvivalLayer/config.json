@@ -849,6 +849,80 @@
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|840"
           }
+        },
+        {
+          "text": "$_RSL_HdrWarmAnim",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_WarmAnim",
+          "help": "$_RSL_WarmAnim_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E32"
+          }
+        },
+        {
+          "text": "$_RSL_WarmAnimDelay",
+          "help": "$_RSL_WarmAnimDelay_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 2,
+            "max": 20,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E33"
+          }
+        },
+        {
+          "text": "$_RSL_HdrCampfire",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_CampfireEnabled",
+          "help": "$_RSL_CampfireEnabled_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E34"
+          }
+        },
+        {
+          "text": "$_RSL_CampfireBurnHours",
+          "help": "$_RSL_CampfireBurnHours_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 24,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E35"
+          }
+        },
+        {
+          "text": "$_RSL_CampfireFuel",
+          "help": "$_RSL_CampfireFuel_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 5,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E36"
+          }
+        },
+        {
+          "text": "$_RSL_CampfireCooldown",
+          "help": "$_RSL_CampfireCooldown_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 30,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E79"
+          }
         }
       ]
     },
@@ -1204,6 +1278,43 @@
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|D40"
           }
+        },
+        {
+          "text": "$_RSL_HdrWood",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_WoodFromTrees",
+          "help": "$_RSL_WoodFromTrees_help",
+          "type": "toggle",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E37"
+          }
+        },
+        {
+          "text": "$_RSL_TreeChopCooldownH",
+          "help": "$_RSL_TreeChopCooldownH_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 72,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E38"
+          }
+        },
+        {
+          "text": "$_RSL_TreeChopYield",
+          "help": "$_RSL_TreeChopYield_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 1,
+            "max": 5,
+            "step": 1,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|E39"
+          }
         }
       ]
     },
@@ -1239,6 +1350,18 @@
           "valueOptions": {
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|81F"
+          }
+        },
+        {
+          "text": "$_RSL_TreeChopRadius",
+          "help": "$_RSL_TreeChopRadius_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 50,
+            "max": 400,
+            "step": 10,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|FD3"
           }
         },
         {
