@@ -159,6 +159,34 @@
           "type": "text"
         },
         {
+          "text": "$_RSL_HlpHCamp",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_Hlp36",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp37",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp38",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp39",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp40",
+          "type": "text"
+        },
+        {
+          "text": "$_RSL_Hlp41",
+          "type": "text"
+        },
+        {
           "text": "$_RSL_HlpHTune",
           "type": "header"
         },
@@ -463,7 +491,7 @@
           "type": "slider",
           "valueOptions": {
             "min": 1,
-            "max": 10,
+            "max": 30,
             "step": 0.5,
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|824"
@@ -747,8 +775,8 @@
           "type": "slider",
           "valueOptions": {
             "min": 100,
-            "max": 500,
-            "step": 5,
+            "max": 1000,
+            "step": 10,
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|81B"
           }
@@ -1261,8 +1289,8 @@
           "type": "slider",
           "valueOptions": {
             "min": 0,
-            "max": 25,
-            "step": 1,
+            "max": 200,
+            "step": 5,
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|831"
           }

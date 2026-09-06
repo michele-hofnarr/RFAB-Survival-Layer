@@ -244,6 +244,16 @@ float chopRT = 0.0
 
 Event OnEffectStart(Actor akTarget, Actor akCaster)
     _RSL_Log.W("Controller OnEffectStart")
+    Startup(false)
+EndEvent
+
+Event OnPlayerLoadGame()
+    Startup(true)
+EndEvent
+
+; Shared cold start. MCM and the widget both lose their SkyUI-manager
+; subscription on a save load, so they are re-armed either way.
+Function Startup(bool afterLoad)
     Bind()
     MigrateSettings()
     SanitizeAbilities()
@@ -251,25 +261,16 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
     Touch()
     PokeMCM()
     KickWidget()
+    If afterLoad
+        ClearColdVisual()   ; drop stuck visual; the tick restores it if needed
+    EndIf
     Schedule()
-EndEvent
-
-Event OnPlayerLoadGame()
-    Bind()
-    MigrateSettings()
-    SanitizeAbilities()
-    RegisterForSleep()
-    Touch()
-    PokeMCM()
-    KickWidget()        ; re-register the widget after a load
-    ClearColdVisual()   ; drop stuck visual; the tick restores it if needed
-    Schedule()
-EndEvent
+EndFunction
 
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 46   ; v46: TreeChopRadius back to 100
+int SETTINGS_VERSION = 47   ; v47: WarmupMult 10, SwimMult 500, BonusRegenPct 25
 
 Function MigrateSettings()
     If !ready
@@ -996,6 +997,12 @@ float Function GV(GlobalVariable g, float dflt)
     return dflt
 EndFunction
 
+; A subsystem runs only when the master switch AND its own toggle are on.
+; Missing GLOB (pre-regen plugin) counts as on, same as GV's default.
+bool Function FeatureOn(GlobalVariable g)
+    return gModEnabled.GetValue() >= 0.5 && GV(g, 1.0) >= 0.5
+EndFunction
+
 ; Mirror the "Отладочный лог" toggle into the fast flag _RSL_Log.W reads.
 Function SyncDebugLog()
     StorageUtil.SetIntValue(None, "_RSL_DbgLog", ((gDebugLog != None) && (gDebugLog.GetValue() >= 0.5)) as int)
@@ -1020,6 +1027,12 @@ Event OnUpdate()
             TeardownAll()
             StorageUtil.SetIntValue(pl, "_RSL_ModOff", 1)
         EndIf
+        ; Keep pushing while off: PushWidget hides all three bars when the mod
+        ; is disabled, and the .swf fades itself out once none is shown. Doing
+        ; it every tick rather than on the edge alone also covers loading a
+        ; save that is already disabled - KickWidget re-registers the widget
+        ; there, and it would otherwise come back with nothing to hide it.
+        PushWidget()
         Touch()
         Schedule()
         return
@@ -1125,9 +1138,11 @@ Function LogCold()
         int ri = 0
         While ri < 7
             int rst = _RSL_Disease.GetStage(pl, rdId[ri])
+            ; markRaw, not "afflicted": our stage 2/3 copies carry RFAB's marker
+            ; MGEF too, so this reads true from our own spell at those stages.
             bool rmark = rdMark[ri] && pl.HasMagicEffect(rdMark[ri])
             If rst > 0 || rmark || (rdBase[ri] && pl.HasSpell(rdBase[ri]))
-                _RSL_Log.W("rfabDz " + rdId[ri] + ": stage=" + rst + " P=" + StorageUtil.GetFloatValue(pl, "_RSL_Dz_" + rdId[ri] + "_Prog", 0.0) + " bad=" + DzAnyAxisBad(pl.HasKeyword(kwUndead)) + " mark=" + rmark + " hasBase=" + (rdBase[ri] && pl.HasSpell(rdBase[ri])) + " has2=" + (rd2[ri] && pl.HasSpell(rd2[ri])) + " has3=" + (rd3[ri] && pl.HasSpell(rd3[ri])))
+                _RSL_Log.W("rfabDz " + rdId[ri] + ": stage=" + rst + " P=" + StorageUtil.GetFloatValue(pl, "_RSL_Dz_" + rdId[ri] + "_Prog", 0.0) + " bad=" + DzAnyAxisBad(pl.HasKeyword(kwUndead)) + " markRaw=" + rmark + " hasBase=" + (rdBase[ri] && pl.HasSpell(rdBase[ri])) + " has2=" + (rd2[ri] && pl.HasSpell(rd2[ri])) + " has3=" + (rd3[ri] && pl.HasSpell(rd3[ri])))
             EndIf
             ri += 1
         EndWhile
@@ -1346,7 +1361,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
                    && !pl.HasKeyword(kwUndead)
 
     If rawWeak && _RSL_Disease.GetStage(pl, "FP") <= 0 && hdS1[3] \
-       && gModEnabled.GetValue() >= 0.5 && GV(gDiseaseEnabled, 1.0) >= 0.5
+       && FeatureOn(gDiseaseEnabled)
         If Utility.RandomFloat(0.0, 100.0) < GV(gFoodPoisonChance, 50.0)
             _RSL_Disease.SetStage(pl, "FP", 1, None, hdS1[3], 0.0, 0.0)
             _RSL_Disease.ResetP(pl, "FP")
@@ -1516,7 +1531,7 @@ float Function Severity()
     EndIf
     float swimM = 1.0
     If swim
-        swimM = GV(gSwimMult, 220.0) / 100.0
+        swimM = GV(gSwimMult, 500.0) / 100.0
     EndIf
 
     ; interior. Ordinary house/cave: fire + not swimming -> 0, else a fraction
@@ -1773,9 +1788,16 @@ Function AdvanceCold(float dtHours)
 
     ; Warm-up faster than cooling (game pace): delta < 0 -> multiply.
     If delta < 0.0
-        delta *= GV(gWarmupMult, 3.0)
+        delta *= GV(gWarmupMult, 10.0)
     EndIf
 
+    UpdateColdVisual(AddCold(delta))
+EndFunction
+
+; The ONLY writer of the cold bar: add a signed delta, clamp to 0..100, store,
+; return the new value. AdvanceCold (environment) and ApplyElemHits (queued
+; frost/fire nudges) both go through here so the clamp lives in one place.
+float Function AddCold(float delta)
     float v = StorageUtil.GetFloatValue(pl, K_COLD, 0.0) + delta
     If v < 0.0
         v = 0.0
@@ -1783,8 +1805,7 @@ Function AdvanceCold(float dtHours)
         v = 100.0
     EndIf
     StorageUtil.SetFloatValue(pl, K_COLD, v)
-
-    UpdateColdVisual(v)
+    return v
 EndFunction
 
 ; Character ice shader above the threshold. MCM toggle. State in StorageUtil
@@ -1894,21 +1915,21 @@ Function CampfireTick()
         EndIf
     EndIf
 
-    If StorageUtil.GetFormValue(pl, "_RSL_CampRef") \
-       && Utility.GetCurrentGameTime() >= StorageUtil.GetFloatValue(pl, "_RSL_CampUntil", 0.0)
+    If StorageUtil.GetFormValue(pl, _RSL_CampfireEffect.KeyFire()) \
+       && Utility.GetCurrentGameTime() >= StorageUtil.GetFloatValue(pl, _RSL_CampfireEffect.KeyUntil(), 0.0)
         RemovePrevCampfire(pl)
         _RSL_Log.W("CampfireTick: campfire burned out")
     EndIf
     CampfireGC(pl)
 EndFunction
 
-; Retire the tracked campfire set. Global so _RSL_CampfireEffect (re-light) and
-; TeardownAll share it.
+; Retire the tracked campfire set. Global so _RSL_CampfireEffect (re-light),
+; _RSL_CampfirePlaced (activate to put out) and TeardownAll share it.
 Function RemovePrevCampfire(Actor p) global
-    DropCampRef(p, "_RSL_CampRef")
-    DropCampRef(p, "_RSL_CampSpitRef")
-    DropCampRef(p, "_RSL_CampCookRef")
-    StorageUtil.UnsetFloatValue(p, "_RSL_CampUntil")
+    DropCampRef(p, _RSL_CampfireEffect.KeyFire())
+    DropCampRef(p, _RSL_CampfireEffect.KeySpit())
+    DropCampRef(p, _RSL_CampfireEffect.KeyPot())
+    StorageUtil.UnsetFloatValue(p, _RSL_CampfireEffect.KeyUntil())
     CampfireGC(p)
 EndFunction
 
@@ -1920,16 +1941,17 @@ Function DropCampRef(Actor p, string storeKey) global
     ObjectReference r = StorageUtil.GetFormValue(p, storeKey) as ObjectReference
     StorageUtil.UnsetFormValue(p, storeKey)
     If r
-        StorageUtil.FormListAdd(p, "_RSL_CampGC", r, false)
+        StorageUtil.FormListAdd(p, _RSL_CampfireEffect.KeyGC(), r, false)
     EndIf
 EndFunction
 
 Function CampfireGC(Actor p) global
-    int i = StorageUtil.FormListCount(p, "_RSL_CampGC") - 1
+    string gc = _RSL_CampfireEffect.KeyGC()
+    int i = StorageUtil.FormListCount(p, gc) - 1
     While i >= 0
-        ObjectReference r = StorageUtil.FormListGet(p, "_RSL_CampGC", i) as ObjectReference
+        ObjectReference r = StorageUtil.FormListGet(p, gc, i) as ObjectReference
         If !r || r.IsDeleted()
-            StorageUtil.FormListRemoveAt(p, "_RSL_CampGC", i)
+            StorageUtil.FormListRemoveAt(p, gc, i)
         Else
             r.DisableNoWait()
             r.Delete()          ; queues if the cell is loaded; harmless to repeat
@@ -1952,7 +1974,8 @@ EndFunction
 
 ; An elemental damage effect landed on the player. Two systems:
 ;   - cold bar: frost raises, fire lowers, scaled by Frost/FireResist. Queued
-;     (K_ELEMACC), folded on the tick by ApplyElemHits so K_COLD has one writer.
+;     (K_ELEMACC) and folded on the tick by ApplyElemHits, which goes through
+;     AddCold like every other cold change - the event never writes K_COLD.
 ;     Fire-warming is intentionally usable - burning costs HP, a real trade.
 ;   - elemental lesions: frost/fire/shock all damage P, scaled by the matching
 ;     resist. Queued (K_ELPACC), folded by AdvanceElemLesion.
@@ -2071,26 +2094,19 @@ Function ApplyElemHits()
     If acc == 0.0
         return
     EndIf
-    float v = StorageUtil.GetFloatValue(pl, K_COLD, 0.0) + acc
-    If v < 0.0
-        v = 0.0
-    ElseIf v > 100.0
-        v = 100.0
-    EndIf
-    StorageUtil.SetFloatValue(pl, K_COLD, v)
+    AddCold(acc)
     StorageUtil.SetFloatValue(pl, K_ELEMACC, 0.0)
 EndFunction
 
 ; --- disease: common cold ----------------------------------------------
-; Stages: Простуда -> Тяжёлая простуда -> Грипп (Disease-type SPEL).
-; Effect: flat -10% max Magicka for every stage (placeholder until the RFAB
-; stat pass), plus the escalating Mitigation multiplier (ColdDiseaseMitMult)
-; that makes cold worse. NEVER touches Health.
+; Stages: Простуда -> Тяжёлая простуда -> Грипп (Disease-type SPEL). Each stage
+; carries its penalty effects plus the escalating Mitigation multiplier
+; (ColdDiseaseMitMult) that makes cold bite harder. NEVER touches Health.
 ; Contract: rolls once per game-hour; chance rises linearly from
 ; ColdColdChanceMin at the threshold to ColdColdChanceMax at ColdColdChanceMaxAt
 ; cold, then x (1 - DiseaseResist/100).
-; Progression / decay: game-time, DiseaseProgressHours / DiseaseDecayHours (24
-; each). Progression only while cold > threshold; decay only while cold <= it.
+; Progression / decay: the shared P engine (see DzStepTarget) - any bad axis
+; worsens it, an all-clear heals it.
 
 ; Sleep-efficiency multiplier for brown rot (draugr disease): rotting flesh
 ; rests poorly. Applied to the SLEEP-counter reduction in OnSleepStop.
@@ -2183,6 +2199,20 @@ EndFunction
 ; MCM "Вылечить болезни" button - full clear of every disease (debug).
 Function CureColdDisease() global
     Actor p = Game.GetPlayer()
+    ClearAllDiseaseState(p)
+
+    ; queued elemental-hit accumulators
+    StorageUtil.SetFloatValue(p, "_RSL_ElemAccum", 0.0)     ; K_ELEMACC
+    StorageUtil.SetFloatValue(p, "_RSL_Dz_EL_PAcc", 0.0)    ; K_ELPACC
+    ReleaseHypoLockdown(p)
+
+    _RSL_Log.W("CureColdDisease: all diseases cleared (MCM button)")
+EndFunction
+
+; Wipe every disease/hypothermia stage this mod tracks, spells included. The
+; MCM "cure all" button and TeardownAll both need exactly this - keep it in one
+; place so a new disease is registered once.
+Function ClearAllDiseaseState(Actor p) global
     _RSL_Disease.ClearStages(p, "CC", _RSL_Forms.DiseaseColdCommon1(), \
         _RSL_Forms.DiseaseColdCommon2(), _RSL_Forms.DiseaseColdCommon3())
     _RSL_Disease.ClearStages(p, "BR", _RSL_Forms.DiseaseBrownRot1(), \
@@ -2198,16 +2228,15 @@ Function CureColdDisease() global
     _RSL_Disease.ClearStages(p, "HY", _RSL_Forms.AbHypo1(), \
         _RSL_Forms.AbHypo2(), _RSL_Forms.AbHypo3())
     ClearAllRfabWraps(p)
+EndFunction
 
-    ; queued elemental-hit accumulators + hypothermia lockdown / rest-block
-    StorageUtil.SetFloatValue(p, "_RSL_ElemAccum", 0.0)     ; K_ELEMACC
-    StorageUtil.SetFloatValue(p, "_RSL_Dz_EL_PAcc", 0.0)    ; K_ELPACC
+; Undo the hypothermia stage-3 lockdown (paralysis + the SetInChargen rest
+; block). Safe to call when no lockdown is active.
+Function ReleaseHypoLockdown(Actor p) global
     p.SetActorValue("Paralysis", 0.0)
     Game.SetInChargen(false, false, false)
     StorageUtil.SetIntValue(p, "_RSL_HypoWaitBlocked", 0)   ; K_HYWAIT
     Game.EnablePlayerControls()
-
-    _RSL_Log.W("CureColdDisease: all diseases cleared (MCM button)")
 EndFunction
 
 ; Clear every RFAB-wrapper stage, base spell included. Used by the MCM "cure
@@ -2352,7 +2381,7 @@ Function AdvanceHitDz(int i, bool undead, float dtHours)
     string id = hdId[i]
     int stage = _RSL_Disease.GetStage(pl, id)
 
-    bool on = gModEnabled.GetValue() >= 0.5 && GV(gDiseaseEnabled, 1.0) >= 0.5
+    bool on = FeatureOn(gDiseaseEnabled)
     If !on || undead
         If stage > 0
             _RSL_Disease.ClearStages(pl, id, s1, hdS2[i], hdS3[i])
@@ -2365,10 +2394,7 @@ Function AdvanceHitDz(int i, bool undead, float dtHours)
 
     Spell cur = HitStageSpell(i, stage)
 
-    int cures = _RSL_Disease.TakeCures(pl, id)
-    If cures == 0 && !(cur && pl.HasSpell(cur))
-        cures = 1
-    EndIf
+    int cures = DzCureCount(id, !(cur && pl.HasSpell(cur)))
     If cures > 0
         int t = stage - cures
         If t < 0
@@ -2383,25 +2409,15 @@ Function AdvanceHitDz(int i, bool undead, float dtHours)
         return
     EndIf
 
-    int net = _RSL_Disease.StepP(pl, id, DzAnyAxisBad(undead), dtHours, \
-        pl.GetActorValue("DiseaseResist"), GV(gDiseaseProgressHours, 24.0), \
-        GV(gDiseaseDecayHours, 24.0))
-    If net != 0
-        int t2 = stage - net
-        If t2 < 0
-            t2 = 0
-        ElseIf t2 > 3
-            t2 = 3
-        EndIf
-        If t2 != stage
-            _RSL_Disease.SetStage(pl, id, t2, cur, HitStageSpell(i, t2), 0.0, 0.0)
-            If t2 == 0 && hdMC[i]
-                hdMC[i].Show()
-            ElseIf t2 > stage && t2 == 3 && hdM3[i]
-                hdM3[i].Show()
-            ElseIf t2 > stage && hdM2[i]
-                hdM2[i].Show()
-            EndIf
+    int t2 = DzStepTarget(id, undead, dtHours, stage)
+    If t2 != stage
+        _RSL_Disease.SetStage(pl, id, t2, cur, HitStageSpell(i, t2), 0.0, 0.0)
+        If t2 == 0 && hdMC[i]
+            hdMC[i].Show()
+        ElseIf t2 > stage && t2 == 3 && hdM3[i]
+            hdM3[i].Show()
+        ElseIf t2 > stage && hdM2[i]
+            hdM2[i].Show()
         EndIf
     EndIf
 EndFunction
@@ -2437,9 +2453,16 @@ Function AdvanceRfabDz(int i, bool undead, float dtHours)
     ; spell list, so HasSpell misses it - detect via HasMagicEffect on the marker
     ; (the first, unconditional debuff). On contract we adopt it with a silent
     ; AddSpell(base, false); from then on it behaves like our own diseases.
-    bool afflicted = (mark && pl.HasMagicEffect(mark)) || pl.HasSpell(base)
+    ;
+    ; CAVEAT: CloneRfabDisease copies RFAB's whole effect list into our stage
+    ; 2/3 spells, marker included - so while one of those is applied the probe
+    ; fires on OUR spell, not on a stray RFAB instance. Only trust it when
+    ; neither copy is on, otherwise "afflicted" is true at every stage forever.
+    bool ourCopyOn = (rd2[i] && pl.HasSpell(rd2[i])) || (rd3[i] && pl.HasSpell(rd3[i]))
+    bool afflicted = pl.HasSpell(base) \
+                  || (mark && !ourCopyOn && pl.HasMagicEffect(mark))
 
-    bool on = gModEnabled.GetValue() >= 0.5 && GV(gRfabDzEnabled, 1.0) >= 0.5
+    bool on = FeatureOn(gRfabDzEnabled)
     If !on || undead
         If stage > 0
             _RSL_Disease.ClearStages(pl, id, base, rd2[i], rd3[i])
@@ -2468,9 +2491,13 @@ Function AdvanceRfabDz(int i, bool undead, float dtHours)
 
     ; at stage 2/3 the base spell was swapped out for our rd2/rd3 copy. A fresh
     ; bite re-applies RFAB's own effects (source = base) on top - dispel those;
-    ; our copy (source = rd2/rd3) is untouched.
+    ; our copy (source = rd2/rd3) is untouched. DispelSpell reports whether it
+    ; actually removed anything, which is the only way to tell a real stray
+    ; RFAB instance from our own copy showing RFAB's effect names.
     If stage >= 2
-        pl.DispelSpell(base)
+        If pl.DispelSpell(base)
+            _RSL_Log.W("rfabDz " + id + ": dispelled a stray RFAB instance at stage " + stage)
+        EndIf
     EndIf
 
     Spell cur = RdStageSpell(i, stage)
@@ -2492,13 +2519,15 @@ Function AdvanceRfabDz(int i, bool undead, float dtHours)
     EndIf
 
     ; cure: engine strips our current Type=Disease spell; counted in
-    ; OnMagicEffectApply. Fallbacks for an uncounted external cure.
-    int cures = _RSL_Disease.TakeCures(pl, id)
-    If cures == 0 && stage == 1 && !afflicted
-        cures = 1
-    ElseIf cures == 0 && stage >= 2 && !(cur && pl.HasSpell(cur))
-        cures = 1
+    ; OnMagicEffectApply. Fallbacks for an uncounted external cure - at stage 1
+    ; the tell is the marker effect going quiet, at 2/3 our own copy vanishing.
+    bool gone = false
+    If stage == 1
+        gone = !afflicted
+    Else
+        gone = !(cur && pl.HasSpell(cur))
     EndIf
+    int cures = DzCureCount(id, gone)
     If cures > 0
         int t = stage - cures
         If t < 0
@@ -2518,28 +2547,18 @@ Function AdvanceRfabDz(int i, bool undead, float dtHours)
 
     ; progression / regression via P. Good living heals it all the way out
     ; (stage 1 -> 0 removes the base RFAB disease), same as our own diseases.
-    int net = _RSL_Disease.StepP(pl, id, DzAnyAxisBad(undead), dtHours, \
-        pl.GetActorValue("DiseaseResist"), GV(gDiseaseProgressHours, 24.0), \
-        GV(gDiseaseDecayHours, 24.0))
-    If net != 0
-        int t2 = stage - net
-        If t2 < 0
-            t2 = 0
-        ElseIf t2 > 3
-            t2 = 3
-        EndIf
-        If t2 != stage
-            _RSL_Disease.SetStage(pl, id, t2, cur, RdStageSpell(i, t2), 0.0, 0.0)
-            If t2 == 0
-                pl.DispelSpell(base)
-                If rdMC[i]
-                    rdMC[i].Show()
-                EndIf
-            ElseIf t2 > stage && t2 == 3 && rdM3[i]
-                rdM3[i].Show()
-            ElseIf t2 > stage && rdM2[i]
-                rdM2[i].Show()
+    int t2 = DzStepTarget(id, undead, dtHours, stage)
+    If t2 != stage
+        _RSL_Disease.SetStage(pl, id, t2, cur, RdStageSpell(i, t2), 0.0, 0.0)
+        If t2 == 0
+            pl.DispelSpell(base)
+            If rdMC[i]
+                rdMC[i].Show()
             EndIf
+        ElseIf t2 > stage && t2 == 3 && rdM3[i]
+            rdM3[i].Show()
+        ElseIf t2 > stage && rdM2[i]
+            rdM2[i].Show()
         EndIf
     EndIf
 EndFunction
@@ -2648,7 +2667,7 @@ Function AdvanceHypothermia(float dtHours, bool undead)
     EndIf
     int stage = _RSL_Disease.GetStage(pl, "HY")
 
-    bool on = gModEnabled.GetValue() >= 0.5 && GV(gHypEnabled, 1.0) >= 0.5
+    bool on = FeatureOn(gHypEnabled)
     If !on || undead
         If stage > 0
             _RSL_Disease.ClearStages(pl, "HY", sHY1, sHY2, sHY3)
@@ -2704,11 +2723,9 @@ Function AdvanceHypothermia(float dtHours, bool undead)
     EndIf
 EndFunction
 
-; Worsen while cold >= ColdColdThreshold; recover while cold <= the (lower)
-; ColdColdRecoverThreshold; drift between the two thresholds holds the stage.
-; True while any survival axis (sleep / hunger / cold) is at least halfway
-; through its penalty ramp. This is the shared "conditions are bad" test that
-; drives every disease's accumulator: bad -> P falls, all-clear -> P rises.
+; An axis counts as "bad" once it is at least halfway through its penalty ramp.
+; This is the shared conditions test driving every disease's accumulator:
+; bad -> P falls (worsens), all-clear -> P rises (heals).
 float DZ_AXIS_BAD = 0.5
 
 ; Any of our diseases at stage > 0. Cached into mHasDisease each tick so the
@@ -2734,6 +2751,36 @@ bool Function AnyDiseaseActive()
         j += 1
     EndWhile
     return false
+EndFunction
+
+; Counted Cure-Disease hits pending for `id`. `spellMissing` is the caller's
+; "our stage spell vanished" test - a console removespell or a cure another mod
+; fires that IsCureEffect missed, both of which count as one uncounted cure.
+int Function DzCureCount(string id, bool spellMissing)
+    int cures = _RSL_Disease.TakeCures(pl, id)
+    If cures == 0 && spellMissing
+        cures = 1
+    EndIf
+    return cures
+EndFunction
+
+; Stage after one P step, clamped to 0..3. Returns `stage` unchanged when the
+; accumulator did not fire. Shared by every disease on the standard P model
+; (elemental lesions run their own drift and do not use this).
+int Function DzStepTarget(string id, bool undead, float dtHours, int stage)
+    int net = _RSL_Disease.StepP(pl, id, DzAnyAxisBad(undead), dtHours, \
+        pl.GetActorValue("DiseaseResist"), GV(gDiseaseProgressHours, 24.0), \
+        GV(gDiseaseDecayHours, 24.0))
+    If net == 0
+        return stage
+    EndIf
+    int t = stage - net
+    If t < 0
+        return 0
+    ElseIf t > 3
+        return 3
+    EndIf
+    return t
 EndFunction
 
 bool Function DzAnyAxisBad(bool undead)
@@ -2762,7 +2809,7 @@ Function AdvanceColdDisease(bool undead, float dtHours)
     EndIf
     int stage = _RSL_Disease.GetStage(pl, "CC")
 
-    bool on = gModEnabled.GetValue() >= 0.5 && GV(gDiseaseEnabled, 1.0) >= 0.5
+    bool on = FeatureOn(gDiseaseEnabled)
     If !on || undead
         If stage > 0
             ClearColdDisease()
@@ -2777,10 +2824,7 @@ Function AdvanceColdDisease(bool undead, float dtHours)
     ; stage spell vanished with no counted cure (console removespell, a cure
     ; another mod fires that IsCureEffect missed) -> treat as one.
     If stage > 0
-        int cures = _RSL_Disease.TakeCures(pl, "CC")
-        If cures == 0 && !(CCStageSpell(stage) && pl.HasSpell(CCStageSpell(stage)))
-            cures = 1
-        EndIf
+        int cures = DzCureCount("CC", !(CCStageSpell(stage) && pl.HasSpell(CCStageSpell(stage))))
         If cures > 0
             int target = stage - cures
             If target < 0
@@ -2808,26 +2852,16 @@ Function AdvanceColdDisease(bool undead, float dtHours)
         return
     EndIf
 
-    ; --- stage >= 1: shared accumulator (net = signed stage delta) ---
-    int net = _RSL_Disease.StepP(pl, "CC", DzAnyAxisBad(undead), dtHours, \
-        pl.GetActorValue("DiseaseResist"), GV(gDiseaseProgressHours, 24.0), \
-        GV(gDiseaseDecayHours, 24.0))
-    If net != 0
-        int target = stage - net
-        If target < 0
-            target = 0
-        ElseIf target > 3
-            target = 3
-        EndIf
-        If target != stage
-            CCSetStage(target)
-            If target == 0
-                CCNotify(msgCCCured)
-            ElseIf target > stage && target == 3
-                CCNotify(msgCC3)
-            ElseIf target > stage
-                CCNotify(msgCC2)
-            EndIf
+    ; --- stage >= 1: shared accumulator ---
+    int target = DzStepTarget("CC", undead, dtHours, stage)
+    If target != stage
+        CCSetStage(target)
+        If target == 0
+            CCNotify(msgCCCured)
+        ElseIf target > stage && target == 3
+            CCNotify(msgCC3)
+        ElseIf target > stage
+            CCNotify(msgCC2)
         EndIf
     EndIf
 EndFunction
@@ -2856,7 +2890,7 @@ Function AdvanceElemLesion(bool undead, float dtHours)
     EndIf
     int stage = _RSL_Disease.GetStage(pl, "EL")
 
-    bool on = gModEnabled.GetValue() >= 0.5 && GV(gElemLesionEnabled, 1.0) >= 0.5
+    bool on = FeatureOn(gElemLesionEnabled)
     If !on || undead
         If stage > 0
             _RSL_Disease.ClearStages(pl, "EL", sEL1, sEL2, sEL3)
@@ -2887,10 +2921,7 @@ Function AdvanceElemLesion(bool undead, float dtHours)
     EndIf
 
     If stage > 0
-        int cures = _RSL_Disease.TakeCures(pl, "EL")
-        If cures == 0 && !(ELStageSpell(stage) && pl.HasSpell(ELStageSpell(stage)))
-            cures = 1
-        EndIf
+        int cures = DzCureCount("EL", !(ELStageSpell(stage) && pl.HasSpell(ELStageSpell(stage))))
         If cures > 0
             int t = stage - cures
             If t < 0
@@ -3004,13 +3035,56 @@ EndFunction
 
 ; Quantization is required: SetNthEffectMagnitude mutates the spell form
 ; (a form change in the save), and remove/add every tick churns effects and
-; the log. So refresh only on a tier change; default step is 5 points.
-int Function Tier(float pct)
+; the log. So refresh only when the quantized value actually moves.
+float Function StepSize()
     float step = gTierStep.GetValue()
     If step < 1.0
         step = 1.0
     EndIf
-    return (pct / step) as int
+    return step
+EndFunction
+
+; Percent quantized DOWN to a multiple of the step. Used for SpeedMult, whose
+; magnitude IS the percentage - it is already on the RFAB 5-point grid, and
+; rounding it up would put the player at -5% speed the moment an axis crosses
+; its grace line.
+float Function QuantPct(float pct, float cap)
+    float step = StepSize()
+    float v = Clamp(pct, cap)
+    return ((v / step) as int) * step
+EndFunction
+
+; Pool penalty in POINTS, on the RFAB grid.
+;
+; RFAB's whole stat sheet is built on multiples of 5, so the number the player
+; actually sees must be one too. Quantizing the PERCENT does not achieve that:
+; 10% of a 120 base is 12 points. So the percentage is applied first and the
+; resulting POINTS are rounded - UP, i.e. against the player: a raw -12 HP
+; becomes -15 HP.
+;
+; Zero stays zero (below the grace line there is no penalty at all); the cap is
+; floored onto the grid first, so rounding up can never push past PenaltyCap.
+float Function QuantPoints(float pct, float base, float cap)
+    If pct <= 0.0 || base <= 0.0
+        return 0.0
+    EndIf
+    float step = StepSize()
+
+    float ceiling = ((0.01 * cap * base / step) as int) * step
+    If ceiling <= 0.0
+        return 0.0
+    EndIf
+
+    float pts = 0.01 * Clamp(pct, cap) * base
+    int n = (pts / step) as int
+    If pts > (n as float) * step
+        n += 1                       ; round up - worse for the player
+    EndIf
+    float q = (n as float) * step
+    If q > ceiling
+        q = ceiling
+    EndIf
+    return q
 EndFunction
 
 Function ApplyPenalties(bool undead)
@@ -3061,39 +3135,30 @@ Function ApplyAxis(Spell ab, string tierKey, float pctH, float pctM, float pctS,
         return
     EndIf
 
-    float step = gTierStep.GetValue()
-    If step < 1.0
-        step = 1.0
-    EndIf
+    ; Pools are quantized in POINTS (see QuantPoints), speed in percent - its
+    ; magnitude is the percentage itself. Magnitude is POSITIVE: Detrimental
+    ; makes the engine subtract it. ModActorValue is not used (save/load
+    ; desync); everything is off the BASE value, not the current max.
+    float qH   = QuantPoints(pctH, pl.GetBaseActorValue("Health"),  cap)
+    float qM   = QuantPoints(pctM, pl.GetBaseActorValue("Magicka"), cap)
+    float qS   = QuantPoints(pctS, pl.GetBaseActorValue("Stamina"), cap)
+    float qSpd = QuantPct(pctSpd, cap)
 
-    ; Quantize DOWN to a multiple of step. The same quantized value feeds both
-    ; the tier key and the magnitude. Previously the key was quantized but the
-    ; magnitude was raw, so a sub-step penalty got stuck (key = tier 0, nonzero
-    ; magnitude, refresh skipped) - the source of -4% health at cold=0.
-    int th  = Tier(Clamp(pctH,   cap))
-    int tm  = Tier(Clamp(pctM,   cap))
-    int ts  = Tier(Clamp(pctS,   cap))
-    int tsp = Tier(Clamp(pctSpd, cap))
-    float qH   = th  * step
-    float qM   = tm  * step
-    float qS   = ts  * step
-    float qSpd = tsp * step
-
-    int t = th * 1000000 + tm * 10000 + ts * 100 + tsp
-    If t == (StorageUtil.GetFloatValue(pl, tierKey, -1.0) as int)
+    ; Refresh only when a quantized value moves. The signature is a string, not
+    ; a packed int: point magnitudes scale with the pool, so a big-magicka build
+    ; would overflow any fixed-width packing and get stuck on a stale penalty.
+    string sig = qH + "|" + qM + "|" + qS + "|" + qSpd
+    If sig == StorageUtil.GetStringValue(pl, tierKey, "")
         return
     EndIf
-    StorageUtil.SetFloatValue(pl, tierKey, t as float)
+    StorageUtil.SetStringValue(pl, tierKey, sig)
 
     _RSL_Log.W("ApplyAxis " + tierKey + ": H=" + qH + " M=" + qM + " S=" + qS + " Spd=" + qSpd)
 
-    ; Magnitude is POSITIVE - Detrimental makes the engine subtract it.
-    ; ModActorValue is not used (save/load desync). Magnitude is off the BASE
-    ; (GetBaseActorValue), not the current max.
-    ab.SetNthEffectMagnitude(0, 0.01 * qH   * pl.GetBaseActorValue("Health"))
-    ab.SetNthEffectMagnitude(1, 0.01 * qM   * pl.GetBaseActorValue("Magicka"))
-    ab.SetNthEffectMagnitude(2, 0.01 * qS   * pl.GetBaseActorValue("Stamina"))
-    ab.SetNthEffectMagnitude(3, 0.01 * qSpd * 100.0)
+    ab.SetNthEffectMagnitude(0, qH)
+    ab.SetNthEffectMagnitude(1, qM)
+    ab.SetNthEffectMagnitude(2, qS)
+    ab.SetNthEffectMagnitude(3, qSpd)
 
     ; Refresh: without remove + re-add the new magnitude does not apply.
     pl.RemoveSpell(ab)
@@ -3133,8 +3198,8 @@ Function ApplyBonus(bool undead)
         return
     EndIf
 
-    bool on = gModEnabled.GetValue() >= 0.5 && GV(gBonusEnabled, 1.0) >= 0.5
-    float pct = GV(gBonusRegenPct, 5.0)
+    bool on = FeatureOn(gBonusEnabled)
+    float pct = GV(gBonusRegenPct, 25.0)
     float thr = GV(gBonusThresholdPct, 10.0) * 0.01
     If thr <= 0.0
         thr = 0.10       ; a misconfigured 0 would make the bonus unreachable
@@ -3208,15 +3273,11 @@ Function ClearAxis(Spell ab, string tierKey)
     If !ab
         return
     EndIf
-    ab.SetNthEffectMagnitude(0, 0.0)
-    ab.SetNthEffectMagnitude(1, 0.0)
-    ab.SetNthEffectMagnitude(2, 0.0)
-    ab.SetNthEffectMagnitude(3, 0.0)   ; SpeedMult
-    pl.RemoveSpell(ab)
-    StorageUtil.SetFloatValue(pl, tierKey, -1.0)
-    ; restore speed (weight nudge)
-    pl.DamageActorValue("CarryWeight", 0.1)
-    pl.RestoreActorValue("CarryWeight", 0.1)
+    ShutdownSpell(pl, ab)
+    StorageUtil.UnsetStringValue(pl, tierKey)   ; "" != any real signature
+    ; pre-v47 the signature was a packed float under the same name; drop it so
+    ; an upgraded save does not carry a dead key forever
+    StorageUtil.UnsetFloatValue(pl, tierKey)
     StorageUtil.SetFloatValue(pl, tierKey + "_hadSpd", 0.0)
 EndFunction
 
@@ -3252,29 +3313,12 @@ Function TeardownAll() global
     StorageUtil.SetFloatValue(p, "_RSL_ColdExposure", 0.0)
     StorageUtil.SetFloatValue(p, "_RSL_ElemAccum", 0.0)   ; K_ELEMACC (literal - global fn)
     StorageUtil.SetFloatValue(p, "_RSL_Dz_EL_PAcc", 0.0)  ; K_ELPACC (literal - global fn)
-    StorageUtil.SetFloatValue(p, "_RSL_TierSleep", -1.0)
-    StorageUtil.SetFloatValue(p, "_RSL_TierHunger", -1.0)
-    StorageUtil.SetFloatValue(p, "_RSL_TierCold", -1.0)
+    StorageUtil.UnsetStringValue(p, "_RSL_TierSleep")    ; K_TIER_SL (literal - global fn)
+    StorageUtil.UnsetStringValue(p, "_RSL_TierHunger")   ; K_TIER_HU
+    StorageUtil.UnsetStringValue(p, "_RSL_TierCold")     ; K_TIER_CO
 
-    _RSL_Disease.ClearStages(p, "CC", _RSL_Forms.DiseaseColdCommon1(), \
-        _RSL_Forms.DiseaseColdCommon2(), _RSL_Forms.DiseaseColdCommon3())
-    _RSL_Disease.ClearStages(p, "BR", _RSL_Forms.DiseaseBrownRot1(), \
-        _RSL_Forms.DiseaseBrownRot2(), _RSL_Forms.DiseaseBrownRot3())
-    _RSL_Disease.ClearStages(p, "GW", _RSL_Forms.DiseaseGutworm1(), \
-        _RSL_Forms.DiseaseGutworm2(), _RSL_Forms.DiseaseGutworm3())
-    _RSL_Disease.ClearStages(p, "GS", _RSL_Forms.DiseaseGreenspore1(), \
-        _RSL_Forms.DiseaseGreenspore2(), _RSL_Forms.DiseaseGreenspore3())
-    _RSL_Disease.ClearStages(p, "FP", _RSL_Forms.DiseaseFoodPoison1(), \
-        _RSL_Forms.DiseaseFoodPoison2(), _RSL_Forms.DiseaseFoodPoison3())
-    _RSL_Disease.ClearStages(p, "EL", _RSL_Forms.DiseaseElemLesion1(), \
-        _RSL_Forms.DiseaseElemLesion2(), _RSL_Forms.DiseaseElemLesion3())
-    _RSL_Disease.ClearStages(p, "HY", _RSL_Forms.AbHypo1(), \
-        _RSL_Forms.AbHypo2(), _RSL_Forms.AbHypo3())
-    ClearAllRfabWraps(p)
-    p.SetActorValue("Paralysis", 0.0)
-    Game.SetInChargen(false, false, false)
-    StorageUtil.SetIntValue(p, "_RSL_HypoWaitBlocked", 0)   ; K_HYWAIT (literal - global fn)
-    Game.EnablePlayerControls()
+    ClearAllDiseaseState(p)
+    ReleaseHypoLockdown(p)
 
     EffectShader shd = _RSL_Forms.FxColdShader()
     If shd
@@ -3289,6 +3333,8 @@ Function TeardownAll() global
     EndIf
 EndFunction
 
+; Zero an axis ability's magnitudes, strip it, and nudge CarryWeight so the
+; engine recomputes movement speed (a removed SpeedMult otherwise lingers).
 Function ShutdownSpell(Actor p, Spell ab) global
     If !ab
         return
@@ -3298,7 +3344,6 @@ Function ShutdownSpell(Actor p, Spell ab) global
     ab.SetNthEffectMagnitude(2, 0.0)
     ab.SetNthEffectMagnitude(3, 0.0)   ; SpeedMult
     p.RemoveSpell(ab)
-    ; restore speed
     p.DamageActorValue("CarryWeight", 0.1)
     p.RestoreActorValue("CarryWeight", 0.1)
 EndFunction

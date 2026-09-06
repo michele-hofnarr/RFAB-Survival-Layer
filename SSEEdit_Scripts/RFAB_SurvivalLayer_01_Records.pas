@@ -387,7 +387,7 @@ begin
   AddGlobal(PFX + 'WeatherRain',         200,   'Float');
   AddGlobal(PFX + 'WeatherSnow',         200,   'Float');
   AddGlobal(PFX + 'NightMult',           170,   'Float');   // 22:00-06:00
-  AddGlobal(PFX + 'SwimMult',            220,   'Float');   // + clothing warmth off
+  AddGlobal(PFX + 'SwimMult',            500,   'Float');   // + clothing warmth off
   AddGlobal(PFX + 'FireMult',            40,    'Float');   // outdoor fire/torch (x0.4); interior+fire -> 0
 
   AddGlobal(PFX + 'SevInterior',         60,    'Float');   // ordinary interior, no fire: % of the hold's outdoor RegionBase
@@ -398,7 +398,7 @@ begin
 
   AddGlobal(PFX + 'ColdRate',            1.0,   'Float');   // overall rate multiplier
   AddGlobal(PFX + 'ColdGrace',           25,    'Float');   // stat penalty ramps cold 25..100; widget notch at 75%
-  AddGlobal(PFX + 'WarmupMult',          5.0,   'Float');   // warm-up N x faster than cooling
+  AddGlobal(PFX + 'WarmupMult',          10.0,  'Float');   // warm-up N x faster than cooling
   AddGlobal(PFX + 'WarmthPerSlot',       7,     'Float');   // warmth per clothing slot (4 slots = 28)
   AddGlobal(PFX + 'ResistWeight',        50,    'Float');   // FrostResist x 50%
   AddGlobal(PFX + 'DryMinutes',          15,    'Float');   // IN-GAME minutes to dry off after water
@@ -420,7 +420,7 @@ begin
   // of its axis max, +BonusRegenPct% regen on the matching pool (cold->Health,
   // sleep->Magicka, hunger->Stamina). Flat, not ramped.
   AddGlobal(PFX + 'BonusEnabled',        1,     'Short');
-  AddGlobal(PFX + 'BonusRegenPct',       5,     'Float');
+  AddGlobal(PFX + 'BonusRegenPct',       25,    'Float');
   AddGlobal(PFX + 'BonusThresholdPct',   10,    'Float');
 
   // cold visual (character ice shader only; screen ISM dropped - no vanilla
@@ -648,43 +648,50 @@ begin
   end;
 end;
 
+// Get-or-create an FLST by EditorID and hand back a FRESH, empty FormIDs
+// container. Both our lists are rebuilt from scratch on every run (the
+// EditorID masks that feed them change between runs), so the reset is shared.
+function EnsureFlstItems(edid: string): IInterface;
+var
+  flst: IwbMainRecord;
+  grp : IwbGroupRecord;
+  old : IInterface;
+begin
+  Result := nil;
+  flst := RecordByEDID(tgt, 'FLST', edid);
+  if Assigned(flst) then
+    Inc(reused)
+  else begin
+    grp := EnsureGroup('FLST');
+    if not Assigned(grp) then Exit;
+    flst := Add(grp, 'FLST', True);
+    if not Assigned(flst) then begin
+      Problem('FLST не создался: ' + edid);
+      Exit;
+    end;
+    PutEdit(flst, 'EDID', edid);
+    Inc(madeNew);
+  end;
+  Remember(edid, flst);
+
+  old := ElementByName(flst, 'FormIDs');
+  if Assigned(old) then Remove(old);
+  Result := Add(flst, 'FormIDs', True);
+  if not Assigned(Result) then
+    Problem('FLST ' + edid + ': нет контейнера FormIDs');
+end;
+
 procedure BuildFireList;
 var
-  flst : IwbMainRecord;
-  grp  : IwbGroupRecord;
   items: IInterface;
-  oldItems: IInterface;
   sigs : TStringList;
   found: Integer;
 begin
   Say('');
   Say('--- FLST: fire sources ---');
 
-  flst := RecordByEDID(tgt, 'FLST', PFX + 'FireSources');
-  if Assigned(flst) then begin
-    Inc(reused);
-  end else begin
-    grp := EnsureGroup('FLST');
-    if not Assigned(grp) then Exit;
-    flst := Add(grp, 'FLST', True);
-    if not Assigned(flst) then begin
-      Problem('не создался FLST');
-      Exit;
-    end;
-    PutEdit(flst, 'EDID', PFX + 'FireSources');
-    Inc(madeNew);
-  end;
-  Remember(PFX + 'FireSources', flst);
-
-  // Always rebuild the contents: the LooksLikeFire mask changes between runs.
-  oldItems := ElementByName(flst, 'FormIDs');
-  if Assigned(oldItems) then
-    Remove(oldItems);
-  items := Add(flst, 'FormIDs', True);
-  if not Assigned(items) then begin
-    Problem('нет контейнера FormIDs в FLST');
-    Exit;
-  end;
+  items := EnsureFlstItems(PFX + 'FireSources');
+  if not Assigned(items) then Exit;
 
   sigs := TStringList.Create;
   try
@@ -731,37 +738,14 @@ end;
 // location parent chain against this list.
 procedure BuildColdInteriors;
 var
-  flst : IwbMainRecord;
-  grp  : IwbGroupRecord;
-  items, old: IInterface;
+  items: IInterface;
   found: Integer;
 begin
   Say('');
   Say('--- FLST: cold interiors ---');
 
-  flst := RecordByEDID(tgt, 'FLST', PFX + 'ColdInteriors');
-  if Assigned(flst) then begin
-    Inc(reused);
-  end else begin
-    grp := EnsureGroup('FLST');
-    if not Assigned(grp) then Exit;
-    flst := Add(grp, 'FLST', True);
-    if not Assigned(flst) then begin
-      Problem('ColdInteriors FLST not created');
-      Exit;
-    end;
-    PutEdit(flst, 'EDID', PFX + 'ColdInteriors');
-    Inc(madeNew);
-  end;
-  Remember(PFX + 'ColdInteriors', flst);
-
-  old := ElementByName(flst, 'FormIDs');
-  if Assigned(old) then Remove(old);
-  items := Add(flst, 'FormIDs', True);
-  if not Assigned(items) then begin
-    Problem('ColdInteriors: no FormIDs container');
-    Exit;
-  end;
+  items := EnsureFlstItems(PFX + 'ColdInteriors');
+  if not Assigned(items) then Exit;
 
   found := 0;
   FlstAddEdids(items, 'Skyrim.esm', 'LCTN',
@@ -1902,12 +1886,76 @@ end;
 // follower keeps the boon only at stage 1 (RFAB's own record); the controller
 // freezes the disease there. The extras collapse to one visible "face" line
 // (the renamed stage + auto-built text); the remaining extras stay hidden.
+// "a. " + "b." -> "a. b." ; either side may be empty.
+function JoinSentences(a, b: string): string;
+begin
+  a := Trim(a);
+  b := Trim(b);
+  if a = '' then Result := b
+  else if b = '' then Result := a
+  else Result := a + ' ' + b;
+end;
+
+// Strip RFAB's visible description-carrier effect (zero magnitude, Actor Value
+// "None" - it applies nothing, it only shows a line) and hand back its text.
+// Real mechanical effects are left alone even when visible.
+function TakeDescriptionCarrier(effs: IInterface; ctx: string): string;
+var
+  i  : Integer;
+  eff, fl: IInterface;
+  mg : IwbMainRecord;
+  hidden: Boolean;
+begin
+  Result := '';
+  if not Assigned(effs) then Exit;
+  for i := Pred(ElementCount(effs)) downto 0 do begin
+    eff := ElementByIndex(effs, i);
+    mg  := LinksTo(ElementByPath(eff, 'EFID'));
+    if not Assigned(mg) then Continue;
+    fl := MgefFlags(mg);
+    hidden := Assigned(fl) and ((GetNativeValue(fl) and $00008000) <> 0);
+    if (not hidden)
+       and (GetNativeValue(ElementByPath(eff, 'EFIT\Magnitude')) < 0.0001)
+       and SameText(GetElementEditValues(mg, 'Magic Effect Data\DATA\Actor Value'), 'None') then begin
+      if Result = '' then Result := Trim(GetElementEditValues(mg, 'DNAM'));
+      Say('    ' + ctx + ': dropped description carrier ' + EditorID(mg));
+      RemoveByIndex(effs, i, True);
+    end;
+  end;
+end;
+
+// "Aggravated stages carry debuffs only." RFAB pairs every disease penalty with
+// a boon - fortify armour, restore magicka, resist stagger - and the boons are
+// Peryite-gated. The Detrimental flag separates the two exactly: in RFAB's
+// records every penalty carries it and no boon does (verified against
+// DumpRfabDiseaseEffects for all 7), so it is the discriminator we filter on.
+//
+// It is NOT the gate itself. The dump shows RFAB uses no vanilla gating here:
+// no CTDA on the MGEF, no Perk to Apply. The only structural tell is that every
+// boon carries KWDA keywords and no penalty does, i.e. RFAB resolves it in its
+// own framework by keyword. Filtering on Detrimental keeps us independent of
+// that.
+procedure DropNonDetrimental(effs: IInterface; ctx: string);
+var
+  i : Integer;
+  mg: IwbMainRecord;
+begin
+  if not Assigned(effs) then Exit;
+  for i := Pred(ElementCount(effs)) downto 0 do begin
+    mg := LinksTo(ElementByPath(ElementByIndex(effs, i), 'EFID'));
+    if not Assigned(mg) then Continue;
+    if Pos('Detrimental', FlagsOf(mg)) = 0 then begin
+      Say('    ' + ctx + ': dropped boon ' + EditorID(mg));
+      RemoveByIndex(effs, i, True);
+    end;
+  end;
+end;
+
 function CloneRfabDisease(disTpl, src: IwbMainRecord;
-  newEdid, newFull, flavour, extraSpec: string): IwbMainRecord;
+  newEdid, newFull, flavour, inheritText, extraSpec: string): IwbMainRecord;
 var
   dst, face : IwbMainRecord;
   effs, e: IInterface;
-  i    : Integer;
   fresh: Boolean;
   descr, stem, faceEdid: string;
 begin
@@ -1927,20 +1975,30 @@ begin
   PutEdit(dst, 'FULL', newFull);
   NormalizeSpit(dst, 'Disease');   // trap template is Constant Effect / Touch
 
-  PutEdit(dst, 'DESC', Trim(flavour + ' ' + L('wrap.aggravated') + ' ' + SpecToText(extraSpec, 0, False)));
-  descr := Trim(flavour + ' ' + L('wrap.aggravated') + ' ' + SpecToText(extraSpec, 0, True));
-
   CopyEffectsFrom(dst, src);
-
-  // Drop RFAB's Peryite-gated bonus effects (the one carrying a CTDA condition).
-  // Our stages 2/3 are debuff-only; the Peryite boon lives on stage 1 alone.
   effs := ElementByName(dst, 'Effects');
-  if Assigned(effs) then
-    for i := Pred(ElementCount(effs)) downto 0 do
-      if Assigned(ElementBySignature(ElementByIndex(effs, i), 'CTDA')) then begin
-        Say('    ' + newEdid + ': dropped Peryite-gated effect [' + IntToStr(i) + ']');
-        RemoveByIndex(effs, i, True);
-      end;
+
+  // NOTE: there is no condition to filter on - neither the effect entry nor the
+  // MGEF carries a CTDA, and Perk to Apply is empty. RFAB gates its boons by
+  // keyword inside its own framework. We filter on the Detrimental flag, which
+  // states the intent directly: an aggravated stage carries penalties only.
+
+  // RFAB's disease records have a fixed shape: several HIDDEN mechanical
+  // effects plus ONE visible zero-magnitude carrier (RFAB_Description_<X>)
+  // that exists only to put a name and a description in the active-effects
+  // list. Our clone brings its own "face" effect for that job, so the carrier
+  // has to go - otherwise one disease shows as two lines.
+  TakeDescriptionCarrier(effs, newEdid);
+  DropNonDetrimental(effs, newEdid);
+
+  // The surviving inherited penalties are hidden and wordless, so they need
+  // describing by hand (wrap.<key>.inherit) - that is the text the player was
+  // missing. RFAB's own carrier text is NOT reused: it also advertises the
+  // boons we just dropped.
+  PutEdit(dst, 'DESC', JoinSentences(inheritText,
+    Trim(flavour + ' ' + L('wrap.aggravated') + ' ' + SpecToText(extraSpec, 0, False))));
+  descr := JoinSentences(inheritText,
+    Trim(flavour + ' ' + L('wrap.aggravated') + ' ' + SpecToText(extraSpec, 0, True)));
 
   stem := FirstStem(extraSpec);
   if stem <> '' then begin
@@ -1962,6 +2020,102 @@ begin
   Result := dst;
 end;
 
+// Diagnostic: dump what RFAB's disease record actually carries. Our stage 2/3
+// clones keep every non-CTDA effect, so this is exactly the set that applies on
+// top of our own extras - and, for anything not Hide-in-UI, renders as its own
+// line in the active-effects list next to our "face" line. The wrapper's DESC
+// currently describes ONLY the extras, so this is the list it fails to mention.
+// Everything on an MGEF that could gate it. Conditions sit under the CTDA
+// signature, NOT in a container called "Conditions" - looking only for the
+// latter silently reports "no conditions" on a gated effect.
+//
+// For RFAB's disease effects the answer turned out to be none of the usual
+// suspects: no CTDA, no Perk to Apply. What separates a boon from a penalty in
+// its records is that boons carry KEYWORDS and penalties do not, so those get
+// printed too, along with any attached script.
+procedure DumpMgefGate(mg: IwbMainRecord);
+var
+  c, one, kw: IInterface;
+  j    : Integer;
+  names: string;
+  k    : IwbMainRecord;
+begin
+  c := ElementBySignature(mg, 'CTDA');
+  if not Assigned(c) then c := ElementByName(mg, 'Conditions');
+  if Assigned(c) then begin
+    if ElementCount(c) > 0 then
+      for j := 0 to Pred(ElementCount(c)) do
+        Say('          cond[' + IntToStr(j) + '] ' + Trim(GetEditValue(ElementByIndex(c, j))))
+    else
+      Say('          cond: ' + Trim(GetEditValue(c)));
+  end;
+
+  kw := ElementByName(mg, 'KWDA');
+  if Assigned(kw) then begin
+    names := '';
+    for j := 0 to Pred(ElementCount(kw)) do begin
+      k := LinksTo(ElementByIndex(kw, j));
+      if Assigned(k) then names := names + ' ' + EditorID(k)
+      else names := names + ' <?>';
+    end;
+    Say('          KWDA:' + names);
+  end;
+
+  one := ElementByPath(mg, 'VMAD\Scripts');
+  if Assigned(one) then begin
+    names := '';
+    for j := 0 to Pred(ElementCount(one)) do
+      names := names + ' ' + GetElementEditValues(ElementByIndex(one, j), 'scriptName');
+    Say('          VMAD:' + names);
+  end;
+
+  if not Assigned(c) and not Assigned(kw) then begin
+    names := '';
+    for j := 0 to Pred(ElementCount(mg)) do
+      names := names + ' ' + Name(ElementByIndex(mg, j));
+    Say('          no gate found; MGEF elements:' + names);
+  end;
+end;
+
+procedure DumpRfabDiseaseEffects(src: IwbMainRecord; key: string);
+var
+  effs, eff, fl: IInterface;
+  mg  : IwbMainRecord;
+  i   : Integer;
+  line, perk: string;
+begin
+  effs := ElementByName(src, 'Effects');
+  if not Assigned(effs) then begin
+    Say('  [' + key + '] no Effects on ' + EditorID(src));
+    Exit;
+  end;
+  Say('  [' + key + '] inherited from ' + EditorID(src) + ':');
+  for i := 0 to Pred(ElementCount(effs)) do begin
+    eff := ElementByIndex(effs, i);
+    mg  := LinksTo(ElementByPath(eff, 'EFID'));
+    if not Assigned(mg) then begin
+      Say('    [' + IntToStr(i) + '] <EFID не разрешился>');
+      Continue;
+    end;
+    line := '    [' + IntToStr(i) + '] ' + EditorID(mg)
+          + '  mag=' + GetElementEditValues(eff, 'EFIT\Magnitude')
+          + '  AV="' + GetElementEditValues(mg, 'Magic Effect Data\DATA\Actor Value') + '"'
+          + '  arch=' + GetElementEditValues(mg, 'Magic Effect Data\DATA\Archtype');
+    fl := MgefFlags(mg);
+    if Assigned(fl) and ((GetNativeValue(fl) and $00008000) <> 0) then
+      line := line + '  HIDDEN'
+    else
+      line := line + '  VISIBLE name="' + GetElementEditValues(mg, 'FULL') + '"';
+    if Pos('Detrimental', FlagsOf(mg)) > 0 then
+      line := line + '  DETRIMENTAL';
+    perk := GetElementEditValues(mg, 'Magic Effect Data\DATA\Perk to Apply');
+    if (perk <> '') and (Pos('NULL', perk) = 0) then
+      line := line + '  perk=' + perk;
+    Say(line);
+    DumpMgefGate(mg);
+  end;
+end;
+
 procedure BuildOneRfabWrapper(disTpl: IwbMainRecord;
   srcFile, srcEdid, key, spec2, spec3: string);
 var
@@ -1975,10 +2129,13 @@ begin
   end;
   AddMasterIfMissing(tgt, srcFile);
   baseName := L('wrap.' + key + '.base');
+  DumpRfabDiseaseEffects(src, key);
   CloneRfabDisease(disTpl, src, PFX + 'Dz' + key + '2',
-    L('wrap.progressive') + ' ' + baseName, L('wrap.' + key + '.flavour.2'), spec2);
+    L('wrap.progressive') + ' ' + baseName, L('wrap.' + key + '.flavour.2'),
+    L('wrap.' + key + '.inherit'), spec2);
   CloneRfabDisease(disTpl, src, PFX + 'Dz' + key + '3',
-    L('wrap.severe') + ' ' + baseName, L('wrap.' + key + '.flavour.3'), spec3);
+    L('wrap.severe') + ' ' + baseName, L('wrap.' + key + '.flavour.3'),
+    L('wrap.' + key + '.inherit'), spec3);
   AddMsg(PFX + 'MsgDz' + key + '2',     baseName + L('wrap.msg.2'));
   AddMsg(PFX + 'MsgDz' + key + '3',     baseName + L('wrap.msg.3'));
   AddMsg(PFX + 'MsgDz' + key + 'Cured', baseName + L('wrap.msg.cured'));
@@ -1996,9 +2153,10 @@ begin
     Say('  no disease template - skipping wrappers');
     Exit;
   end;
-  // extras = library effects appended on top of RFAB's stage-1 effects (which
-  // are copied 1:1). Peryite-gated effects in the copy are scaled x1.25/1.5.
-  // Magnitudes are first-pass - tune in playtest.
+  // extras = library effects appended on top of RFAB's stage-1 effects, which
+  // are copied 1:1 minus the Peryite-gated ones. NOTE: those inherited effects
+  // apply but are NOT mentioned in the stage description - see
+  // DumpRfabDiseaseEffects. Magnitudes are first-pass - tune in playtest.
   BuildOneRfabWrapper(disTpl, 'RFAB.esp', 'RFAB_Disease_Ataxia', 'AT',
     'MgefWeapSpeed=10',
     'MgefWeapSpeed=20,MgefSneak=20');
@@ -2310,35 +2468,6 @@ begin
     end;
   end;
   Say('  no Lesser Power SPEL found - using ability template + PutEdit');
-end;
-
-// A Script-archetype MGEF that is already Fire and Forget (so its Casting Type
-// need not be set by enum label). Falls back to the Constant-Effect script
-// template + an explicit PutEdit.
-function FindScriptFFTemplate: IwbMainRecord;
-var
-  src : IwbFile;
-  grp : IwbGroupRecord;
-  r   : IwbMainRecord;
-  i   : Integer;
-  arch, cast: string;
-begin
-  Result := nil;
-  src := FileByName('Skyrim.esm');
-  if not Assigned(src) then Exit;
-  grp := GroupBySignature(src, 'MGEF');
-  if not Assigned(grp) then Exit;
-  for i := 0 to Pred(ElementCount(grp)) do begin
-    r := ElementByIndex(grp, i);
-    arch := GetElementEditValues(r, 'Magic Effect Data\DATA\Archtype');
-    cast := GetElementEditValues(r, 'Magic Effect Data\DATA\Casting Type');
-    if SameText(arch, 'Script') and (Pos('Fire', cast) > 0) then begin
-      Result := r;
-      Say('  script-FF MGEF template: ' + EditorID(r) + '  [' + arch + ' / ' + cast + ']');
-      Exit;
-    end;
-  end;
-  Say('  no Fire-and-Forget script MGEF in Skyrim.esm - using constant-effect one');
 end;
 
 // First Skyrim.esm ACTI that has a Model and no script / destruction data - a
@@ -3428,6 +3557,9 @@ begin
     JsonHeader(sl, '_RSL_HlpHHypo');
     JsonInfo(sl, '_RSL_Hlp30');  JsonInfo(sl, '_RSL_Hlp31');  JsonInfo(sl, '_RSL_Hlp32');
     JsonInfo(sl, '_RSL_Hlp33');
+    JsonHeader(sl, '_RSL_HlpHCamp');
+    JsonInfo(sl, '_RSL_Hlp36');  JsonInfo(sl, '_RSL_Hlp37');  JsonInfo(sl, '_RSL_Hlp38');
+    JsonInfo(sl, '_RSL_Hlp39');  JsonInfo(sl, '_RSL_Hlp40');  JsonInfo(sl, '_RSL_Hlp41');
     JsonHeader(sl, '_RSL_HlpHTune');
     JsonInfo(sl, '_RSL_Hlp34');  JsonInfo(sl, '_RSL_Hlp35');
     TrimLastComma(sl);
@@ -3496,7 +3628,7 @@ begin
     JsonHeader(sl, '_RSL_HdrColdModel');
     JsonSlider(sl, PFX + 'ColdRate',      '0.25', '3',  '0.25');  // overall rate multiplier
     JsonSlider(sl, PFX + 'ColdGrace',     '0',    '100', '5');
-    JsonSlider(sl, PFX + 'WarmupMult',    '1',    '10',  '0.5');
+    JsonSlider(sl, PFX + 'WarmupMult',    '1',    '30',  '0.5');
     JsonSlider(sl, PFX + 'WarmthPerSlot', '0',   '30',  '1');
     JsonSlider(sl, PFX + 'ResistWeight',  '0',   '200', '5');   // % of FrostResist
     JsonSlider(sl, PFX + 'DryMinutes',    '0',   '30',  '1');
@@ -3521,7 +3653,7 @@ begin
     JsonSlider(sl, PFX + 'WeatherRain',       '50',  '400', '5');
     JsonSlider(sl, PFX + 'WeatherSnow',       '50',  '400', '5');
     JsonSlider(sl, PFX + 'NightMult',         '100', '400', '5');
-    JsonSlider(sl, PFX + 'SwimMult',          '100', '500', '5');
+    JsonSlider(sl, PFX + 'SwimMult',          '100', '1000', '10');
     JsonSlider(sl, PFX + 'FireMult',          '0',   '100', '5');
     JsonSlider(sl, PFX + 'SevInterior',       '0',   '150', '5');
     JsonSlider(sl, PFX + 'SevColdInterior',   '0',   '150', '5');
@@ -3597,7 +3729,7 @@ begin
     JsonSlider(sl, PFX + 'TierStep',       '5', '25',  '5');
     JsonHeader(sl, '_RSL_HdrBonus');
     JsonToggle(sl, PFX + 'BonusEnabled');
-    JsonSlider(sl, PFX + 'BonusRegenPct',      '0', '25', '1');
+    JsonSlider(sl, PFX + 'BonusRegenPct',      '0', '200', '5');
     JsonSlider(sl, PFX + 'BonusThresholdPct',  '0', '50', '5');
     JsonHeader(sl, '_RSL_HdrWood');
     JsonToggle(sl, PFX + 'WoodFromTrees');

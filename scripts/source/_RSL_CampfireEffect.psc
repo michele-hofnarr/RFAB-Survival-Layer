@@ -18,6 +18,33 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
     Dispel()          ; Constant Effect - remove ourselves so this is a one-shot
 EndEvent
 
+; --- StorageUtil key names ------------------------------------------------
+; This script writes the campfire state, _RSL_Controller owns its lifecycle
+; (RemovePrevCampfire / CampfireGC / the burn-out check), so both must address
+; the exact same keys. Papyrus has no cross-script constants - these getters
+; are the single source of truth. Never inline the strings.
+
+string Function KeyFire() global
+    return "_RSL_CampRef"
+EndFunction
+
+string Function KeySpit() global
+    return "_RSL_CampSpitRef"
+EndFunction
+
+string Function KeyPot() global
+    return "_RSL_CampCookRef"
+EndFunction
+
+string Function KeyUntil() global
+    return "_RSL_CampUntil"
+EndFunction
+
+; FormList of retired refs still awaiting Disable/Delete (see CampfireGC).
+string Function KeyGC() global
+    return "_RSL_CampGC"
+EndFunction
+
 Function LightCampfire(Actor p) global
     If !p
         return
@@ -66,9 +93,9 @@ Function LightCampfire(Actor p) global
 
     ; grab the previous set BEFORE placing the new one - it is cleaned up only
     ; AFTER the new campfire is up (see _RSL_Controller.CampfireGC).
-    ObjectReference oldFire = StorageUtil.GetFormValue(p, "_RSL_CampRef") as ObjectReference
-    ObjectReference oldSpit = StorageUtil.GetFormValue(p, "_RSL_CampSpitRef") as ObjectReference
-    ObjectReference oldPot  = StorageUtil.GetFormValue(p, "_RSL_CampCookRef") as ObjectReference
+    ObjectReference oldFire = StorageUtil.GetFormValue(p, KeyFire()) as ObjectReference
+    ObjectReference oldSpit = StorageUtil.GetFormValue(p, KeySpit()) as ObjectReference
+    ObjectReference oldPot  = StorageUtil.GetFormValue(p, KeyPot()) as ObjectReference
 
     float a = p.GetAngleZ()
     ObjectReference r = PlaceRel(p, base, p, Math.Sin(a) * 110.0, Math.Cos(a) * 110.0, 0.0, a)
@@ -88,24 +115,25 @@ Function LightCampfire(Actor p) global
             Math.Cos(a) * fwd - Math.Sin(a) * side, up, a)
     EndIf
 
-    StorageUtil.SetFormValue(p, "_RSL_CampRef", r)
-    StorageUtil.SetFormValue(p, "_RSL_CampSpitRef", rs)
-    StorageUtil.SetFormValue(p, "_RSL_CampCookRef", rp)
-    StorageUtil.SetFloatValue(p, "_RSL_CampUntil", \
+    StorageUtil.SetFormValue(p, KeyFire(), r)
+    StorageUtil.SetFormValue(p, KeySpit(), rs)
+    StorageUtil.SetFormValue(p, KeyPot(), rp)
+    StorageUtil.SetFloatValue(p, KeyUntil(), \
         Utility.GetCurrentGameTime() + BurnHours() / 24.0)
 
     ShowMsg(_RSL_Forms.MsgCampLit())
     _RSL_Log.W("LightCampfire: lit " + r + " until day " \
-        + StorageUtil.GetFloatValue(p, "_RSL_CampUntil", 0.0))
+        + StorageUtil.GetFloatValue(p, KeyUntil(), 0.0))
 
+    string gc = KeyGC()
     If oldFire
-        StorageUtil.FormListAdd(p, "_RSL_CampGC", oldFire, false)
+        StorageUtil.FormListAdd(p, gc, oldFire, false)
     EndIf
     If oldSpit
-        StorageUtil.FormListAdd(p, "_RSL_CampGC", oldSpit, false)
+        StorageUtil.FormListAdd(p, gc, oldSpit, false)
     EndIf
     If oldPot
-        StorageUtil.FormListAdd(p, "_RSL_CampGC", oldPot, false)
+        StorageUtil.FormListAdd(p, gc, oldPot, false)
     EndIf
 EndFunction
 

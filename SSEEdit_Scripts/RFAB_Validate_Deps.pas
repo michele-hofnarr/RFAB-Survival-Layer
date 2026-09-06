@@ -114,7 +114,7 @@ begin
   sl.Add('Skyrim.esm|#0DC20D|EFSH|FxColdShader (ice crust visual)');
   sl.Add('RFAB.esp|#0CD63E|KYWD|KwRawFood (food poisoning trigger)');
   sl.Add('RFAB.esp|#4CF31E|KYWD|KwStrongStomach (poison immunity)');
-  sl.Add('RFAB.esp|#0CD63D|KYWD|KwSpecialFood (75% hunger restore)');
+  sl.Add('RFAB.esp|#0CD63D|KYWD|KwSpecialFood (HungerSpecialFoodPct per kg)');
   sl.Add('RFAB.esp|#0CE2AD|KYWD|KwSpecialDrink (drinks carry no hunger)');
   sl.Add('RFAB.esp|RFAB_Bandage|ALCH|Clean linen cloth - heals elemental-lesion P');
 
