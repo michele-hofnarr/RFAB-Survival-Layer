@@ -92,6 +92,7 @@ Message[]     rdM2
 Message[]     rdM3
 Message[]     rdMC
 GlobalVariable gRfabDzEnabled
+Spell         peryiteBless   ; RFAB_Blessing_Peryite - freezes AT/RJ/WB/RA/BF/BRR at stage 1
 
 ; hypothermia (id "HY") - an Ability, not a disease
 Spell    sHY1
@@ -566,6 +567,7 @@ Function Bind()
     gDiseaseHitChance    = _RSL_Forms.DiseaseHitChance()
     gFoodPoisonChance    = _RSL_Forms.FoodPoisonChance()
     gRfabDzEnabled       = _RSL_Forms.RfabDzEnabled()
+    peryiteBless         = _RSL_Forms.PeryiteBlessing()
     gHypEnabled          = _RSL_Forms.HypothermiaEnabled()
     gHypThreshold        = _RSL_Forms.HypothermiaThreshold()
     gHypRecoverThr       = _RSL_Forms.HypothermiaRecoverThr()
@@ -2472,6 +2474,22 @@ Function AdvanceRfabDz(int i, bool undead, float dtHours)
     EndIf
 
     Spell cur = RdStageSpell(i, stage)
+
+    ; RFAB Peryite blessing: for the 6 base-game diseases (not DR) stage 1 is
+    ; RFAB's own record and carries the Peryite boon. Freeze it there - no P
+    ; progression, no auto-cure - so we never touch RFAB's Peryite balance.
+    ; Stages 2/3 still run our scheme, so a disease the player already had can
+    ; settle back to stage 1 and lock in (our 2/3 are debuff-only).
+    If i <= 5 && peryiteBless && pl.HasSpell(peryiteBless)
+        If stage == 1
+            If !afflicted
+                pl.AddSpell(base, false)     ; re-assert if a stray cure stripped it
+            EndIf
+            _RSL_Disease.ResetP(pl, id)
+            _RSL_Disease.TakeCures(pl, id)   ; discard pending cures - frozen
+            return
+        EndIf
+    EndIf
 
     ; cure: engine strips our current Type=Disease spell; counted in
     ; OnMagicEffectApply. Fallbacks for an uncounted external cure.

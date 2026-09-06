@@ -1896,15 +1896,17 @@ begin
       Problem('CopyEffectsFrom: effect ' + IntToStr(i) + ' not copied');
 end;
 
-// Stage 2/3 wrapper SPEL = RFAB's stage-1 effects (copied 1:1, still visible
-// under RFAB's own names) + Peryite-conditional effects scaled by peryiteMult
-// (CTDA kept) + our extras. The extras collapse to one visible "face" line
+// Stage 2/3 wrapper SPEL = RFAB's stage-1 debuff effects (copied 1:1, still
+// visible under RFAB's own names) + our extras. RFAB's Peryite-conditional
+// bonus effects are DROPPED - our aggravated stages are pure debuff. A Peryite
+// follower keeps the boon only at stage 1 (RFAB's own record); the controller
+// freezes the disease there. The extras collapse to one visible "face" line
 // (the renamed stage + auto-built text); the remaining extras stay hidden.
 function CloneRfabDisease(disTpl, src: IwbMainRecord;
-  newEdid, newFull, flavour, extraSpec: string; peryiteMult: Real): IwbMainRecord;
+  newEdid, newFull, flavour, extraSpec: string): IwbMainRecord;
 var
   dst, face : IwbMainRecord;
-  effs, eff, e: IInterface;
+  effs, e: IInterface;
   i    : Integer;
   fresh: Boolean;
   descr, stem, faceEdid: string;
@@ -1930,15 +1932,15 @@ begin
 
   CopyEffectsFrom(dst, src);
 
+  // Drop RFAB's Peryite-gated bonus effects (the one carrying a CTDA condition).
+  // Our stages 2/3 are debuff-only; the Peryite boon lives on stage 1 alone.
   effs := ElementByName(dst, 'Effects');
-  if Assigned(effs) and (peryiteMult <> 1.0) then
-    for i := 0 to Pred(ElementCount(effs)) do begin
-      eff := ElementByIndex(effs, i);
-      // a Peryite bonus effect is the one carrying a CTDA condition
-      if Assigned(ElementBySignature(eff, 'CTDA')) then
-        PutNative(eff, 'EFIT\Magnitude',
-          GetNativeValue(ElementByPath(eff, 'EFIT\Magnitude')) * peryiteMult);
-    end;
+  if Assigned(effs) then
+    for i := Pred(ElementCount(effs)) downto 0 do
+      if Assigned(ElementBySignature(ElementByIndex(effs, i), 'CTDA')) then begin
+        Say('    ' + newEdid + ': dropped Peryite-gated effect [' + IntToStr(i) + ']');
+        RemoveByIndex(effs, i, True);
+      end;
 
   stem := FirstStem(extraSpec);
   if stem <> '' then begin
@@ -1974,9 +1976,9 @@ begin
   AddMasterIfMissing(tgt, srcFile);
   baseName := L('wrap.' + key + '.base');
   CloneRfabDisease(disTpl, src, PFX + 'Dz' + key + '2',
-    L('wrap.progressive') + ' ' + baseName, L('wrap.' + key + '.flavour.2'), spec2, 1.25);
+    L('wrap.progressive') + ' ' + baseName, L('wrap.' + key + '.flavour.2'), spec2);
   CloneRfabDisease(disTpl, src, PFX + 'Dz' + key + '3',
-    L('wrap.severe') + ' ' + baseName, L('wrap.' + key + '.flavour.3'), spec3, 1.5);
+    L('wrap.severe') + ' ' + baseName, L('wrap.' + key + '.flavour.3'), spec3);
   AddMsg(PFX + 'MsgDz' + key + '2',     baseName + L('wrap.msg.2'));
   AddMsg(PFX + 'MsgDz' + key + '3',     baseName + L('wrap.msg.3'));
   AddMsg(PFX + 'MsgDz' + key + 'Cured', baseName + L('wrap.msg.cured'));
@@ -3165,6 +3167,8 @@ begin
     // v0.3.0 survival extras: perks (RFAB.esp originals), items, placement bases
     EmitVanillaGetter(sl, 'Perk',       'PerkSurvivalBasics', '0CE266', 'RFAB.esp');
     EmitVanillaGetter(sl, 'Perk',       'PerkCook',           '0CE264', 'RFAB.esp');
+    // RFAB_Blessing_Peryite - freezes the 6 base-game disease wrappers at stage 1
+    EmitVanillaGetter(sl, 'Spell',      'PeryiteBlessing',    '0060A5', 'RFAB.esp');
     EmitVanillaGetter(sl, 'Form',       'Firewood',           '06F993', 'Skyrim.esm');
     EmitVanillaGetter(sl, 'Weapon',     'WoodAxe',             '02F2F4', 'Skyrim.esm');
     EmitVanillaGetter(sl, 'Armor',      'Backpack',            '0CD955', 'RFAB.esp');

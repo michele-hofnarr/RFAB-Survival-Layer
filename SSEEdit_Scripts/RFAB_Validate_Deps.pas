@@ -72,6 +72,7 @@ begin
   sl.Add('Skyrim.esm|#0B877E|SPEL|RfabDzBF  stage-1 spell');
   sl.Add('Skyrim.esm|#0B877F|SPEL|RfabDzBRR stage-1 spell');
   sl.Add('Dragonborn.esm|#0285C1|SPEL|RfabDzDR stage-1 spell');
+  sl.Add('RFAB.esp|#0060A5|SPEL|RFAB_Blessing_Peryite (disease-wrapper freeze)');
 
   // --- wrapper marker MGEF (first unconditional debuff; HasMagicEffect probe) ---
   sl.Add('RFAB.esp|#0CD9BD|MGEF|RfabDzMarkAT');

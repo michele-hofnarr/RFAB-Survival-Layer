@@ -542,6 +542,10 @@ Perk Function PerkCook() global
     return Game.GetFormFromFile(0x000CE264, "RFAB.esp") as Perk
 EndFunction
 
+Spell Function PeryiteBlessing() global
+    return Game.GetFormFromFile(0x000060A5, "RFAB.esp") as Spell
+EndFunction
+
 Form Function Firewood() global
     return Game.GetFormFromFile(0x0006F993, "Skyrim.esm") as Form
 EndFunction
