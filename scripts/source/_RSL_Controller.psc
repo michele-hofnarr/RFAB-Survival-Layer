@@ -19,10 +19,14 @@ string  K_LASTTIME  = "_RSL_LastGameTime"      ; game days, for the delta
 string  K_WETUNTIL  = "_RSL_WetUntil"          ; game days, wet until
 string  K_SLEEPING  = "_RSL_Sleeping"          ; 1 while sleeping
 string  K_SLEEPFROM = "_RSL_SleepStartedAt"    ; game days
+string  K_SLEEPTENT = "_RSL_SleptSheltered"    ; 1 = fell asleep under our own tent
 string  K_WASUNDEAD = "_RSL_WasUndead"         ; to catch the transition
 string  K_TIER_SL   = "_RSL_TierSleep"
 string  K_TIER_HU   = "_RSL_TierHunger"
 string  K_TIER_CO   = "_RSL_TierCold"
+string  K_PEN_SL    = "_RSL_PenPctSleep"     ; primary-pool cut %, for the widget
+string  K_PEN_HU    = "_RSL_PenPctHunger"
+string  K_PEN_CO    = "_RSL_PenPctCold"
 string  K_HYWAIT    = "_RSL_HypoWaitBlocked"   ; 1 while SetInChargen blocks rest
 string  K_ELEMACC   = "_RSL_ElemAccum"         ; signed cold nudge from frost/fire hits, pending fold
 string  K_ELPACC    = "_RSL_Dz_EL_PAcc"        ; signed elemental-lesion P delta (hits -, bandage +), pending fold
@@ -47,6 +51,7 @@ Idle     idleWarm           ; warm-hands-by-fire idle (IdleWarmHandsStanding)
 ; v0.3.0: campfire power + wood-from-trees
 Perk    pkSurvival        ; RFAB "Основы выживания"
 Perk    pkCook            ; RFAB "Кулинар"
+Perk    pkAcclim          ; RFAB "Акклиматизация" - second half of the shelter gate
 Form    fwFirewood        ; Firewood01
 Weapon  woodAxe           ; Axe01 / RFAB wood axe
 Armor   backpack          ; RFAB "Рюкзак авантюриста"
@@ -200,8 +205,12 @@ GlobalVariable gHudWidgetX
 GlobalVariable gHudWidgetY
 GlobalVariable gHudWidgetScale
 GlobalVariable gHudWidgetAlpha
-GlobalVariable gHudWidgetHAnchor
-GlobalVariable gHudWidgetVAnchor
+GlobalVariable gHudTempX            ; the temperature icon is placed on its own
+GlobalVariable gHudTempY
+GlobalVariable gHudTempScale
+GlobalVariable gHudInvX             ; and so is the inventory food preview
+GlobalVariable gHudInvY
+GlobalVariable gHudInvScale
 
 ; full-bar regen bonuses
 GlobalVariable gBonusEnabled
@@ -217,10 +226,12 @@ GlobalVariable gCampfireEnabled
 GlobalVariable gCampfireBurnHours
 GlobalVariable gCampfireFuel
 GlobalVariable gCampfireCooldown
+GlobalVariable gShelterColdCap      ; cold ceiling by own fire / in own tent
 GlobalVariable gWoodFromTrees
 GlobalVariable gTreeChopCooldownH
 GlobalVariable gTreeChopYield
 GlobalVariable gTreeChopRadius
+GlobalVariable gChopKey             ; 0 = chop on the Activate control instead
 
 bool ready = false
 
@@ -237,8 +248,15 @@ bool  warmIdleOn = false
 float warmLastPX = 0.0
 float warmLastPY = 0.0
 
+; Tick interval while a SkyUI item list is up - see Schedule().
+float MENU_POLL = 0.25
+
 ; wood-from-tree: real-time spam guard (per-tree cooldown is on the tree ref)
 float chopRT = 0.0
+
+; DX scan code currently held by RegisterForKey, 0 = none. Session only: key
+; registrations do not survive a save load, and SyncChopKey re-arms on the tick.
+int chopKeyOn = 0
 
 ; --- lifecycle -------------------------------------------------------------
 
@@ -270,7 +288,7 @@ EndFunction
 ; A save keeps its own GLOB values. When its recorded version lags
 ; SETTINGS_VERSION, MigrateSettings re-applies all defaults once, then stamps
 ; the new version. Bump this whenever a default changes.
-int SETTINGS_VERSION = 47   ; v47: WarmupMult 10, SwimMult 500, BonusRegenPct 25
+int SETTINGS_VERSION = 48   ; v48: SwimMult 1000, FireMult 20, CampfireFuel 3
 
 Function MigrateSettings()
     If !ready
@@ -363,23 +381,6 @@ Function KickWidget()
     EndIf
 EndFunction
 
-string Function AnchorName(float idx, bool horiz)
-    If horiz
-        If idx >= 1.5
-            return "right"
-        ElseIf idx >= 0.5
-            return "center"
-        EndIf
-        return "left"
-    EndIf
-    If idx >= 1.5
-        return "bottom"
-    ElseIf idx >= 0.5
-        return "center"
-    EndIf
-    return "top"
-EndFunction
-
 float Function Frac01(float x)
     If x < 0.0
         return 0.0
@@ -418,6 +419,13 @@ Function PushWidget()
 
     bool off = gModEnabled.GetValue() < 0.5 || GV(gHudWidget, 1.0) < 0.5
     bool undead = pl.HasKeyword(kwUndead)
+    If off
+        ; Nothing is applied while the mod is off - do not leave stale numbers
+        ; on the bars for the moment before they fade out.
+        StorageUtil.SetFloatValue(pl, K_PEN_SL, 0.0)
+        StorageUtil.SetFloatValue(pl, K_PEN_HU, 0.0)
+        StorageUtil.SetFloatValue(pl, K_PEN_CO, 0.0)
+    EndIf
 
     float slMax = gSleepMax.GetValue()
     float slFill = 100.0 - Frac01(StorageUtil.GetFloatValue(pl, K_SLEEP, 0.0) / slMax) * 100.0
@@ -436,11 +444,89 @@ Function PushWidget()
 
     w.X = GV(gHudWidgetX, 220.0)
     w.Y = GV(gHudWidgetY, 655.0)
-    w.HAnchor = AnchorName(GV(gHudWidgetHAnchor, 0.0), true)
-    w.VAnchor = AnchorName(GV(gHudWidgetVAnchor, 0.0), false)
+    ; One anchor, top-left, exactly like RFAB's own widgets: their
+    ; [RFAB] Interface.ini knows only X/Y in a 1280x720 space measured from the
+    ; top-left corner. Same origin here means the same X/Y put our widget in
+    ; line with theirs.
+    w.HAnchor = "left"
+    w.VAnchor = "top"
     w.SetScale(GV(gHudWidgetScale, 100.0))
 
-    w.PushData(slShown, slFill, slSafe, huShown, huFill, huSafe, coShown, coFill, coSafe,         GV(gHudWidgetAutoHide, 1.0) > 0.5, GV(gHudWidgetAlpha, 100.0), TempFeel(), GV(gHudColor, 1.0) >= 0.5)
+    w.PushData(slShown, slFill, slSafe, huShown, huFill, huSafe, coShown, coFill, coSafe, \
+        GV(gHudWidgetAutoHide, 1.0) > 0.5, GV(gHudWidgetAlpha, 100.0), TempFeel(), \
+        GV(gHudColor, 1.0) >= 0.5, \
+        StorageUtil.GetFloatValue(pl, K_PEN_SL, 0.0), \
+        StorageUtil.GetFloatValue(pl, K_PEN_HU, 0.0), \
+        StorageUtil.GetFloatValue(pl, K_PEN_CO, 0.0))
+
+    ; The temperature icon and the food preview are not part of the bar block -
+    ; they get their own screen positions.
+    w.SetTempPos(LocalX(GV(gHudTempX, 420.0)), LocalY(GV(gHudTempY, 640.0)), \
+                 LocalScale(GV(gHudTempScale, 100.0)))
+    PushInvBar(w, off, undead, huMax)
+EndFunction
+
+; --- separately placed pieces ---------------------------------------------
+;
+; Both live inside the widget clip, which SkyUI puts at (HudWidgetX, HudWidgetY)
+; and scales by HudWidgetScale. To let the player give them plain screen
+; coordinates, that placement has to be divided back out here.
+
+float Function WidgetScale()
+    float s = GV(gHudWidgetScale, 100.0)
+    If s < 10.0
+        s = 10.0        ; setScale clamps the same way; never divide by ~0
+    EndIf
+    return s
+EndFunction
+
+float Function LocalX(float absX)
+    return (absX - GV(gHudWidgetX, 220.0)) * 100.0 / WidgetScale()
+EndFunction
+
+float Function LocalY(float absY)
+    return (absY - GV(gHudWidgetY, 655.0)) * 100.0 / WidgetScale()
+EndFunction
+
+; Same idea for size: the player asks for a percentage of normal, not a
+; percentage of whatever the bars happen to be scaled to.
+float Function LocalScale(float pct)
+    return pct * 100.0 / WidgetScale()
+EndFunction
+
+; The food bar drawn over the inventory. It shows the hunger bar as it is now
+; plus where it would land after eating the highlighted item - the widget shades
+; the gap lighter when a meal would help, darker when it would not stay down.
+;
+; The projection comes from HungerAfterEating, the same function that runs when
+; the item is actually eaten, so the promise cannot drift from the result.
+;
+; Updates ride the normal tick, so how promptly the preview follows the cursor
+; is PollInterval - and it only follows at all while the menu leaves the game
+; running (Skyrim Souls). MenuTick() shortens the interval while a menu is up.
+Function PushInvBar(_RSL_HUDWidget w, bool off, bool undead, float huMax)
+    bool shown = !off && !undead && UI.IsMenuOpen("InventoryMenu")
+    If !shown
+        w.SetInvBar(false, 0.0, 0.0, 0.0, 0.0, 0.0, 100.0)
+        return
+    EndIf
+
+    float cur = StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0)
+    float fill = 100.0 - Frac01(cur / huMax) * 100.0
+    float safe = 100.0 - Frac01(gHungerGrace.GetValue() / huMax) * 100.0
+
+    float proj = fill
+    Form sel = SelectedItem()
+    If sel
+        float after = HungerAfterEating(sel)
+        If after >= 0.0
+            proj = 100.0 - Frac01(after / huMax) * 100.0
+        EndIf
+    EndIf
+
+    w.SetInvBar(true, fill, safe, proj, \
+                LocalX(GV(gHudInvX, 360.0)), LocalY(GV(gHudInvY, 600.0)), \
+                LocalScale(GV(gHudInvScale, 100.0)))
 EndFunction
 
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
@@ -460,6 +546,7 @@ Function Bind()
     chopRT = 0.0
     warmLastActiveRT = 0.0
     elemEvtLast = 0.0
+    chopKeyOn = 0
 
     abSleep     = _RSL_Forms.AbSleep()
     abHunger    = _RSL_Forms.AbHunger()
@@ -476,6 +563,7 @@ Function Bind()
     idleWarm    = _RSL_Forms.IdleWarmHands()
     pkSurvival  = _RSL_Forms.PerkSurvivalBasics()
     pkCook      = _RSL_Forms.PerkCook()
+    pkAcclim    = _RSL_Forms.PerkAcclimatization()
     fwFirewood  = _RSL_Forms.Firewood()
     woodAxe     = _RSL_Forms.WoodAxe()
     backpack    = _RSL_Forms.Backpack()
@@ -546,8 +634,12 @@ Function Bind()
     gHudWidgetY          = _RSL_Forms.HudWidgetY()
     gHudWidgetScale      = _RSL_Forms.HudWidgetScale()
     gHudWidgetAlpha      = _RSL_Forms.HudWidgetAlpha()
-    gHudWidgetHAnchor    = _RSL_Forms.HudWidgetHAnchor()
-    gHudWidgetVAnchor    = _RSL_Forms.HudWidgetVAnchor()
+    gHudTempX            = _RSL_Forms.HudTempX()
+    gHudTempY            = _RSL_Forms.HudTempY()
+    gHudTempScale        = _RSL_Forms.HudTempScale()
+    gHudInvX             = _RSL_Forms.HudInvX()
+    gHudInvY             = _RSL_Forms.HudInvY()
+    gHudInvScale         = _RSL_Forms.HudInvScale()
     gBonusEnabled        = _RSL_Forms.BonusEnabled()
     gBonusRegenPct       = _RSL_Forms.BonusRegenPct()
     gBonusThresholdPct   = _RSL_Forms.BonusThresholdPct()
@@ -557,10 +649,12 @@ Function Bind()
     gCampfireBurnHours   = _RSL_Forms.CampfireBurnHours()
     gCampfireFuel        = _RSL_Forms.CampfireFuel()
     gCampfireCooldown    = _RSL_Forms.CampfireCooldown()
+    gShelterColdCap      = _RSL_Forms.ShelterColdCap()
     gWoodFromTrees       = _RSL_Forms.WoodFromTrees()
     gTreeChopCooldownH   = _RSL_Forms.TreeChopCooldownH()
     gTreeChopYield       = _RSL_Forms.TreeChopYield()
     gTreeChopRadius      = _RSL_Forms.TreeChopRadius()
+    gChopKey             = _RSL_Forms.ChopKey()
 
     gDiseaseEnabled      = _RSL_Forms.DiseaseEnabled()
     gDiseaseProgressHours = _RSL_Forms.DiseaseProgressHours()
@@ -738,6 +832,7 @@ EndFunction
 ; "Activate" also drives the tree chop (feature 7). Survives keybind remaps,
 ; which RegisterForKey did not - and OnKeyDown was not firing at all in testing.
 Function RegisterInputs()
+    SyncChopKey()
     RegisterForControl("Forward")
     RegisterForControl("Back")
     RegisterForControl("Strafe Left")
@@ -750,6 +845,37 @@ Function RegisterInputs()
     _RSL_Log.W("RegisterInputs: controls registered")
 EndFunction
 
+; Follow the MCM keymap. ChopKey 0 keeps the old behaviour - chopping rides on
+; the Activate control - so no key is held. Called from Bind and from the tick,
+; because MCM Helper writes the GLOB without telling us.
+Function SyncChopKey()
+    int want = 0
+    If gChopKey
+        want = gChopKey.GetValue() as int
+    EndIf
+    If want == chopKeyOn
+        return
+    EndIf
+    If chopKeyOn > 0
+        UnregisterForKey(chopKeyOn)
+    EndIf
+    If want > 0
+        RegisterForKey(want)
+    EndIf
+    chopKeyOn = want
+    _RSL_Log.W("SyncChopKey: chop key = " + want)
+EndFunction
+
+Event OnKeyDown(int keyCode)
+    If !ready || keyCode != chopKeyOn || chopKeyOn <= 0
+        return
+    EndIf
+    If Utility.IsInMenuMode() || UI.IsMenuOpen("Console")
+        return
+    EndIf
+    TryChopWood()
+EndEvent
+
 Event OnControlDown(string control)
     If !ready
         return
@@ -760,7 +886,9 @@ Event OnControlDown(string control)
     ; any registered control = the player is doing something -> drop the idle
     warmLastActiveRT = Utility.GetCurrentRealTime()
     CancelWarmIdle()
-    If control == "Activate"
+    ; With a dedicated key bound, Activate no longer chops - otherwise the two
+    ; paths both fire and the 2s guard in TryChopWood is what decides.
+    If control == "Activate" && chopKeyOn <= 0
         TryChopWood()
     EndIf
 EndEvent
@@ -979,8 +1107,16 @@ Function Schedule()
     If iv < 1.0
         iv = 1.0
     EndIf
+    ; While an item list is open the tick is what redraws the food preview as
+    ; the cursor moves, and a whole second of lag is very obvious. Nothing else
+    ; in the tick costs anything there - game time is barely advancing, so every
+    ; Advance* call is a no-op and the penalties do not re-quantize.
+    If ready && OpenItemMenu() != ""
+        iv = MENU_POLL
+    EndIf
     RegisterForSingleUpdate(iv)
 EndFunction
+
 
 ; Reset the reference point so no delta is charged for time that did not pass
 ; for us (first run, save load).
@@ -1018,6 +1154,7 @@ Event OnUpdate()
     EndIf
 
     SyncDebugLog()
+    SyncChopKey()
 
     If gModEnabled.GetValue() < 0.5
         ; Run the full teardown once on the on->off edge; the monitor keeps
@@ -1085,9 +1222,55 @@ Event OnUpdate()
         _RSL_Log.W("tick dt=" + dtHours + "h  sleep=" + StorageUtil.GetFloatValue(pl, K_SLEEP, 0.0) + "  hunger=" + StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0) + "  cold=" + StorageUtil.GetFloatValue(pl, K_COLD, 0.0) + "  sev=" + Severity() + "  mit=" + Mitigation() + "  undead=" + undead)
         LogStats()
         LogCold()
+        LogSelectedItem()
     EndIf
     Schedule()
 EndEvent
+
+; What the player has highlighted in a SkyUI item list, spelled out in the log.
+; The inventory food preview runs on the same read; this only exists so a wrong
+; item can be spotted, and it costs nothing unless the debug log is on.
+Function LogSelectedItem()
+    string m = OpenItemMenu()
+    If m == ""
+        return
+    EndIf
+    Form f = SelectedItem()
+    If !f
+        _RSL_Log.W("selected: " + m + " -> none")
+        return
+    EndIf
+    _RSL_Log.W("selected: " + m + " form=" + f \
+        + " edid=" + PO3_SKSEFunctions.GetFormEditorID(f) \
+        + " name=" + f.GetName() + " hungerAfter=" + HungerAfterEating(f))
+EndFunction
+
+; The item the player has highlighted in a SkyUI list, or None. Container /
+; barter / gift reuse the same list, so one path covers all four menus.
+Form Function SelectedItem()
+    string m = OpenItemMenu()
+    If m == ""
+        return None
+    EndIf
+    int fid = UI.GetInt(m, "_root.Menu_mc.inventoryLists.itemList.selectedEntry.formId")
+    If fid == 0
+        return None
+    EndIf
+    return Game.GetFormEx(fid)
+EndFunction
+
+string Function OpenItemMenu()
+    If UI.IsMenuOpen("InventoryMenu")
+        return "InventoryMenu"
+    ElseIf UI.IsMenuOpen("ContainerMenu")
+        return "ContainerMenu"
+    ElseIf UI.IsMenuOpen("BarterMenu")
+        return "BarterMenu"
+    ElseIf UI.IsMenuOpen("GiftMenu")
+        return "GiftMenu"
+    EndIf
+    return ""
+EndFunction
 
 ; Cold breakdown: how severity/mitigation add up and the COLD axis state.
 Function LogCold()
@@ -1230,7 +1413,26 @@ Event OnSleepStart(float afSleepStartTime, float afDesiredSleepEndTime)
     CancelWarmIdle()
     StorageUtil.SetFloatValue(pl, K_SLEEPING, 1.0)
     StorageUtil.SetFloatValue(pl, K_SLEEPFROM, afSleepStartTime)
+    ; Note it now, not on waking: by OnSleepStop the player has stood up and
+    ; may have been moved out of the bedroll entirely.
+    StorageUtil.SetIntValue(pl, K_SLEEPTENT, SleepingUnderOwnTent() as int)
 EndEvent
+
+; True if one of OUR pitched tents stands over the bed being slept in. The base
+; form is the vanilla NorTentSmall, which also stands in bandit camps all over
+; Skyrim, so the ref itself carries a mark written when we place it - a camp we
+; did not pitch gives no shelter.
+bool Function SleepingUnderOwnTent()
+    Form tentBase = _RSL_Forms.BaseTent()
+    If !tentBase
+        return false
+    EndIf
+    ObjectReference t = Game.FindClosestReferenceOfTypeFromRef(tentBase, pl, 250.0)
+    If !t
+        return false
+    EndIf
+    return StorageUtil.GetIntValue(t, "_RSL_OwnTent", 0) > 0
+EndFunction
 
 Event OnSleepStop(bool abInterrupted)
     If !ready
@@ -1249,7 +1451,7 @@ Event OnSleepStop(bool abInterrupted)
     ; guarded by K_SLEEPING, so call after clearing the flag.
     If slept > 0.0
         AdvanceHunger(slept, pl.HasKeyword(kwUndead))
-        AdvanceCold(slept)
+        AdvanceCold(slept, SleptColdCap())
     EndIf
 
     ; Move the reference point by hand: slept time must not enter the next
@@ -1294,6 +1496,20 @@ Event OnSleepStop(bool abInterrupted)
     Schedule()
 EndEvent
 
+; Cold ceiling for the hours just slept: the tent (noted at OnSleepStart) or
+; the campfire the player is standing next to, whichever shelters better.
+float Function SleptColdCap()
+    float cap = ShelterCapNow()
+    If HasShelterPerks() && StorageUtil.GetIntValue(pl, K_SLEEPTENT, 0) > 0
+        float tent = GV(gShelterColdCap, 75.0)
+        If tent < cap
+            cap = tent
+        EndIf
+    EndIf
+    StorageUtil.SetIntValue(pl, K_SLEEPTENT, 0)
+    return cap
+EndFunction
+
 ; --- HUNGER axis ---------------------------------------------------------
 
 Function AdvanceHunger(float dtHours, bool undead)
@@ -1337,30 +1553,15 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
         return
     EndIf
 
-    If !food.IsFood()
+    ; HungerAfterEating gates on IsFood and on drinks as well, so one call
+    ; decides whether any of this applies - and the poison roll below only
+    ; fires for food that is actually going to be swallowed.
+    float after = HungerAfterEating(akBaseObject)
+    If after < 0.0
         return
     EndIf
 
-    ; Drinks (wine / mead / ale / water bottle) are all RFAB_Drink_* and carry
-    ; only VendorItemFood - no single keyword separates them from an apple.
-    ; EditorID prefix catches all of them (incl. water); RFAB_SpecialDrink is a
-    ; fallback for alcohol if GetFormEditorID comes back empty in this setup.
-    If StringUtil.Find(eid, "RFAB_Drink_") == 0 \
-       || (kwSpecialDrink && akBaseObject.HasKeyword(kwSpecialDrink))
-        return   ; drinks carry no hunger effect
-    EndIf
-
-    float mx = gHungerMax.GetValue()
-    bool raw = kwRawFood && akBaseObject.HasKeyword(kwRawFood)
-
-    ; Raw food on a weak stomach (no REQ_KW_StrongStomach race, not undead):
-    ; a poison-roll, and it gives NO nourishment - it comes back up, so the
-    ; hunger counter goes to max instead of dropping.
-    bool rawWeak = raw \
-                   && !(kwStrongStomach && pl.HasKeyword(kwStrongStomach)) \
-                   && !pl.HasKeyword(kwUndead)
-
-    If rawWeak && _RSL_Disease.GetStage(pl, "FP") <= 0 && hdS1[3] \
+    If IsRawWeak(akBaseObject) && _RSL_Disease.GetStage(pl, "FP") <= 0 && hdS1[3] \
        && FeatureOn(gDiseaseEnabled)
         If Utility.RandomFloat(0.0, 100.0) < GV(gFoodPoisonChance, 50.0)
             _RSL_Disease.SetStage(pl, "FP", 1, None, hdS1[3], 0.0, 0.0)
@@ -1372,38 +1573,71 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
         EndIf
     EndIf
 
-    If rawWeak
-        StorageUtil.SetFloatValue(pl, K_HUNGER, mx)
-        Touch()
-        return
+    StorageUtil.SetFloatValue(pl, K_HUNGER, after)
+    _RSL_Log.W("ate " + eid + " -> hunger " + after)
+    Touch()
+EndEvent
+
+; Raw food on a weak stomach: no REQ_KW_StrongStomach race, not undead. It comes
+; straight back up - a poison roll, and no nourishment whatsoever.
+bool Function IsRawWeak(Form akBaseObject)
+    return kwRawFood && akBaseObject.HasKeyword(kwRawFood) \
+        && !(kwStrongStomach && pl.HasKeyword(kwStrongStomach)) \
+        && !pl.HasKeyword(kwUndead)
+EndFunction
+
+; Where the HUNGER counter would land after eating this. Shared by
+; OnObjectEquipped and the inventory preview, so what the widget promises and
+; what actually happens cannot drift apart.
+;
+; Returns -1.0 for anything that does not touch hunger at all (not food, or a
+; drink), which a caller can tell apart from "eating it changes nothing".
+;
+; Restore scales with the item's WEIGHT (DATA - Weight), per kg:
+;   plain Food item          -> HungerFoodPct % of the bar per kg (def. 50)
+;   RFAB_SpecialFood keyword -> HungerSpecialFoodPct % per kg     (def. 100)
+;   RFAB_RawFood keyword     -> same as SpecialFood (dense, uncooked) - only
+;     reachable with a strong stomach; a weak one gets the max above.
+; The 2+ effects check stays as a fallback for non-RFAB dishes.
+float Function HungerAfterEating(Form akBaseObject)
+    Potion food = akBaseObject as Potion
+    If !food || !food.IsFood()
+        return -1.0
     EndIf
 
-    ; Restore scales with the item's WEIGHT (DATA - Weight), per kg:
-    ;   plain Food item          -> HungerFoodPct % of the bar per kg (def. 50)
-    ;   RFAB_SpecialFood keyword  -> HungerSpecialFoodPct % per kg     (def. 100)
-    ;   RFAB_RawFood keyword      -> same as SpecialFood (dense, uncooked) -
-    ;     only reachable with a strong stomach (rawWeak already returned above).
-    ; The 2+ effects check stays as a fallback for non-RFAB dishes.
+    ; Drinks (wine / mead / ale / water bottle) are all RFAB_Drink_* and carry
+    ; only VendorItemFood - no single keyword separates them from an apple.
+    string eid = PO3_SKSEFunctions.GetFormEditorID(akBaseObject)
+    If StringUtil.Find(eid, "RFAB_Drink_") == 0 \
+       || (kwSpecialDrink && akBaseObject.HasKeyword(kwSpecialDrink))
+        return -1.0
+    EndIf
+
+    float mx = gHungerMax.GetValue()
+    If IsRawWeak(akBaseObject)
+        return mx        ; straight to empty, not a reduction
+    EndIf
+
     float w = akBaseObject.GetWeight()
     If w <= 0.0
         w = 0.1          ; weightless food (some modded produce) still counts a little
     EndIf
 
     float pct = GV(gHungerFoodPct, 50.0)
-    If raw || (kwSpecialFood && akBaseObject.HasKeyword(kwSpecialFood)) || food.GetNumEffects() >= 2
+    If (kwRawFood && akBaseObject.HasKeyword(kwRawFood)) \
+       || (kwSpecialFood && akBaseObject.HasKeyword(kwSpecialFood)) \
+       || food.GetNumEffects() >= 2
         pct = GV(gHungerSpecialFoodPct, 100.0)
     EndIf
 
     ; gutworm steals nutrition: a meal helps -25 / -50 / -80 % less by stage.
-    float gwMult = 1.0 - GwFoodPenalty()
-    float v = StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0) - mx * 0.01 * pct * w * gwMult
+    float v = StorageUtil.GetFloatValue(pl, K_HUNGER, 0.0) \
+            - mx * 0.01 * pct * w * (1.0 - GwFoodPenalty())
     If v < 0.0
         v = 0.0
     EndIf
-    StorageUtil.SetFloatValue(pl, K_HUNGER, v)
-    _RSL_Log.W("ate " + eid + " w=" + w + " pct/kg=" + pct + " -> hunger " + v)
-    Touch()
-EndEvent
+    return v
+EndFunction
 
 ; Gutworm penalty on hunger restore, by GW stage.
 float Function GwFoodPenalty()
@@ -1531,7 +1765,7 @@ float Function Severity()
     EndIf
     float swimM = 1.0
     If swim
-        swimM = GV(gSwimMult, 500.0) / 100.0
+        swimM = GV(gSwimMult, 1000.0) / 100.0
     EndIf
 
     ; interior. Ordinary house/cave: fire + not swimming -> 0, else a fraction
@@ -1545,7 +1779,7 @@ float Function Severity()
         If ColdInteriorHere()
             float ci = GV(gSevColdInterior, 45.0) * swimM
             If nearFire && !swim
-                ci *= GV(gFireMult, 40.0) / 100.0
+                ci *= GV(gFireMult, 20.0) / 100.0
             EndIf
             return ci
         EndIf
@@ -1608,7 +1842,7 @@ float Function Severity()
     sev *= swimM
 
     If nearFire
-        sev *= GV(gFireMult, 40.0) / 100.0
+        sev *= GV(gFireMult, 20.0) / 100.0
     EndIf
 
     If sev < 0.0
@@ -1774,7 +2008,10 @@ EndFunction
 
 ; Accumulator, not a grace timer. When Severity is below Mitigation the delta
 ; goes negative - the character warms up.
-Function AdvanceCold(float dtHours)
+; capOverride < 0 means "work it out from where the player is standing".
+; OnSleepStop passes an explicit ceiling instead - by then the player is out of
+; the bedroll and ShelterCapNow() can no longer see the tent they slept under.
+Function AdvanceCold(float dtHours, float capOverride = -1.0)
     ; No charge during sleep - OnSleepStop adds the slept hours in one go.
     If StorageUtil.GetFloatValue(pl, K_SLEEPING, 0.0) > 0.5
         return
@@ -1789,16 +2026,66 @@ Function AdvanceCold(float dtHours)
     ; Warm-up faster than cooling (game pace): delta < 0 -> multiply.
     If delta < 0.0
         delta *= GV(gWarmupMult, 10.0)
+    ElseIf pl.GetCombatState() == 1
+        ; Mirror of the combat multiplier on sleep and hunger: a fight drains
+        ; the reserves that much faster, and by the same token keeps the body
+        ; hot, so heat leaves that much slower. Warm-up is untouched - it has
+        ; WarmupMult of its own.
+        delta /= CombatMult()
     EndIf
 
-    UpdateColdVisual(AddCold(delta))
+    float cap = capOverride
+    If cap < 0.0
+        cap = ShelterCapNow()
+    EndIf
+
+    UpdateColdVisual(AddCold(delta, cap))
+EndFunction
+
+; Both RFAB survival perks together turn the player's own camp into shelter.
+bool Function HasShelterPerks()
+    return pkSurvival && pkAcclim && pl.HasPerk(pkSurvival) && pl.HasPerk(pkAcclim)
+EndFunction
+
+; Cold ceiling for right now: ShelterColdCap next to the player's OWN burning
+; campfire, else 100 (no ceiling). Standing there or waiting through the menu
+; both go through the tick, so both are covered.
+float Function ShelterCapNow()
+    If !HasShelterPerks()
+        return 100.0
+    EndIf
+    ObjectReference fire = StorageUtil.GetFormValue(pl, _RSL_CampfireEffect.KeyFire()) as ObjectReference
+    If !fire || fire.IsDisabled()
+        return 100.0
+    EndIf
+    ; A fire past its burn deadline is dead even if CampfireTick has not swept
+    ; it yet - the sweep runs after AdvanceCold in the same tick.
+    If Utility.GetCurrentGameTime() > StorageUtil.GetFloatValue(pl, _RSL_CampfireEffect.KeyUntil(), 0.0)
+        return 100.0
+    EndIf
+    If pl.GetDistance(fire) > GV(gFireRadius, 400.0)
+        return 100.0
+    EndIf
+    return GV(gShelterColdCap, 75.0)
 EndFunction
 
 ; The ONLY writer of the cold bar: add a signed delta, clamp to 0..100, store,
 ; return the new value. AdvanceCold (environment) and ApplyElemHits (queued
 ; frost/fire nudges) both go through here so the clamp lives in one place.
-float Function AddCold(float delta)
-    float v = StorageUtil.GetFloatValue(pl, K_COLD, 0.0) + delta
+float Function AddCold(float delta, float ceiling = 100.0)
+    float was = StorageUtil.GetFloatValue(pl, K_COLD, 0.0)
+    float v = was + delta
+
+    ; A shelter ceiling stops the bar RISING past it - it never warms anyone up
+    ; for free. Walk to your fire already worse off than the ceiling and the
+    ; ordinary negative delta is what brings you back down.
+    If delta > 0.0 && v > ceiling
+        v = ceiling
+        If v < was
+            v = was
+        EndIf
+    EndIf
+
     If v < 0.0
         v = 0.0
     ElseIf v > 100.0
@@ -1808,9 +2095,9 @@ float Function AddCold(float delta)
     return v
 EndFunction
 
-; Character ice shader above the threshold. MCM toggle. State in StorageUtil
-; (survives save load); force-cleared in OnEffectFinish/TeardownAll. Screen
-; ISM was dropped: no vanilla IMAD holds visually as "frost".
+; Character ice shader above the threshold, plus the screen stack below. MCM
+; toggle. State in StorageUtil (survives save load); force-cleared in
+; OnEffectFinish/TeardownAll.
 Function UpdateColdVisual(float v)
     float thr = GV(_RSL_Forms.ColdVisualThreshold(), 50.0)
     bool want = v > thr
@@ -1830,6 +2117,53 @@ Function UpdateColdVisual(float v)
         EndIf
         StorageUtil.SetIntValue(pl, "_RSL_SHon", 0)
     EndIf
+
+    UpdateColdScreen(v)
+EndFunction
+
+; --- cold screen stack ----------------------------------------------------
+;
+; Three vanilla IMADs layered on top of each other, each fading in over its own
+; slice of the 0..100 bar: the world loses its colour, then a cold blue cast
+; settles over it, then the edges go soft and dark. Nothing new is authored -
+; ImageSpaceModifier.Apply(strength) scales a stock record.
+;
+; The strength is quantised onto a 5% grid and only re-applied when the bucket
+; moves. Apply() stacks, so every change has to Remove() first, and doing that
+; on every tick would flicker and eventually leave one stuck on screen.
+
+Function UpdateColdScreen(float v)
+    ApplyColdImod(_RSL_Forms.ImodColdDesat(), "_RSL_ImDesat", v, \
+        GV(_RSL_Forms.ColdVisDesatLo(), 40.0), GV(_RSL_Forms.ColdVisDesatHi(), 100.0))
+    ApplyColdImod(_RSL_Forms.ImodColdTint(), "_RSL_ImTint", v, \
+        GV(_RSL_Forms.ColdVisTintLo(), 55.0), GV(_RSL_Forms.ColdVisTintHi(), 100.0))
+    ApplyColdImod(_RSL_Forms.ImodColdBlur(), "_RSL_ImBlur", v, \
+        GV(_RSL_Forms.ColdVisBlurLo(), 75.0), GV(_RSL_Forms.ColdVisBlurHi(), 100.0))
+EndFunction
+
+; One layer. `stateKey` holds the bucket currently on screen (0..20, i.e. 5% steps);
+; -1 would be ambiguous with "not applied", so 0 means off.
+Function ApplyColdImod(ImageSpaceModifier im, string stateKey, float v, float lo, float hi)
+    If !im
+        return          ; getter not in the plugin yet (pre-regen)
+    EndIf
+
+    int bucket = 0
+    If hi > lo
+        bucket = ((Frac01((v - lo) / (hi - lo)) * 20.0) + 0.5) as int
+    ElseIf v >= hi
+        bucket = 20     ; degenerate window - treat it as a hard switch
+    EndIf
+
+    If bucket == StorageUtil.GetIntValue(pl, stateKey, 0)
+        return
+    EndIf
+
+    im.Remove()
+    If bucket > 0
+        im.Apply((bucket as float) / 20.0)
+    EndIf
+    StorageUtil.SetIntValue(pl, stateKey, bucket)
 EndFunction
 
 Function ClearColdVisual()
@@ -1841,6 +2175,16 @@ Function ClearColdVisual()
         sh.Stop(pl)
     EndIf
     StorageUtil.SetIntValue(pl, "_RSL_SHon", 0)
+    ClearColdImod(_RSL_Forms.ImodColdDesat(), "_RSL_ImDesat")
+    ClearColdImod(_RSL_Forms.ImodColdTint(),  "_RSL_ImTint")
+    ClearColdImod(_RSL_Forms.ImodColdBlur(),  "_RSL_ImBlur")
+EndFunction
+
+Function ClearColdImod(ImageSpaceModifier im, string stateKey)
+    If im
+        im.Remove()
+    EndIf
+    StorageUtil.SetIntValue(pl, stateKey, 0)
 EndFunction
 
 ; Warm hands by a fire. After WarmAnimDelay seconds of the player standing
@@ -3123,6 +3467,13 @@ Function ApplyPenalties(bool undead)
 
     ; Primary pool for the axis, plus the cross component on the other two,
     ; plus the cross component on speed.
+    ; What the widget prints over each bar: the cut on that axis's own pool,
+    ; which is the number the player actually feels. Clamped the same way
+    ; ApplyAxis clamps it, so the label never claims more than is applied.
+    StorageUtil.SetFloatValue(pl, K_PEN_SL, Clamp(fSleep  * primary, cap))
+    StorageUtil.SetFloatValue(pl, K_PEN_HU, Clamp(fHunger * primary, cap))
+    StorageUtil.SetFloatValue(pl, K_PEN_CO, Clamp(fCold   * primary, cap))
+
     ApplyAxis(abSleep,  K_TIER_SL, fSleep  * cross,   fSleep  * primary, fSleep  * cross,   sSpd, cap)
     ApplyAxis(abHunger, K_TIER_HU, fHunger * cross,   fHunger * cross,   fHunger * primary, hSpd, cap)
     ApplyAxis(abCold,   K_TIER_CO, fCold   * primary, fCold   * cross,   fCold   * cross,   cSpd, cap)
