@@ -3913,39 +3913,45 @@ begin
     Problem('override not created for ' + EditorID(src));
 end;
 
-// Set a native value, trying each candidate path in turn - xEdit's field names
-// differ between record definitions and between builds, and a wrong guess is
-// otherwise a silent no-op. Returns the path that took, or '' - and on total
-// failure lists what the record actually offers, so the next run names it.
-function PutNativeAny(rec: IwbMainRecord; paths: string; value: Variant; dumpPath: string): string;
+// Set a native value on a named field of a container.
+//
+// Two traps here, both paid for once already:
+//   - the compound path 'Magic Effect Data\DATA\Minimum Skill Level' resolves
+//     to nil even though the field plainly exists (the same JvInterpreter quirk
+//     MgefFlags documents for DATA\Flags), so the container is resolved first
+//     and the field looked up by name on it;
+//   - TStringList.CommaText splits on SPACES as well as commas - see line 660,
+//     which converts spaces to commas on purpose - so a list of names with
+//     spaces in them cannot be passed that way. One name, no splitting.
+//
+// A miss logs what the container actually holds, which is how these two names
+// were pinned down in the first place.
+function PutNativeIn(rec: IwbMainRecord; containerPath, fieldName: string; value: Variant): Boolean;
 var
-  sl : TStringList;
-  i  : Integer;
-  el, dump : IInterface;
-  names: string;
+  cont, el: IInterface;
+  i   : Integer;
+  have: string;
 begin
-  Result := '';
-  sl := TStringList.Create;
-  try
-    sl.CommaText := paths;
-    for i := 0 to Pred(sl.Count) do begin
-      el := ElementByPath(rec, sl[i]);
-      if not Assigned(el) then Continue;
-      SetNativeValue(el, value);
-      Result := sl[i];
-      Exit;
-    end;
-  finally
-    sl.Free;
+  Result := False;
+
+  cont := ElementByPath(rec, containerPath);
+  if not Assigned(cont) then begin
+    Problem('нет "' + containerPath + '" в ' + EditorID(rec));
+    Exit;
   end;
 
-  names := '';
-  dump := ElementByPath(rec, dumpPath);
-  if Assigned(dump) then
-    for i := 0 to Pred(ElementCount(dump)) do
-      names := names + ' | ' + Name(ElementByIndex(dump, i));
-  Problem('none of [' + paths + '] resolved in ' + EditorID(rec)
-        + '. "' + dumpPath + '" offers:' + names);
+  el := ElementByName(cont, fieldName);
+  if not Assigned(el) then begin
+    have := '';
+    for i := 0 to Pred(ElementCount(cont)) do
+      have := have + ' | ' + Name(ElementByIndex(cont, i));
+    Problem('"' + fieldName + '" не найдено в ' + containerPath + ' записи '
+          + EditorID(rec) + '. Есть:' + have);
+    Exit;
+  end;
+
+  SetNativeValue(el, value);
+  Result := True;
 end;
 
 function RfabRec(sig, edid: string): IwbMainRecord;
@@ -3962,7 +3968,6 @@ end;
 procedure PatchControlWeather;
 var
   mgef, spel, masterPerk, ovr: IwbMainRecord;
-  hit: string;
 begin
   Say('');
   Say('--- RFAB override: "Управление погодой" -> мастер ---');
@@ -3977,12 +3982,8 @@ begin
   if Assigned(mgef) then begin
     ovr := OverrideOf(mgef);
     if Assigned(ovr) then begin
-      hit := PutNativeAny(ovr, 'Magic Effect Data\DATA\Minimum Skill Level,'
-                             + 'Magic Effect Data\DATA\Skill Level,'
-                             + 'Magic Effect Data\DATA\Min Skill Level',
-                          100, 'Magic Effect Data\DATA');
-      if hit <> '' then
-        Say('  MGEF WB_A100_ControlWeather_Effect: "' + hit + '" = 100');
+      if PutNativeIn(ovr, 'Magic Effect Data\DATA', 'Minimum Skill Level', 100) then
+        Say('  MGEF WB_A100_ControlWeather_Effect: Minimum Skill Level = 100');
     end;
   end;
 
@@ -3993,11 +3994,9 @@ begin
   if Assigned(spel) then begin
     ovr := OverrideOf(spel);
     if Assigned(ovr) then begin
-      hit := PutNativeAny(ovr, 'SPIT\Half-cost Perk,SPIT\Half Cost Perk,SPIT\Casting Perk',
-                          GetLoadOrderFormID(masterPerk), 'SPIT');
-      if hit <> '' then
-        Say('  SPEL RFAB_Spell_Alteration1_ControlWeather_PC: "' + hit
-          + '" = AlterationMaster100');
+      if PutNativeIn(ovr, 'SPIT', 'Half-cost Perk', GetLoadOrderFormID(masterPerk)) then
+        Say('  SPEL RFAB_Spell_Alteration1_ControlWeather_PC: '
+          + 'Half-cost Perk = AlterationMaster100');
     end;
   end;
 end;
