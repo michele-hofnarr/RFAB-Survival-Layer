@@ -12,11 +12,20 @@
 # In:   _base_skyui_activeeffects.swf  (copy of SkyUI activeeffects.swf)
 #       src/__Packages/skyui/widgets/rfab_survival/*.as
 #       icons/*.png  (64x64 RGBA - needs + temp-feel icons, embedded as
-#                     DefineBitsLossless2 "ico_<name>" by embed_icons.py)
+#                     DefineBitsLossless2 "ico_<name>" by embed_icons.py).
+#                     The knotwork bar end caps are vectors, not art -
+#                     see drawKnotCap in Rfab_SurvivalWidget.as.
 # Out:  ../Interface/exported/widgets/RFABSurvivalLayer/RSLHud.swf (+ fallback path)
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
-FF="R:/Games/The Elder Scrolls V Skyrim - Special Edition/develop/ffdec_26.2.1/ffdec.jar"
+# JPEXS FFDec. Not part of the repo and not always installed - override with
+# FFDEC=/path/to/ffdec.jar if it lives somewhere else.
+FF="${FFDEC:-R:/Games/The Elder Scrolls V Skyrim - Special Edition/develop/ffdec_26.2.1/ffdec.jar}"
+if [ ! -f "$FF" ]; then
+    echo "FFDec not found: $FF" >&2
+    echo "Install JPEXS Free Flash Decompiler and re-run, or set FFDEC=..." >&2
+    exit 1
+fi
 BASE="$HERE/_base_skyui_activeeffects.swf"
 OUT="$HERE/../Interface/exported/widgets/RFABSurvivalLayer/RSLHud.swf"
 OUT2="$HERE/../Interface/widgets/RFABSurvivalLayer/RSLHud.swf"
