@@ -286,30 +286,6 @@
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|85C"
           }
-        },
-        {
-          "text": "$_RSL_HudWidgetHAnchor",
-          "help": "$_RSL_HudWidgetHAnchor_help",
-          "type": "slider",
-          "valueOptions": {
-            "min": 0,
-            "max": 2,
-            "step": 1,
-            "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85D"
-          }
-        },
-        {
-          "text": "$_RSL_HudWidgetVAnchor",
-          "help": "$_RSL_HudWidgetVAnchor_help",
-          "type": "slider",
-          "valueOptions": {
-            "min": 0,
-            "max": 2,
-            "step": 1,
-            "sourceType": "GlobalValue",
-            "sourceForm": "RFAB_SurvivalLayer.esp|85E"
-          }
         }
       ]
     },
@@ -951,6 +927,18 @@
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|83A"
           }
+        },
+        {
+          "text": "$_RSL_ShelterColdCap",
+          "help": "$_RSL_ShelterColdCap_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B91"
+          }
         }
       ]
     },
@@ -1321,6 +1309,15 @@
           }
         },
         {
+          "text": "$_RSL_ChopKey",
+          "help": "$_RSL_ChopKey_help",
+          "type": "keymap",
+          "valueOptions": {
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B92"
+          }
+        },
+        {
           "text": "$_RSL_TreeChopCooldownH",
           "help": "$_RSL_TreeChopCooldownH_help",
           "type": "slider",
@@ -1390,6 +1387,158 @@
             "step": 10,
             "sourceType": "GlobalValue",
             "sourceForm": "RFAB_SurvivalLayer.esp|83E"
+          }
+        },
+        {
+          "text": "$_RSL_HdrHudPlace",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_HudTempX",
+          "help": "$_RSL_HudTempX_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 1280,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B93"
+          }
+        },
+        {
+          "text": "$_RSL_HudTempY",
+          "help": "$_RSL_HudTempY_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 720,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B94"
+          }
+        },
+        {
+          "text": "$_RSL_HudTempScale",
+          "help": "$_RSL_HudTempScale_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 25,
+            "max": 300,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B95"
+          }
+        },
+        {
+          "text": "$_RSL_HudInvX",
+          "help": "$_RSL_HudInvX_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 1280,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B96"
+          }
+        },
+        {
+          "text": "$_RSL_HudInvY",
+          "help": "$_RSL_HudInvY_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 720,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B97"
+          }
+        },
+        {
+          "text": "$_RSL_HudInvScale",
+          "help": "$_RSL_HudInvScale_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 25,
+            "max": 300,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B98"
+          }
+        },
+        {
+          "text": "$_RSL_HdrColdVis",
+          "type": "header"
+        },
+        {
+          "text": "$_RSL_ColdVisDesatLo",
+          "help": "$_RSL_ColdVisDesatLo_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B8B"
+          }
+        },
+        {
+          "text": "$_RSL_ColdVisDesatHi",
+          "help": "$_RSL_ColdVisDesatHi_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B8C"
+          }
+        },
+        {
+          "text": "$_RSL_ColdVisTintLo",
+          "help": "$_RSL_ColdVisTintLo_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B8D"
+          }
+        },
+        {
+          "text": "$_RSL_ColdVisTintHi",
+          "help": "$_RSL_ColdVisTintHi_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B8E"
+          }
+        },
+        {
+          "text": "$_RSL_ColdVisBlurLo",
+          "help": "$_RSL_ColdVisBlurLo_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B8F"
+          }
+        },
+        {
+          "text": "$_RSL_ColdVisBlurHi",
+          "help": "$_RSL_ColdVisBlurHi_help",
+          "type": "slider",
+          "valueOptions": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "sourceType": "GlobalValue",
+            "sourceForm": "RFAB_SurvivalLayer.esp|B90"
           }
         },
         {

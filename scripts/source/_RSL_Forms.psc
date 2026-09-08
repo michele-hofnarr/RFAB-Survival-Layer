@@ -244,12 +244,28 @@ GlobalVariable Function HudWidgetAlpha() global
     return Game.GetFormFromFile(0x0000085C, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function HudWidgetHAnchor() global
-    return Game.GetFormFromFile(0x0000085D, "RFAB_SurvivalLayer.esp") as GlobalVariable
+GlobalVariable Function HudTempX() global
+    return Game.GetFormFromFile(0x00000B93, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
-GlobalVariable Function HudWidgetVAnchor() global
-    return Game.GetFormFromFile(0x0000085E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+GlobalVariable Function HudTempY() global
+    return Game.GetFormFromFile(0x00000B94, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudTempScale() global
+    return Game.GetFormFromFile(0x00000B95, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudInvX() global
+    return Game.GetFormFromFile(0x00000B96, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudInvY() global
+    return Game.GetFormFromFile(0x00000B97, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function HudInvScale() global
+    return Game.GetFormFromFile(0x00000B98, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function PollInterval() global
@@ -274,6 +290,30 @@ EndFunction
 
 GlobalVariable Function ColdVisualThreshold() global
     return Game.GetFormFromFile(0x00000834, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdVisDesatLo() global
+    return Game.GetFormFromFile(0x00000B8B, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdVisDesatHi() global
+    return Game.GetFormFromFile(0x00000B8C, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdVisTintLo() global
+    return Game.GetFormFromFile(0x00000B8D, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdVisTintHi() global
+    return Game.GetFormFromFile(0x00000B8E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdVisBlurLo() global
+    return Game.GetFormFromFile(0x00000B8F, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ColdVisBlurHi() global
+    return Game.GetFormFromFile(0x00000B90, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 GlobalVariable Function DiseaseEnabled() global
@@ -380,6 +420,10 @@ GlobalVariable Function CampfireCooldown() global
     return Game.GetFormFromFile(0x0000083A, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
+GlobalVariable Function ShelterColdCap() global
+    return Game.GetFormFromFile(0x00000B91, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
 GlobalVariable Function WoodFromTrees() global
     return Game.GetFormFromFile(0x0000083B, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
@@ -394,6 +438,10 @@ EndFunction
 
 GlobalVariable Function TreeChopRadius() global
     return Game.GetFormFromFile(0x0000083E, "RFAB_SurvivalLayer.esp") as GlobalVariable
+EndFunction
+
+GlobalVariable Function ChopKey() global
+    return Game.GetFormFromFile(0x00000B92, "RFAB_SurvivalLayer.esp") as GlobalVariable
 EndFunction
 
 ; --- abilities -----------------------------------------------------
@@ -542,6 +590,22 @@ Perk Function PerkCook() global
     return Game.GetFormFromFile(0x000CE264, "RFAB.esp") as Perk
 EndFunction
 
+Perk Function PerkAcclimatization() global
+    return Game.GetFormFromFile(0x000CE268, "RFAB.esp") as Perk
+EndFunction
+
+ImageSpaceModifier Function ImodColdDesat() global
+    return Game.GetFormFromFile(0x000B7983, "Skyrim.esm") as ImageSpaceModifier
+EndFunction
+
+ImageSpaceModifier Function ImodColdTint() global
+    return Game.GetFormFromFile(0x000486F4, "Skyrim.esm") as ImageSpaceModifier
+EndFunction
+
+ImageSpaceModifier Function ImodColdBlur() global
+    return Game.GetFormFromFile(0x000B97F7, "Skyrim.esm") as ImageSpaceModifier
+EndFunction
+
 Spell Function PeryiteBlessing() global
     return Game.GetFormFromFile(0x000060A5, "RFAB.esp") as Spell
 EndFunction
@@ -568,6 +632,10 @@ EndFunction
 
 Form Function BaseCookPot() global
     return Game.GetFormFromFile(0x001010B3, "Skyrim.esm") as Form
+EndFunction
+
+Form Function BaseTent() global
+    return Game.GetFormFromFile(0x000800E2, "Skyrim.esm") as Form
 EndFunction
 
 Race Function RaceDraugr() global
