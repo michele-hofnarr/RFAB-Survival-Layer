@@ -37,6 +37,11 @@ const
   DEF_PENALTY_CROSS   = 10;   // the two other pools
   DEF_PENALTY_SPEED   = 10;   // SpeedMult, per axis
 
+  // v0.4.0. Everything this layer appends to an RFAB perk description starts
+  // here. A rerun cuts the description back to this marker before appending
+  // again, so the text can never be doubled up.
+  PERK_MARK = '<br>[Слой выживания]<br>';
+
 var
   tgt      : IwbFile;
   problems : Integer;
@@ -94,6 +99,14 @@ begin
     Exit;
   end;
   Result := strTbl.Values[key];
+end;
+
+// Is this key present at all? L() shouts and returns the key name when it is
+// not, which is the right default for text that must exist - but a caller with
+// a genuinely optional key needs to ask quietly first.
+function HasStr(key: string): Boolean;
+begin
+  Result := strTbl.IndexOfName(key) >= 0;
 end;
 
 // Expand %P / %C / %S in a description to the penalty defaults, angle-bracketed
@@ -387,8 +400,8 @@ begin
   AddGlobal(PFX + 'WeatherRain',         200,   'Float');
   AddGlobal(PFX + 'WeatherSnow',         200,   'Float');
   AddGlobal(PFX + 'NightMult',           170,   'Float');   // 22:00-06:00
-  AddGlobal(PFX + 'SwimMult',            500,   'Float');   // + clothing warmth off
-  AddGlobal(PFX + 'FireMult',            40,    'Float');   // outdoor fire/torch (x0.4); interior+fire -> 0
+  AddGlobal(PFX + 'SwimMult',            1000,  'Float');   // + clothing warmth off
+  AddGlobal(PFX + 'FireMult',            20,    'Float');   // outdoor fire/torch (x0.2); interior+fire -> 0
 
   AddGlobal(PFX + 'SevInterior',         60,    'Float');   // ordinary interior, no fire: % of the hold's outdoor RegionBase
   AddGlobal(PFX + 'SevColdInterior',     45,    'Float');   // ice cave / frozen ruin: fire only partly warms (x FireMult)
@@ -428,6 +441,20 @@ begin
   AddGlobal(PFX + 'ColdVisualShader',    1,     'Short');   // ice crust on character (on)
   AddGlobal(PFX + 'ColdVisualThreshold', 90,    'Float');   // cold >= 90 -> ice crust
 
+  // Screen ISM stack (v0.4.0). Three vanilla IMADs applied additively, each
+  // ramping over its own cold window: strength = (cold - Lo) / (Hi - Lo).
+  //   Desat -> defaultDesaturateImod   Skyrim.esm 000B7983
+  //   Tint  -> SlowTimeImod            Skyrim.esm 000486F4 (cold blue TNAM)
+  //   Blur  -> ISMDinCloudBlurStatic   Skyrim.esm 000B97F7 (blur + grey fade)
+  // The six bounds are exposed on the Debug page for in-game tuning and get
+  // frozen (and removed from the MCM) once the look is settled.
+  AddGlobal(PFX + 'ColdVisDesatLo',      40,    'Float');
+  AddGlobal(PFX + 'ColdVisDesatHi',      100,   'Float');
+  AddGlobal(PFX + 'ColdVisTintLo',       55,    'Float');
+  AddGlobal(PFX + 'ColdVisTintHi',       100,   'Float');
+  AddGlobal(PFX + 'ColdVisBlurLo',       75,    'Float');
+  AddGlobal(PFX + 'ColdVisBlurHi',       100,   'Float');
+
   // warm-hands-by-fire idle: after WarmAnimDelay seconds standing still near a
   // heat source, play the vanilla IdleWarmHandsStanding on the player. Best-
   // effort - any input cancels it, and PlayIdle on the player is fragile.
@@ -439,8 +466,14 @@ begin
   // CampfireBurnHours in-game hours, a new one replaces the old.
   AddGlobal(PFX + 'CampfireEnabled',     1,     'Short');
   AddGlobal(PFX + 'CampfireBurnHours',   4,     'Float');   // in-game hours before it burns out
-  AddGlobal(PFX + 'CampfireFuel',        1,     'Short');    // Firewood01 consumed per light
+  AddGlobal(PFX + 'CampfireFuel',        3,     'Short');    // Firewood01 consumed per light
   AddGlobal(PFX + 'CampfireCooldown',    5,     'Float');    // real seconds between casts
+  // Shelter cap (v0.4.0). With BOTH RFAB perks ("Основы выживания" +
+  // "Акклиматизация") the cold bar still rises, but never past this value:
+  //   - next to the player's OWN campfire: always (standing, or waiting via T)
+  //   - asleep in the player's own tent bedroll: over the slept hours
+  // 75 of 100 leaves a 15-point margin below the hypothermia threshold (90).
+  AddGlobal(PFX + 'ShelterColdCap',      75,    'Float');
   // cook-pot offset from the campfire is hardcoded in _RSL_CampfireEffect
   // (the CraftingCookingPotSm mesh pivot is off-centre): fwd -47, up -13.3.
 
@@ -450,6 +483,10 @@ begin
   AddGlobal(PFX + 'TreeChopCooldownH',   12,    'Float');   // in-game hours a tree needs before it yields again
   AddGlobal(PFX + 'TreeChopYield',       1,     'Short');
   AddGlobal(PFX + 'TreeChopRadius',      100,   'Float');   // scan-around fallback range (crosshair misses most TREE refs)
+  // Rebindable chop key (v0.4.0). 0 = keep the old behaviour, i.e. chop on the
+  // Activate control. Any other value is a DirectX scan code registered with
+  // RegisterForKey, and the Activate path is then switched off.
+  AddGlobal(PFX + 'ChopKey',             0,     'Short');
 
   // diseases. Progress = worsen, Decay = improve; 24 game-hours each for now.
   AddGlobal(PFX + 'DiseaseEnabled',      1,     'Short');
@@ -498,8 +535,19 @@ begin
   AddGlobal(PFX + 'HudWidgetY',          655,   'Float');    // px at 720 tall
   AddGlobal(PFX + 'HudWidgetScale',      100,   'Float');    // %
   AddGlobal(PFX + 'HudWidgetAlpha',      100,   'Float');    // %
-  AddGlobal(PFX + 'HudWidgetHAnchor',    0,     'Short');    // 0 left 1 center 2 right
-  AddGlobal(PFX + 'HudWidgetVAnchor',    0,     'Short');    // 0 top 1 center 2 bottom
+  // v0.4.0: the temperature-feel icon and the inventory food preview are
+  // placed on their own, not as part of the bar block - same 1280x720 space
+  // measured from the top-left. Exposed on the Debug page for placing in game;
+  // freeze the numbers here and drop the sliders once they are settled.
+  AddGlobal(PFX + 'HudTempX',            420,   'Float');
+  AddGlobal(PFX + 'HudTempY',            640,   'Float');
+  AddGlobal(PFX + 'HudTempScale',        100,   'Float');
+  AddGlobal(PFX + 'HudInvX',             360,   'Float');
+  AddGlobal(PFX + 'HudInvY',             600,   'Float');
+  AddGlobal(PFX + 'HudInvScale',         100,   'Float');
+  // v0.4.0: no anchor globals. RFAB's own widgets ([RFAB] Interface.ini) know
+  // only X/Y in a 1280x720 space measured from the top-left, so the widget is
+  // pinned to HAnchor "left" / VAnchor "top" and X/Y alone place it.
 
   // service
   AddGlobal(PFX + 'PollInterval',        1.0,   'Float');
@@ -3201,8 +3249,12 @@ begin
     EmitGlobalGetter(sl, 'HudWidgetY');
     EmitGlobalGetter(sl, 'HudWidgetScale');
     EmitGlobalGetter(sl, 'HudWidgetAlpha');
-    EmitGlobalGetter(sl, 'HudWidgetHAnchor');
-    EmitGlobalGetter(sl, 'HudWidgetVAnchor');
+    EmitGlobalGetter(sl, 'HudTempX');
+    EmitGlobalGetter(sl, 'HudTempY');
+    EmitGlobalGetter(sl, 'HudTempScale');
+    EmitGlobalGetter(sl, 'HudInvX');
+    EmitGlobalGetter(sl, 'HudInvY');
+    EmitGlobalGetter(sl, 'HudInvScale');
     EmitGlobalGetter(sl, 'PollInterval');
     EmitGlobalGetter(sl, 'DebugLog');
 
@@ -3211,6 +3263,12 @@ begin
     EmitGlobalGetter(sl, 'SpeedCap');
     EmitGlobalGetter(sl, 'ColdVisualShader');
     EmitGlobalGetter(sl, 'ColdVisualThreshold');
+    EmitGlobalGetter(sl, 'ColdVisDesatLo');
+    EmitGlobalGetter(sl, 'ColdVisDesatHi');
+    EmitGlobalGetter(sl, 'ColdVisTintLo');
+    EmitGlobalGetter(sl, 'ColdVisTintHi');
+    EmitGlobalGetter(sl, 'ColdVisBlurLo');
+    EmitGlobalGetter(sl, 'ColdVisBlurHi');
     EmitGlobalGetter(sl, 'DiseaseEnabled');
     EmitGlobalGetter(sl, 'DiseaseProgressHours');
     EmitGlobalGetter(sl, 'DiseaseDecayHours');
@@ -3241,10 +3299,12 @@ begin
     EmitGlobalGetter(sl, 'CampfireBurnHours');
     EmitGlobalGetter(sl, 'CampfireFuel');
     EmitGlobalGetter(sl, 'CampfireCooldown');
+    EmitGlobalGetter(sl, 'ShelterColdCap');
     EmitGlobalGetter(sl, 'WoodFromTrees');
     EmitGlobalGetter(sl, 'TreeChopCooldownH');
     EmitGlobalGetter(sl, 'TreeChopYield');
     EmitGlobalGetter(sl, 'TreeChopRadius');
+    EmitGlobalGetter(sl, 'ChopKey');
 
     sl.Add('; --- abilities -----------------------------------------------------');
     sl.Add('');
@@ -3296,6 +3356,12 @@ begin
     // v0.3.0 survival extras: perks (RFAB.esp originals), items, placement bases
     EmitVanillaGetter(sl, 'Perk',       'PerkSurvivalBasics', '0CE266', 'RFAB.esp');
     EmitVanillaGetter(sl, 'Perk',       'PerkCook',           '0CE264', 'RFAB.esp');
+    // v0.4.0: RFAB_Perk_Survival_Acclimatization - second half of the shelter gate
+    EmitVanillaGetter(sl, 'Perk',       'PerkAcclimatization', '0CE268', 'RFAB.esp');
+    // v0.4.0: cold screen stack - three vanilla IMADs applied additively
+    EmitVanillaGetter(sl, 'ImageSpaceModifier', 'ImodColdDesat', '0B7983', 'Skyrim.esm');
+    EmitVanillaGetter(sl, 'ImageSpaceModifier', 'ImodColdTint',  '0486F4', 'Skyrim.esm');
+    EmitVanillaGetter(sl, 'ImageSpaceModifier', 'ImodColdBlur',  '0B97F7', 'Skyrim.esm');
     // RFAB_Blessing_Peryite - freezes the 6 base-game disease wrappers at stage 1
     EmitVanillaGetter(sl, 'Spell',      'PeryiteBlessing',    '0060A5', 'RFAB.esp');
     EmitVanillaGetter(sl, 'Form',       'Firewood',           '06F993', 'Skyrim.esm');
@@ -3307,6 +3373,9 @@ begin
     EmitSkyrimForm(sl, 'BaseCampfire', 'Campfire01Burning');
     EmitSkyrimForm(sl, 'BaseCookSpit', 'CookingSpitSm01');
     EmitSkyrimForm(sl, 'BaseCookPot',  'CraftingCookingPotSm');
+    // v0.4.0: tent pitched over the portable bedroll when the player holds both
+    // "Основы выживания" and "Акклиматизация" (SmallNordicTent01.nif).
+    EmitSkyrimForm(sl, 'BaseTent',     'NorTentSmall');
     // OnHit disease carriers (Skyrim.esm)
     EmitVanillaGetter(sl, 'Race',    'RaceDraugr',        '000D53', 'Skyrim.esm');
     EmitVanillaGetter(sl, 'Race',    'RaceSlaughterfish', '013203', 'Skyrim.esm');
@@ -3498,6 +3567,21 @@ begin
   sl.Add('        },');
 end;
 
+// MCM Helper KeyMapControl. The stored value is a DirectX scan code; 0 keeps
+// the feature on its default control instead of a dedicated key.
+procedure JsonKeymap(sl: TStringList; edid: string);
+begin
+  sl.Add('        {');
+  sl.Add('          "text": "$' + edid + '",');
+  sl.Add('          "help": "$' + edid + '_help",');
+  sl.Add('          "type": "keymap",');
+  sl.Add('          "valueOptions": {');
+  sl.Add('            "sourceType": "GlobalValue",');
+  sl.Add('            "sourceForm": "' + SourceForm(edid) + '"');
+  sl.Add('          }');
+  sl.Add('        },');
+end;
+
 procedure JsonHeader(sl: TStringList; key: string);
 begin
   sl.Add('        {');
@@ -3580,10 +3664,8 @@ begin
     JsonSlider(sl, PFX + 'HudWidgetY',      '0', '720',  '5');
     JsonSlider(sl, PFX + 'HudWidgetScale',  '50', '200', '5');
     JsonSlider(sl, PFX + 'HudWidgetAlpha',  '0', '100',  '5');
-    // Anchors 0/1/2 as sliders (0 left/top, 1 center, 2 right/bottom);
-    // MCM Helper menu with GlobalValue is untested in this pack.
-    JsonSlider(sl, PFX + 'HudWidgetHAnchor', '0', '2', '1');
-    JsonSlider(sl, PFX + 'HudWidgetVAnchor', '0', '2', '1');
+    // No anchor rows: the widget is pinned top-left, exactly like RFAB's own
+    // widgets, so X/Y alone place it in the 1280x720 HUD space.
     TrimLastComma(sl);
     sl.Add('      ]');
     sl.Add('    },');
@@ -3672,6 +3754,7 @@ begin
     JsonSlider(sl, PFX + 'CampfireBurnHours', '1', '24', '1');
     JsonSlider(sl, PFX + 'CampfireFuel',      '1', '5',  '1');
     JsonSlider(sl, PFX + 'CampfireCooldown',  '0', '30', '1');
+    JsonSlider(sl, PFX + 'ShelterColdCap',    '0', '100', '5');
     TrimLastComma(sl);
     sl.Add('      ]');
     sl.Add('    },');
@@ -3733,6 +3816,7 @@ begin
     JsonSlider(sl, PFX + 'BonusThresholdPct',  '0', '50', '5');
     JsonHeader(sl, '_RSL_HdrWood');
     JsonToggle(sl, PFX + 'WoodFromTrees');
+    JsonKeymap(sl, PFX + 'ChopKey');
     JsonSlider(sl, PFX + 'TreeChopCooldownH', '0', '72', '1');
     JsonSlider(sl, PFX + 'TreeChopYield',     '1', '5',  '1');
     TrimLastComma(sl);
@@ -3748,6 +3832,23 @@ begin
     JsonSlider(sl, PFX + 'PollInterval', '1', '30', '1');
     JsonToggle(sl, PFX + 'DebugLog');
     JsonSlider(sl, PFX + 'TreeChopRadius', '50', '400', '10');
+    // Cold screen stack, tuning only. Each effect ramps from Lo to Hi on the
+    // 0..100 cold bar. Freeze the numbers in BuildGlobals once the look is
+    // settled and delete this block.
+    JsonHeader(sl, '_RSL_HdrHudPlace');
+    JsonSlider(sl, PFX + 'HudTempX',     '0', '1280', '5');
+    JsonSlider(sl, PFX + 'HudTempY',     '0', '720',  '5');
+    JsonSlider(sl, PFX + 'HudTempScale', '25', '300', '5');
+    JsonSlider(sl, PFX + 'HudInvX',      '0', '1280', '5');
+    JsonSlider(sl, PFX + 'HudInvY',      '0', '720',  '5');
+    JsonSlider(sl, PFX + 'HudInvScale',  '25', '300', '5');
+    JsonHeader(sl, '_RSL_HdrColdVis');
+    JsonSlider(sl, PFX + 'ColdVisDesatLo', '0', '100', '5');
+    JsonSlider(sl, PFX + 'ColdVisDesatHi', '0', '100', '5');
+    JsonSlider(sl, PFX + 'ColdVisTintLo',  '0', '100', '5');
+    JsonSlider(sl, PFX + 'ColdVisTintHi',  '0', '100', '5');
+    JsonSlider(sl, PFX + 'ColdVisBlurLo',  '0', '100', '5');
+    JsonSlider(sl, PFX + 'ColdVisBlurHi',  '0', '100', '5');
     sl.Add('        {');
     sl.Add('          "text": "$_RSL_BtnReset",');
     sl.Add('          "help": "$_RSL_BtnReset_help",');
@@ -3775,6 +3876,176 @@ begin
   finally
     sl.Free;
   end;
+end;
+
+// --- v0.4.0: overrides on RFAB.esp own records -----------------------------
+//
+// Unlike everything above, these are OVERRIDES, not new records:
+// wbCopyElementToFile with AsNew=False keeps RFAB's formID, so the game sees
+// the retuned original rather than a duplicate. Our plugin already masters
+// RFAB.esp and must load after it. Reruns are safe - copying a record that is
+// already overridden returns the existing override.
+
+// aAsNew=False keeps the master's formID; aDeepCopy=TRUE is what actually
+// brings the subrecords along. With False the override comes out as a bare
+// record header - every field empty - and then editing it does not fail, it
+// silently ships a blanked-out version of RFAB's record.
+//
+// Any override left by an earlier run is dropped first and re-derived from the
+// master: reusing one would inherit whatever that run left behind (including a
+// blanked record), and every edit below is a fresh re-derivation anyway.
+function OverrideOf(src: IwbMainRecord): IwbMainRecord;
+var
+  old: IwbMainRecord;
+begin
+  Result := nil;
+  if not Assigned(src) then Exit;
+  AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(src))));
+
+  old := RecordByEDID(tgt, Signature(src), EditorID(src));
+  if Assigned(old) then begin
+    Say('    re-deriving override of ' + EditorID(src) + ' from the master');
+    Remove(old);
+  end;
+
+  Result := wbCopyElementToFile(src, tgt, False, True);
+  if not Assigned(Result) then
+    Problem('override not created for ' + EditorID(src));
+end;
+
+// Set a native value, trying each candidate path in turn - xEdit's field names
+// differ between record definitions and between builds, and a wrong guess is
+// otherwise a silent no-op. Returns the path that took, or '' - and on total
+// failure lists what the record actually offers, so the next run names it.
+function PutNativeAny(rec: IwbMainRecord; paths: string; value: Variant; dumpPath: string): string;
+var
+  sl : TStringList;
+  i  : Integer;
+  el, dump : IInterface;
+  names: string;
+begin
+  Result := '';
+  sl := TStringList.Create;
+  try
+    sl.CommaText := paths;
+    for i := 0 to Pred(sl.Count) do begin
+      el := ElementByPath(rec, sl[i]);
+      if not Assigned(el) then Continue;
+      SetNativeValue(el, value);
+      Result := sl[i];
+      Exit;
+    end;
+  finally
+    sl.Free;
+  end;
+
+  names := '';
+  dump := ElementByPath(rec, dumpPath);
+  if Assigned(dump) then
+    for i := 0 to Pred(ElementCount(dump)) do
+      names := names + ' | ' + Name(ElementByIndex(dump, i));
+  Problem('none of [' + paths + '] resolved in ' + EditorID(rec)
+        + '. "' + dumpPath + '" offers:' + names);
+end;
+
+function RfabRec(sig, edid: string): IwbMainRecord;
+begin
+  Result := RecordByEDID(FileByName('RFAB.esp'), sig, edid);
+  if not Assigned(Result) then
+    Problem(sig + ' ' + edid + ' не найден в RFAB.esp');
+end;
+
+// "Управление погодой" is flagged A100 by its own EditorID, but the effect
+// still carries Minimum Skill Level 0 and the spell still points at the novice
+// half-cost perk - so the game lists it as a novice spell. Fix both; cost and
+// charge time stay as RFAB set them.
+procedure PatchControlWeather;
+var
+  mgef, spel, masterPerk, ovr: IwbMainRecord;
+  hit: string;
+begin
+  Say('');
+  Say('--- RFAB override: "Управление погодой" -> мастер ---');
+
+  masterPerk := RecordByEDID(FileByName('Skyrim.esm'), 'PERK', 'AlterationMaster100');
+  if not Assigned(masterPerk) then begin
+    Problem('AlterationMaster100 не найден в Skyrim.esm');
+    Exit;
+  end;
+
+  mgef := RfabRec('MGEF', 'WB_A100_ControlWeather_Effect');
+  if Assigned(mgef) then begin
+    ovr := OverrideOf(mgef);
+    if Assigned(ovr) then begin
+      hit := PutNativeAny(ovr, 'Magic Effect Data\DATA\Minimum Skill Level,'
+                             + 'Magic Effect Data\DATA\Skill Level,'
+                             + 'Magic Effect Data\DATA\Min Skill Level',
+                          100, 'Magic Effect Data\DATA');
+      if hit <> '' then
+        Say('  MGEF WB_A100_ControlWeather_Effect: "' + hit + '" = 100');
+    end;
+  end;
+
+  // The field is "Half-cost Perk" in this xEdit build, not "Casting Perk".
+  // RFAB overrides the vanilla alteration perks in place, so 000C44BA resolves
+  // to its own RFAB_Perk_Alteration_MasterAlteration at runtime.
+  spel := RfabRec('SPEL', 'RFAB_Spell_Alteration1_ControlWeather_PC');
+  if Assigned(spel) then begin
+    ovr := OverrideOf(spel);
+    if Assigned(ovr) then begin
+      hit := PutNativeAny(ovr, 'SPIT\Half-cost Perk,SPIT\Half Cost Perk,SPIT\Casting Perk',
+                          GetLoadOrderFormID(masterPerk), 'SPIT');
+      if hit <> '' then
+        Say('  SPEL RFAB_Spell_Alteration1_ControlWeather_PC: "' + hit
+          + '" = AlterationMaster100');
+    end;
+  end;
+end;
+
+// Append this layer's own line to an RFAB perk description. Additive and
+// idempotent: everything from PERK_MARK on is cut first, so the original RFAB
+// text is preserved and a rerun replaces our block instead of stacking copies.
+procedure AppendPerkNote(edid, strKey: string);
+var
+  perk, ovr: IwbMainRecord;
+  desc, note: string;
+  cut: Integer;
+begin
+  // A missing key must not reach the record: L() would hand back the key name
+  // itself and that is what would end up in the perk description in game.
+  if not HasStr(strKey) then begin
+    Problem('нет строки ' + strKey + ' - описание ' + edid + ' не тронуто'
+          + ' (не забыт ли deploy.sh?)');
+    Exit;
+  end;
+  note := Trim(L(strKey));
+  if note = '' then begin
+    Say('  ' + edid + ': ключ ' + strKey + ' пуст - описание не тронуто');
+    Exit;
+  end;
+
+  perk := RfabRec('PERK', edid);
+  if not Assigned(perk) then Exit;
+
+  ovr := OverrideOf(perk);
+  if not Assigned(ovr) then Exit;
+
+  desc := GetElementEditValues(ovr, 'DESC');
+  cut := Pos(PERK_MARK, desc);
+  if cut > 0 then
+    desc := Copy(desc, 1, cut - 1);
+
+  if PutEdit(ovr, 'DESC', desc + PERK_MARK + note) then
+    Say('  ' + edid + ': описание дополнено (' + strKey + ')');
+end;
+
+procedure PatchRfabPerks;
+begin
+  Say('');
+  Say('--- RFAB override: описания перков выживания ---');
+  AppendPerkNote('RFAB_Perk_Survival_BaseSurvival',    'perk.BaseSurvival.add');
+  AppendPerkNote('RFAB_Perk_Survival_Acclimatization', 'perk.Acclimatization.add');
+  AppendPerkNote('RFAB_Perk_Survival_Chef',            'perk.Chef.add');
 end;
 
 // ---------------------------------------------------------------------------
@@ -3812,6 +4083,8 @@ begin
   BuildDiseases;
   BuildRfabWrappers;
   BuildHypothermia;
+  PatchControlWeather;
+  PatchRfabPerks;
   PurgeStaleRecords;
   ScanCureEffects;
   BuildMonitorAndQuest;
