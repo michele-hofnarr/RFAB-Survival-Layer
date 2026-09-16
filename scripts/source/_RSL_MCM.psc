@@ -9,7 +9,7 @@ Scriptname _RSL_MCM extends MCM_ConfigBase
 
 Function ResetDefaults()
   ; Written by tools/make_mcm.py. One line per setting the plugin reads.
-  SetModSettingBool("bModEnabled:General", true)
+  SetModSettingBool("bModEnabled:General", false)
   SetModSettingBool("bColdShaderEnabled:Cold", true)
   SetModSettingFloat("fColdShaderAt:Cold", 0.100000)
   SetModSettingBool("bColdScreenEnabled:Cold", true)

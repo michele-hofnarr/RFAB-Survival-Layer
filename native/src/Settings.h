@@ -20,7 +20,14 @@ namespace RSL
         static void ReadSettings();
 
         // --- master ---
-        static inline bool bModEnabled{ true };
+        //
+        // OFF until the player turns it on, and that is deliberate.
+        // The switch being off is what runs the teardown, so a save
+        // loaded with a freshly installed build is swept clean of
+        // whatever an older one left on it before anything new is
+        // applied. Defaulting to on would start the mod on top of
+        // those leftovers instead.
+        static inline bool bModEnabled{ false };
         // On while the model is being tuned; the cold sample is what needs
         // watching and there is no other way to see its terms.
         static inline bool bDebugLog{ true };
