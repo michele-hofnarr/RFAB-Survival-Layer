@@ -370,7 +370,7 @@ def around(heights, x, y):
     return total / n if n else None
 
 
-def collect(tag, worldspace, plugins, snowids):
+def collect(tag, worldspace, plugins, snowids, iceids):
     """Every marker of one worldspace, with its covariates.
 
     Each plugin's markers are named from that plugin's own string table, so
@@ -378,7 +378,6 @@ def collect(tag, worldspace, plugins, snowids):
     coordinate.
     """
     print("# %s ..." % tag, file=sys.stderr)
-    names = {}
     marks = []
     regs = []
     heights = snow = None
@@ -388,9 +387,17 @@ def collect(tag, worldspace, plugins, snowids):
             continue
         buf = path.read_bytes()
         found = markers(buf, worldspace)
-        marks += found
         if found:
-            names.update(strings_table(plugin.split(".")[0].lower()))
+            # RESOLVED HERE, against this plugin's OWN table.
+            #
+            # The id spaces are per file and they overlap heavily: 4226 of
+            # Skyrim's 30301 ids also exist in a DLC table meaning something
+            # else. Merging the tables and looking up afterwards renamed every
+            # one of them - Septimus Signus's Outpost came out as a line of
+            # Dawnguard dialogue, because 0x2328 means both.
+            table = strings_table(plugin.split(".")[0].lower())
+            marks += [(table.get(nid), kind, x, y, z)
+                      for nid, kind, x, y, z in found]
         if heights is None:
             # Terrain and regions come from whichever plugin owns the
             # worldspace, which is the first one listed.
@@ -398,7 +405,8 @@ def collect(tag, worldspace, plugins, snowids):
             was = esm.TAMRIEL
             esm.TAMRIEL = worldspace
             try:
-                heights, snow = esm.land(buf, esm.top_groups(buf), snowids)
+                heights, snow = esm.land(
+                    buf, esm.top_groups(buf), snowids, iceids)
             finally:
                 esm.TAMRIEL = was
             # The same ruler the baking uses, so a point is measured the way
@@ -411,7 +419,7 @@ def collect(tag, worldspace, plugins, snowids):
           % (len(marks), len(regs), len(heights or {})), file=sys.stderr)
 
     rows = []
-    for nid, kind, x, y, z in marks:
+    for name, kind, x, y, z in marks:
         h = sample(heights, x, y)
         if h is None:
             continue
@@ -422,7 +430,6 @@ def collect(tag, worldspace, plugins, snowids):
             if any(esm.contains(r, x, y) for r in rings):
                 hit = rname
                 break
-        name = names.get(nid)
         if not name:
             # No strings for this plugin: say what it is and where.
             name = "%s %.0f, %.0f" % (
@@ -575,14 +582,17 @@ def write_xlsx(sheets, path):
 
 def main():
     snowids = set()
+    iceids = {}
     for plugin in ("Skyrim.esm", "Dragonborn.esm"):
         buf = (DATA / plugin).read_bytes()
         g = esm.top_groups(buf)
         if b"LTEX" in g:
             snowids |= esm.snow_textures(buf, g)
+        if b"STAT" in g:
+            iceids.update(esm.ice_statics(buf, g))
         del buf
 
-    sheets = [(tag, collect(tag, ws, plugins, snowids))
+    sheets = [(tag, collect(tag, ws, plugins, snowids, iceids))
               for tag, ws, plugins in WORLDS]
 
     if "--xlsx" in sys.argv:

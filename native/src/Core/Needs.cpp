@@ -398,7 +398,14 @@ namespace RSL
         // Only the losing side is scaled. A tent is shelter from the cold, not
         // a brake on a fire - the same reasoning that already makes the combat
         // multiplier one-sided, and the same reason warming ignores the load.
-        const float rateMult = losing ? a_coldRateMult : 1.0f;
+        // Water carries heat away far faster than air does, and the drop
+        // in temperature alone does not say that - that moves where the
+        // bar is heading, this is how fast it gets there. Losing side
+        // only, like every other multiplier here.
+        const float swim = climate.inWater
+                               ? std::max(1.0f, Settings::fSwimChillMult)
+                               : 1.0f;
+        const float rateMult = losing ? a_coldRateMult * swim : 1.0f;
         const float speed = climate.ColdSpeed(before) * rateMult / combat;
         const float step = speed * a_hours;
         const float moved = losing ? std::max(before - step, target)
@@ -422,7 +429,8 @@ namespace RSL
         // reserve's fall and used to leave bought time burning at full rate,
         // and a fight slowed the reserve fivefold while the buffer ran on.
         const float burn = std::abs(climate.ColdLoad()) * Settings::fColdChillRate /
-                           climate.ChillSlow() * a_coldRateMult / combat * a_hours;
+                           climate.ChillSlow() * a_coldRateMult * swim /
+                           combat * a_hours;
 
         // ONE DRAIN, NOT TWO. What the buffer burns is also what it pays
         // towards the fall - the burn IS the absorption, seen from the other
@@ -444,6 +452,26 @@ namespace RSL
             // pushed out from underneath as it fills. A fire does not stack on
             // top of bought time; it replaces it.
             _state.cold = std::clamp(_state.cold + delta, 0.0f, 1.0f);
+        }
+
+        // AND THE TAKING OVER IS ITS OWN STEP, not a side effect of delta.
+        //
+        // delta is what the WHOLE BAR has left to travel, and a running buffer
+        // is what makes the whole bar arrive before the reserve underneath it
+        // has. Once the bar sits on its target delta is zero, and the line
+        // above then moved nothing: at a fire the bar stuck at nine tenths
+        // reserve and one tenth bought time and stayed there for as long as
+        // the fire burned, because the burn has nothing to eat either in a
+        // place with no chill to it.
+        //
+        // So warming converts the buffer at its own rate, and the TOTAL does
+        // not move for it - what was bought time becomes warmth the player
+        // actually has. Which is what "a fire replaces it" was always meant to
+        // say.
+        if (!losing) {
+            const float taken = std::min(_state.coldTemp, step);
+            _state.cold = std::clamp(_state.cold + taken, 0.0f, 1.0f);
+            _state.coldTemp -= taken;
         }
         _state.coldTemp = std::min(_state.coldTemp, 1.0f - _state.cold);
 

@@ -76,6 +76,8 @@ namespace RSL
         ReadFloat(ini, "Cold", "fLoadPerDegree", fLoadPerDegree);
         ReadFloat(ini, "Cold", "fWetLoad", fWetLoad);
         ReadFloat(ini, "Cold", "fWetWarmthLoss", fWetWarmthLoss);
+        ReadFloat(ini, "Cold", "fSwimTemp", fSwimTemp);
+        ReadFloat(ini, "Cold", "fSwimChillMult", fSwimChillMult);
         ReadFloat(ini, "Cold", "fSoakMinutes", fSoakMinutes);
         ReadFloat(ini, "Cold", "fDryMinutes", fDryMinutes);
         ReadFloat(ini, "Cold", "fWarmthPerSlot", fWarmthPerSlot);

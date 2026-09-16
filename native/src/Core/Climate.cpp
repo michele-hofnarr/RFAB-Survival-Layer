@@ -588,6 +588,20 @@ namespace RSL
 
         out.temperature = beforeFire + out.fireOffset;
 
+        // AND THE WATER, after everything, the fire included.
+        //
+        // Every term above answers for the AIR over this spot, and the
+        // air over a river can be perfectly mild - the baked field says
+        // so and it is right. Water is not air: it takes heat out of a
+        // body at a rate nothing on that scale describes. So going in is
+        // worth a flat drop, applied where nothing can soften it, and the
+        // indicator falls with it - which is the point. It should read as
+        // freezing the moment the player is in, not once they climb out
+        // wet.
+        if (out.inWater) {
+            out.temperature += Settings::fSwimTemp;
+        }
+
         return out;
     }
 

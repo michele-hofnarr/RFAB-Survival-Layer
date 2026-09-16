@@ -572,7 +572,12 @@ begin
     'DuskglowCreviceLocation FrostflowLighthouseLocation GreywaterGrottoLocation ' +
     'HaemarsShameLocation HobsFallCaveLocation SeptimusSignusOutpostLocation ' +
     'SightlessPitLocation SouthfringeSanctumLocation SteepfallBurrowLocation ' +
-    'StillbornCaveLocation YngvildLocation AlftandLocation ForsakenCaveLocation', found);
+    'StillbornCaveLocation YngvildLocation AlftandLocation ForsakenCaveLocation ' +
+    // Added by hand, from play rather than from CC's list: Uttering Hills Cave
+    // is an ice cave the vanilla set does not name. Its location covers the
+    // exterior cells as well, which costs nothing - the controller only asks
+    // this question once it already knows the player is indoors.
+    'UtteringHillsCampLocation', found);
   FlstAddEdids(items, 'Dawnguard.esm', 'LCTN', 'DLC1GlacialCreviceLocation', found);
   FlstAddEdids(items, 'Dragonborn.esm', 'LCTN',
     'DLC2AltarofThrondLocation DLC2BenkongerikeLocation DLC2BristlebackCaveLocation ' +

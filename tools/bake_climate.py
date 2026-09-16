@@ -148,7 +148,18 @@ def snow_textures():
     return ids
 
 
-def block(tag, plugin, worldspace, resid, trend, snowids):
+def ice_statics():
+    ids = {}
+    for plugin in ("Skyrim.esm", "Dragonborn.esm"):
+        buf = (DATA / plugin).read_bytes()
+        groups = esm.top_groups(buf)
+        if b"STAT" in groups:
+            ids.update(esm.ice_statics(buf, groups))
+        del buf
+    return ids
+
+
+def block(tag, plugin, worldspace, resid, trend, snowids, iceids):
     """Bake one worldspace and return its bytes."""
     print("  %s, from %s" % (tag, plugin))
     buf = (DATA / plugin).read_bytes()
@@ -156,7 +167,7 @@ def block(tag, plugin, worldspace, resid, trend, snowids):
     was = esm.TAMRIEL
     esm.TAMRIEL = worldspace
     try:
-        heights, snow = esm.land(buf, groups, snowids)
+        heights, snow = esm.land(buf, groups, snowids, iceids)
     finally:
         esm.TAMRIEL = was
     del buf
@@ -283,10 +294,13 @@ def main():
                   % (sheet, min(r[2] for r in rs), max(r[2] for r in rs)))
 
     snowids = snow_textures()
-    print("  %d ground textures named as snow" % len(snowids))
+    iceids = ice_statics()
+    print("  %d ground textures named as snow, %d ice records"
+          % (len(snowids), len(iceids)))
 
     print("baking ...")
-    blocks = [block(tag, plugin, ws, resid.get(sheet, []), trend, snowids)
+    blocks = [block(tag, plugin, ws, resid.get(sheet, []), trend,
+                    snowids, iceids)
               for tag, plugin, ws, sheet in WORLDS]
 
     blob = bytearray()

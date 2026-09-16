@@ -28,12 +28,20 @@ units. Cells with no terrain cast no vote: the values and the votes are blurred
 together and divided at the end, so a coastline averages the land it has rather
 than the sea it has not.
 
-RADIUS is the one number worth tuning, and it is a length: 8 vertices is 1024
-units, and two passes build a triangle reaching twice that. It was picked
-against Ingol's clearing, which is a wide one at seven vertices - 4 leaves a
-visible dip in it, 6 nearly closes it, 8 closes it. Half a cell is still well
-under the scale a real snow line works at, which is tens of cells, so what goes
-is the painting and not the climate.
+RADIUS is the one number worth tuning, and it is a length: 16 vertices is 2048
+units, and two passes build a triangle reaching twice that - a whole cell.
+
+It started at 8, picked against Ingol's clearing, which is a wide one at seven
+vertices: 4 leaves a visible dip in it, 6 nearly closes it, 8 closes it. But a
+clearing is not the widest thing the painting gets wrong. A watercourse is
+painted bare for its whole length, bed and banks together, and a corridor is not
+a patch - at 8 the blur reached across the water and not across the bare margin
+beside it, and the baked field ran a warm ribbon down every river in the north.
+Measured over the 1298 cells with a real river bed in them, a riverbed vertex
+came out +0.63 warmer than the rest of its own cell, and up to +9.9.
+
+One cell is still far under the scale a real snow line works at, which is tens
+of cells, so what goes is the painting and not the climate.
 """
 from array import array
 from collections import deque
@@ -43,7 +51,7 @@ from operator import add, sub
 SIDE = 33
 STRIDE = SIDE - 1          # vertices a cell advances; 33 overlaps by one
 
-RADIUS = 8                 # vertices each way in one pass; 1024 units
+RADIUS = 16                # vertices each way in one pass; 2048 units
 PASSES = 2                 # two boxes make a triangle
 
 

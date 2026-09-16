@@ -177,13 +177,32 @@ namespace RSL
         // degree adds load; above it, none does.
         static inline float fComfortTemp{ 12.0f };
         static inline float fLoadPerDegree{ 0.055f };
-        static inline float fWetLoad{ 0.227f };
+        static inline float fWetLoad{ 0.0f };
 
         // Wet clothes stop being clothes. At full soaking this much of the
         // warmth they were giving is gone - v0.4.0 folded the same idea into
         // WetnessFactor as a multiplier on warmth. Not solved: only two target
         // rows are wet and both wear nothing, so the table cannot see it.
         static inline float fWetWarmthLoss{ 0.60f };
+
+        // BEING IN THE WATER, which is not the same thing as being wet.
+        //
+        // The map answers for the air over a spot, and the air over a
+        // river in the Rift is mild. The water is not, and neither term
+        // above can say so: soaking through is a state you carry out onto
+        // the bank with you, while this lasts exactly as long as the
+        // swim. So it is charged twice over and both are felt at once -
+        // the reading drops like a stone, and the heat leaves faster
+        // while it is down there.
+        //
+        // Degrees off the temperature, after everything else including
+        // the fire: a fire on the bank is not reaching you.
+        static inline float fSwimTemp{ -20.0f };
+
+        // And a multiplier on how fast the bar falls, on the losing side
+        // only - the same one-sidedness the tent and the combat brake
+        // have. Swimming towards a fire does not warm you faster.
+        static inline float fSwimChillMult{ 5.0f };
 
         // In-game minutes to soak through, and to dry out again. Drying only
         // runs by a fire or under cover, so the two are not symmetrical in
@@ -245,7 +264,7 @@ namespace RSL
         // set a little under Snow, which is what an interior cut into a glacier
         // should be.
         static inline float fInteriorTemp{ 6.0f };
-        static inline float fColdInteriorTemp{ -7.0f };
+        static inline float fColdInteriorTemp{ -10.0f };
 
         // Heat sources. v0.4.0 searched a radius of 400 units and multiplied
         // the outdoor severity by 0.2 when it found one; here a fire raises the
