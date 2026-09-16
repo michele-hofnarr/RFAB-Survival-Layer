@@ -1,7 +1,8 @@
 # Releasing
 
-Build artifacts (`.esp`, `.pex`, `.swf`, `.dll`, `.bin`) are **not** tracked in git —
-they are reproduced from source and uploaded straight to a GitHub Release.
+Build artifacts (`.pex`, `.swf`, `.dll`, `.bin`) are **not** tracked in git — they
+are reproduced from source and uploaded straight to a GitHub Release. The `.esp`
+is the one exception and **is** tracked, for the reason step 1 gives.
 
 ## 1. Regenerate the plugin
 
