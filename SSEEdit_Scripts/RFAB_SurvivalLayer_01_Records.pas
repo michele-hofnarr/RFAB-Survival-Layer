@@ -1,13 +1,23 @@
 {
   RFAB Survival Layer - plugin generator, part 1: records.
 
-  Creates in RFAB_SurvivalLayer.esp: ~60 GLOB (settings, also read by MCM
-  Helper), 1 FLST (fire sources), 12 MGEF (Value Modifier on H/M/S/SpeedMult -
-  axis penalties), 3 SPEL (axis abilities), 1 Script-MGEF + 1 SPEL (monitor,
-  carries all logic), 3 QUST (Start Game Enabled: controller, MCM, widget),
-  and the VMAD bindings. Also emits two derived files so no formID is ever
-  hand-copied: scripts\source\_RSL_Forms.psc and
-  MCM\Config\RFAB_SurvivalLayer\config.json.
+  Creates in RFAB_SurvivalLayer.esp: 1 FLST (fire sources), 12 MGEF (Value
+  Modifier on H/M/S/SpeedMult - axis penalties), 3 SPEL (axis abilities),
+  1 Script-MGEF + 1 SPEL (monitor), 3 QUST (Start Game Enabled: controller,
+  MCM, widget). Also emits native\src\Core\FormIDs.h so no formID is ever
+  hand-copied between the plugin and the DLL.
+
+  Papyrus is down to one script, _RSL_MCM, and it is empty: MCM Helper needs a
+  quest with a script extending MCM_ConfigBase before it will register the menu
+  at all. Everything else the mod does is in the native plugin, so nothing else
+  is bound - and the bindings are actively DROPPED, because a plugin generated
+  by an older run still carries them.
+
+  Settings are NOT here. They live in an ini the native plugin reads directly
+  (MCM\Config\RFAB_SurvivalLayer\settings.ini), and the menu that edits them
+  is generated from the plugin's own Settings.h by tools/make_mcm.py. That is
+  what removed the 109 GLOBs, _RSL_Balance.psc and the config.json emitter
+  this file used to carry.
 
   Run: SSEEdit via MO2 with -D:"...\Data\", right-click Skyrim.esm -> Apply
   Script. Idempotent: reruns do not duplicate.
@@ -30,6 +40,13 @@ const
   MARK_DETRIMENTAL = True;
 
   FLAG_DETRIMENTAL = $00000004;
+  FLAG_HOSTILE     = $00000001;
+
+  // EQUP EitherHand (Skyrim.esm 00013F44). Every one of the 250 vanilla
+  // Ability SPELs and all 13 Disease SPELs carry an ETYP, and 242 of the
+  // abilities use this one. A SPEL with no ETYP is the shape AddSpell
+  // silently refuses to instantiate - see NormalizeSpit.
+  EQUP_EITHER_HAND = $00013F44;
 
   // Penalty defaults (percent, multiples of 5). Must match BuildGlobals;
   // used to fill explicit numbers into effect descriptions.
@@ -37,19 +54,12 @@ const
   DEF_PENALTY_CROSS   = 10;   // the two other pools
   DEF_PENALTY_SPEED   = 10;   // SpeedMult, per axis
 
-  // v0.4.0. Everything this layer appends to an RFAB perk description starts
-  // here. A rerun cuts the description back to this marker before appending
-  // again, so the text can never be doubled up.
-  PERK_MARK = '<br>[Слой выживания]<br>';
-
 var
   tgt      : IwbFile;
   problems : Integer;
   madeNew  : Integer;
   reused   : Integer;
   ids      : TStringList;   // EDID = local formID (hex)
-  cureForms: TStringList;   // "hex6=filename" per cure-disease MGEF
-  balDefaults: TStringList; // "EDID=default" per GLOB - emitted as _RSL_Balance.psc
   strTbl   : TStringList;   // key=value, all user-facing RU text (strings.txt)
 
 // --- helpers ---------------------------------------------------------------
@@ -107,6 +117,18 @@ end;
 function HasStr(key: string): Boolean;
 begin
   Result := strTbl.IndexOfName(key) >= 0;
+end;
+
+// Real line breaks, for a value that had to arrive on one line.
+//
+// The string file is key=value, one key per line, so a literal newline cannot
+// be written in it. The source writes \n and this turns it into what the game
+// wants - which for a HELP PAGE is a real CRLF, not the <br> that perk
+// descriptions use. Measured on RFAB's own: HelpEnchantingLong carries ten
+// pairs of #13#10 and not one <br>.
+function Multiline(s: string): string;
+begin
+  Result := StringReplace(s, '\n', #13#10, [rfReplaceAll]);
 end;
 
 // Expand %P / %C / %S in a description to the penalty defaults, angle-bracketed
@@ -229,17 +251,6 @@ begin
   end;
 end;
 
-// For MCM Helper: "plugin|8xx", no leading zeros.
-function SourceForm(edid: string): string;
-var
-  h: string;
-begin
-  h := RecalledHex(edid);
-  while (Length(h) > 1) and (h[1] = '0') do
-    Delete(h, 1, 1);
-  Result := PLUGIN_NAME + '|' + h;
-end;
-
 // --- files and records ---------------------------------------------------
 
 function FileByName(fname: string): IwbFile;
@@ -303,256 +314,6 @@ begin
     Problem('не удалось создать группу ' + sig);
 end;
 
-// --- GLOB: settings -----------------------------------------------------
-
-function AddGlobal(edid: string; value: Real; kind: string): IwbMainRecord;
-var
-  grp: IwbGroupRecord;
-begin
-  // record the default so WriteBalanceScript can emit _RSL_Balance.ResetDefaults.
-  // All GLOB defaults are whole numbers; add float formatting if that changes.
-  balDefaults.Add(edid + '=' + IntToStr(Round(value)));
-
-  Result := RecordByEDID(tgt, 'GLOB', edid);
-  if Assigned(Result) then begin
-    // Refresh the value on reuse too: plugin FLTV is the default for a NEW
-    // game. A running save keeps its own GLOB values (MCM writes them);
-    // regen does not touch those. Keeps the plugin at current balance.
-    PutEdit(Result, 'FNAM', kind);
-    PutNative(Result, 'FLTV', value);
-    Inc(reused);
-    Remember(edid, Result);
-    Exit;
-  end;
-
-  grp := EnsureGroup('GLOB');
-  if not Assigned(grp) then Exit;
-
-  Result := Add(grp, 'GLOB', True);
-  if not Assigned(Result) then begin
-    Problem('не создался GLOB ' + edid);
-    Exit;
-  end;
-
-  PutEdit(Result, 'EDID', edid);
-  PutEdit(Result, 'FNAM', kind);
-  PutNative(Result, 'FLTV', value);
-  Remember(edid, Result);
-  Inc(madeNew);
-end;
-
-procedure BuildGlobals;
-begin
-  Say('');
-  Say('--- GLOB: settings ---');
-
-  // master switch
-  AddGlobal(PFX + 'ModEnabled',          1,     'Short');
-
-  // SLEEP axis
-  AddGlobal(PFX + 'SleepGrace',          16,    'Float');
-  AddGlobal(PFX + 'SleepMax',            48,    'Float');
-  AddGlobal(PFX + 'SleepRestorePerHour', 6,     'Float');
-  AddGlobal(PFX + 'SleepMinHours',       1,     'Float');
-  // Combat multiplies the sleep AND hunger accrual rate (GetCombatState == 1).
-  AddGlobal(PFX + 'CombatFatigueMult',   5,     'Float');
-
-  // HUNGER axis. Food restore is weight-scaled: Food*Pct = % of the bar per kg
-  // of item weight (DATA - Weight). Plain Food -> HungerFoodPct; RFAB_SpecialFood
-  // or RFAB_RawFood (with a strong stomach) -> HungerSpecialFoodPct.
-  AddGlobal(PFX + 'HungerGrace',         12,    'Float');
-  AddGlobal(PFX + 'HungerMax',           48,    'Float');
-  AddGlobal(PFX + 'HungerFoodPct',        50,    'Float');   // % of bar per kg, plain Food
-  AddGlobal(PFX + 'HungerSpecialFoodPct', 100,   'Float');   // % of bar per kg, meal / raw-if-hardy
-
-  // COLD model (multiplicative):
-  //   sev = RegionBase x Weather x Night x Swim x Fire (RegionBase rises with altitude)
-  //   delta/game-hour = (sev - Mitigation) x ColdRate
-  //   Mitigation = slots x WarmthPerSlot x Wetness + FrostResist x ResistWeight/100
-  // Multipliers stored as percent (multiples of 5), script divides by 100.
-  // Timings tuned for TimeScale=10: naked, 0 resist, cold 0->100:
-  //   cold region day/clear 15 real min - mid 30 - warm 60 (x2 swim/blizzard).
-  // Dressed (4 slots) + Acclimatization perk (25 resist): cold day/clear gap 0.
-
-  // flat region base (replaces the old HoldMult multiplier)
-  AddGlobal(PFX + 'RegionWinterhold',    40,    'Float');
-  AddGlobal(PFX + 'RegionPale',          40,    'Float');
-  AddGlobal(PFX + 'RegionEastmarch',     40,    'Float');
-  AddGlobal(PFX + 'RegionReach',         20,    'Float');
-  AddGlobal(PFX + 'RegionHjaalmarch',    20,    'Float');
-  AddGlobal(PFX + 'RegionHaafingar',     20,    'Float');
-  AddGlobal(PFX + 'RegionWhiterun',      10,    'Float');
-  AddGlobal(PFX + 'RegionFalkreath',     10,    'Float');
-  AddGlobal(PFX + 'RegionRift',          10,    'Float');
-  AddGlobal(PFX + 'RegionDefault',       20,    'Float');   // unknown hold
-  // If the current region CAN snow (Weather.FindWeather(3) != None - the same
-  // check RFAB's Control Weather spell uses), it is a cold climate even under
-  // a clear sky. Floor the hold base at this. A warm hold's high spots
-  // (Ветреный Пик etc.) sit in a snow region the altitude Z ramp misses.
-  AddGlobal(PFX + 'RegionSnowFloor',     40,    'Float');
-  // Mountain severity floor. Between AltitudeLow and AltitudeHigh the base
-  // interpolates hold_base -> RegionAltitude by Z height.
-  AddGlobal(PFX + 'RegionAltitude',      100,   'Float');
-
-  // multipliers (percent), 100 = x1.0
-  AddGlobal(PFX + 'WeatherClear',        100,   'Float');
-  AddGlobal(PFX + 'WeatherCloudy',       150,   'Float');
-  AddGlobal(PFX + 'WeatherRain',         200,   'Float');
-  AddGlobal(PFX + 'WeatherSnow',         200,   'Float');
-  AddGlobal(PFX + 'NightMult',           170,   'Float');   // 22:00-06:00
-  AddGlobal(PFX + 'SwimMult',            1000,  'Float');   // + clothing warmth off
-  AddGlobal(PFX + 'FireMult',            20,    'Float');   // outdoor fire/torch (x0.2); interior+fire -> 0
-
-  AddGlobal(PFX + 'SevInterior',         60,    'Float');   // ordinary interior, no fire: % of the hold's outdoor RegionBase
-  AddGlobal(PFX + 'SevColdInterior',     45,    'Float');   // ice cave / frozen ruin: fire only partly warms (x FireMult)
-  AddGlobal(PFX + 'AltitudeLow',         8000,  'Float');   // below -> hold base
-  AddGlobal(PFX + 'AltitudeHigh',        14000, 'Float');   // above -> full RegionAltitude
-  AddGlobal(PFX + 'FireRadius',          400,   'Float');
-
-  AddGlobal(PFX + 'ColdRate',            1.0,   'Float');   // overall rate multiplier
-  AddGlobal(PFX + 'ColdGrace',           25,    'Float');   // stat penalty ramps cold 25..100; widget notch at 75%
-  AddGlobal(PFX + 'WarmupMult',          10.0,  'Float');   // warm-up N x faster than cooling
-  AddGlobal(PFX + 'WarmthPerSlot',       7,     'Float');   // warmth per clothing slot (4 slots = 28)
-  AddGlobal(PFX + 'ResistWeight',        50,    'Float');   // FrostResist x 50%
-  AddGlobal(PFX + 'DryMinutes',          15,    'Float');   // IN-GAME minutes to dry off after water
-  // Per-hit nudge on the cold bar (MagicDamageFrost / MagicDamageFire effects),
-  // rate-limited to one hit per 0.5 s. 0 disables. Fire warming is deliberately
-  // exploitable - burning costs HP.
-  AddGlobal(PFX + 'FrostHitCold',        2,     'Float');
-  AddGlobal(PFX + 'FireHitWarm',         2,     'Float');
-
-  // penalties, all multiples of 5
-  AddGlobal(PFX + 'PenaltyPrimary',      60,    'Float');
-  AddGlobal(PFX + 'PenaltyCross',        10,    'Float');
-  AddGlobal(PFX + 'PenaltySpeed',        10,    'Float');   // SpeedMult, per axis
-  AddGlobal(PFX + 'SpeedCap',            30,    'Float');   // total cap; RFAB burden already takes up to 50 SpeedMult
-  AddGlobal(PFX + 'PenaltyCap',          85,    'Float');
-  AddGlobal(PFX + 'TierStep',            5,     'Float');
-
-  // Full-bar bonuses: while a need's deprivation stays within BonusThresholdPct
-  // of its axis max, +BonusRegenPct% regen on the matching pool (cold->Health,
-  // sleep->Magicka, hunger->Stamina). Flat, not ramped.
-  AddGlobal(PFX + 'BonusEnabled',        1,     'Short');
-  AddGlobal(PFX + 'BonusRegenPct',       25,    'Float');
-  AddGlobal(PFX + 'BonusThresholdPct',   10,    'Float');
-
-  // cold visual (character ice shader only; screen ISM dropped - no vanilla
-  // IMAD holds visually)
-  AddGlobal(PFX + 'ColdVisualShader',    1,     'Short');   // ice crust on character (on)
-  AddGlobal(PFX + 'ColdVisualThreshold', 90,    'Float');   // cold >= 90 -> ice crust
-
-  // Screen ISM stack (v0.4.0). Three vanilla IMADs applied additively, each
-  // ramping over its own cold window: strength = (cold - Lo) / (Hi - Lo).
-  //   Desat -> defaultDesaturateImod   Skyrim.esm 000B7983
-  //   Tint  -> SlowTimeImod            Skyrim.esm 000486F4 (cold blue TNAM)
-  //   Blur  -> ISMDinCloudBlurStatic   Skyrim.esm 000B97F7 (blur + grey fade)
-  // The six bounds are exposed on the Debug page for in-game tuning and get
-  // frozen (and removed from the MCM) once the look is settled.
-  AddGlobal(PFX + 'ColdVisDesatLo',      40,    'Float');
-  AddGlobal(PFX + 'ColdVisDesatHi',      100,   'Float');
-  AddGlobal(PFX + 'ColdVisTintLo',       55,    'Float');
-  AddGlobal(PFX + 'ColdVisTintHi',       100,   'Float');
-  AddGlobal(PFX + 'ColdVisBlurLo',       75,    'Float');
-  AddGlobal(PFX + 'ColdVisBlurHi',       100,   'Float');
-
-  // warm-hands-by-fire idle: after WarmAnimDelay seconds standing still near a
-  // heat source, play the vanilla IdleWarmHandsStanding on the player. Best-
-  // effort - any input cancels it, and PlayIdle on the player is fragile.
-  AddGlobal(PFX + 'WarmAnim',            1,     'Short');
-  AddGlobal(PFX + 'WarmAnimDelay',       5,     'Float');   // seconds still before it plays
-
-  // campfire lesser power (RFAB "Основы выживания" perk gates the power; RFAB
-  // "Кулинар" adds a cooking pot). Consumes CampfireFuel x Firewood01, burns
-  // CampfireBurnHours in-game hours, a new one replaces the old.
-  AddGlobal(PFX + 'CampfireEnabled',     1,     'Short');
-  AddGlobal(PFX + 'CampfireBurnHours',   4,     'Float');   // in-game hours before it burns out
-  AddGlobal(PFX + 'CampfireFuel',        3,     'Short');    // Firewood01 consumed per light
-  AddGlobal(PFX + 'CampfireCooldown',    5,     'Float');    // real seconds between casts
-  // Shelter cap (v0.4.0). With BOTH RFAB perks ("Основы выживания" +
-  // "Акклиматизация") the cold bar still rises, but never past this value:
-  //   - next to the player's OWN campfire: always (standing, or waiting via T)
-  //   - asleep in the player's own tent bedroll: over the slept hours
-  // 75 of 100 leaves a 15-point margin below the hypothermia threshold (90).
-  AddGlobal(PFX + 'ShelterColdCap',      75,    'Float');
-  // cook-pot offset from the campfire is hardcoded in _RSL_CampfireEffect
-  // (the CraftingCookingPotSm mesh pivot is off-centre): fwd -47, up -13.3.
-
-  // wood from trees: Activate on a tree yields 1 Firewood01 if carrying the
-  // wood axe, or (RFAB "Рюкзак авантюриста" + "Основы выживания" perk).
-  AddGlobal(PFX + 'WoodFromTrees',       1,     'Short');
-  AddGlobal(PFX + 'TreeChopCooldownH',   12,    'Float');   // in-game hours a tree needs before it yields again
-  AddGlobal(PFX + 'TreeChopYield',       1,     'Short');
-  AddGlobal(PFX + 'TreeChopRadius',      100,   'Float');   // scan-around fallback range (crosshair misses most TREE refs)
-  // Rebindable chop key (v0.4.0). 0 = keep the old behaviour, i.e. chop on the
-  // Activate control. Any other value is a DirectX scan code registered with
-  // RegisterForKey, and the Activate path is then switched off.
-  AddGlobal(PFX + 'ChopKey',             0,     'Short');
-
-  // diseases. Progress = worsen, Decay = improve; 24 game-hours each for now.
-  AddGlobal(PFX + 'DiseaseEnabled',      1,     'Short');
-  AddGlobal(PFX + 'DiseaseProgressHours', 24,   'Float');
-  AddGlobal(PFX + 'DiseaseDecayHours',   24,    'Float');
-  // wrappers over RFAB's own 6 diseases + Droops: progressive stages 2/3
-  AddGlobal(PFX + 'RfabDzEnabled',       1,     'Short');
-  // % chance to catch an OnHit disease per melee hit from a carrier
-  // (draugr/troll/slaughterfish), then * (1 - DiseaseResist/100).
-  AddGlobal(PFX + 'DiseaseHitChance',    100,   'Float');
-  // % chance to get food poisoning per raw-food item eaten. Flat - no
-  // DiseaseResist; only the strong-stomach races / already-sick are immune.
-  AddGlobal(PFX + 'FoodPoisonChance',    50,    'Float');
-  // hypothermia (an Ability, not a disease): P 0..100 threshold-crossing.
-  // cold>=Threshold -> P +100 over WorsenHours -> stage+1, P=0.
-  // cold<=RecoverThr -> P -100 over RecoverHours -> stage-1. else frozen.
-  AddGlobal(PFX + 'HypothermiaEnabled',      1,  'Short');
-  AddGlobal(PFX + 'HypothermiaThreshold',    90, 'Float');
-  AddGlobal(PFX + 'HypothermiaRecoverThr',   25, 'Float');
-  AddGlobal(PFX + 'HypothermiaWorsenHours',  1,  'Float');
-  AddGlobal(PFX + 'HypothermiaRecoverHours', 1,  'Float');
-  AddGlobal(PFX + 'HypothermiaDrainPerSec',  1,  'Float');   // stage 3 HP/sec base
-  AddGlobal(PFX + 'HypothermiaDrainRamp',    30, 'Float');   // sec for the drain to ~double
-  // common-cold contract chance/game-hour, linear from Min at Threshold to
-  // Max at MaxAt cold level, then * (1 - DiseaseResist/100).
-  AddGlobal(PFX + 'ColdColdThreshold',        50, 'Float');
-  AddGlobal(PFX + 'ColdColdChanceMin',   10,    'Float');
-  AddGlobal(PFX + 'ColdColdChanceMax',   90,    'Float');
-  AddGlobal(PFX + 'ColdColdChanceMaxAt', 90,    'Float');
-  // elemental lesions (frostbite/burns): a 3-stage Disease-type SPEL with a
-  // bespoke P model - worsens from cold>=ColdThr and from frost/fire/shock hits
-  // (P -= HitP x resist), heals only when every axis is clear, +BandageP per
-  // RFAB_Bandage used. Contract: P<=-ContractP, or a roll at hypothermia st.>=2.
-  AddGlobal(PFX + 'ElemLesionEnabled',       1,  'Short');
-  AddGlobal(PFX + 'ElemLesionColdThr',       90, 'Float');   // cold >= this worsens existing lesions
-  AddGlobal(PFX + 'ElemLesionHypoChance',    50, 'Float');   // %/game-hour to contract at hypothermia stage >= 2
-  AddGlobal(PFX + 'ElemLesionHitP',          4,  'Float');   // P per elemental hit (pre-resist)
-  AddGlobal(PFX + 'ElemLesionContractP',     70, 'Float');   // |P| to contract from hits
-  AddGlobal(PFX + 'ElemLesionBandageP',      10, 'Float');
-
-  // HUD widget. HudWidget = master on/off; the 3 bars always show together.
-  AddGlobal(PFX + 'HudWidget',           1,     'Short');
-  AddGlobal(PFX + 'HudColor',            1,     'Short');   // 1 = tinted icons/bars, 0 = plain white
-  AddGlobal(PFX + 'HudWidgetAutoHide',   0,     'Short');   // hide when all safe (off by default)
-  AddGlobal(PFX + 'HudWidgetX',          220,   'Float');    // px at 1280 wide
-  AddGlobal(PFX + 'HudWidgetY',          655,   'Float');    // px at 720 tall
-  AddGlobal(PFX + 'HudWidgetScale',      100,   'Float');    // %
-  AddGlobal(PFX + 'HudWidgetAlpha',      100,   'Float');    // %
-  // v0.4.0: the temperature-feel icon and the inventory food preview are
-  // placed on their own, not as part of the bar block - same 1280x720 space
-  // measured from the top-left. Exposed on the Debug page for placing in game;
-  // freeze the numbers here and drop the sliders once they are settled.
-  AddGlobal(PFX + 'HudTempX',            420,   'Float');
-  AddGlobal(PFX + 'HudTempY',            640,   'Float');
-  AddGlobal(PFX + 'HudTempScale',        100,   'Float');
-  AddGlobal(PFX + 'HudInvX',             360,   'Float');
-  AddGlobal(PFX + 'HudInvY',             600,   'Float');
-  AddGlobal(PFX + 'HudInvScale',         100,   'Float');
-  // v0.4.0: no anchor globals. RFAB's own widgets ([RFAB] Interface.ini) know
-  // only X/Y in a 1280x720 space measured from the top-left, so the widget is
-  // pinned to HAnchor "left" / VAnchor "top" and X/Y alone place it.
-
-  // service
-  AddGlobal(PFX + 'PollInterval',        1.0,   'Float');
-  AddGlobal(PFX + 'DebugLog',            0,     'Short');   // gates all RSL_debug.log writes
-end;
 
 // --- FLST: fire sources -------------------------------------------------
 
@@ -638,7 +399,17 @@ begin
     AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(r))));
   el := ElementAssign(items, HighInteger, nil, False);
   if not Assigned(el) then Exit;
-  SetNativeValue(el, fid);
+  // Written as a REFERENCE, not as a number. GetLoadOrderFormID + SetNativeValue
+  // is remapped to the file's own master list when the plugin is saved - except
+  // it was not for the entry appended to HelpManualPC right after that same run
+  // gave the file a new master: it saved as 16001007, the load order id, which
+  // resolves to nothing. Name() is what xEdit's own scripts pass for a FormID
+  // field ("Read Books Aloud" sets SDSC that way) and it is resolved on write.
+  SetEditValue(el, Name(r));
+  if GetNativeValue(el) = 0 then begin
+    Problem('FlstAddRecord: ссылка не записалась: ' + Name(r));
+    Exit;
+  end;
   Result := True;
 end;
 
@@ -817,6 +588,133 @@ end;
 // bound and RUN), DNAM (template description), KSIZ/KWDA (keywords like
 // MagicAlchHarmful), MDOB. All removed right after the copy.
 
+// --- conditions (CTDA) -----------------------------------------------------
+//
+// The comparison operator lives in the top three bits of the Type byte, so a
+// value of 0 is "equal to" and 3 shifted up (3 * 32 = 96) is "greater than or
+// equal to". Everything else in the byte is flags we do not use.
+const
+  CTDA_OP_EQ = 0;
+  CTDA_OP_GE = 3;
+
+  CTDA_FUNC_GETITEMCOUNT = 47;
+  CTDA_FUNC_HASPERK      = 448;
+
+// Point a form-reference field at a record in ANOTHER file.
+//
+// SetNativeValue writes a formID VERBATIM. GetLoadOrderFormID hands back the
+// index the file has in the LOAD ORDER, and a saved plugin stores the index
+// into its OWN master list - two different numbers whenever they are not the
+// same file. Everything this script wrote before got away with it by accident:
+//
+//   Skyrim.esm   load-order index 0, our master index 0. Equal, so correct.
+//   our own file load-order index 22, and the engine reads any index at or
+//                above the master count as "this plugin", so 22 lands home.
+//   RFAB.esp     load-order index 7, our master index 4. NOT equal, and 7 is
+//                also >= our 5 masters - so it read as OUR file, formID
+//                0703DFE8, which is nothing. xEdit showed it as
+//                "<Error: Could not be resolved>" and the recipe made nothing.
+//
+// The EDIT value is the path that does the mapping, so that is what is written
+// here - and then read back through LinksTo, because a silently wrong
+// cross-file reference is exactly the bug this comment exists to describe.
+function PutFormID(rec: IInterface; path: string; src: IwbMainRecord): Boolean;
+var
+  el : IInterface;
+  got: IwbMainRecord;
+begin
+  Result := False;
+  if not Assigned(src) then Exit;
+
+  AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(src))));
+
+  el := ElementByPath(rec, path);
+  if not Assigned(el) then
+    el := Add(rec, path, True);
+  if not Assigned(el) then begin
+    Problem('нет поля "' + path + '" в ' + Name(rec));
+    Exit;
+  end;
+
+  try
+    SetEditValue(el, IntToHex(GetLoadOrderFormID(src), 8));
+  except
+    on E: Exception do begin
+      Problem('ссылка "' + path + '" в ' + Name(rec) + ': ' + E.Message);
+      Exit;
+    end;
+  end;
+
+  got := LinksTo(el);
+  if Assigned(got) and SameText(EditorID(got), EditorID(src)) then begin
+    Result := True;
+    Exit;
+  end;
+  Problem('"' + path + '" в ' + Name(rec) + ' не разрешилось в ' + EditorID(src));
+end;
+
+// Write the condition's first parameter.
+//
+// It is NOT addressed by one path, because xEdit RENAMES it once the function
+// is set: "Perk" for HasPerk, "Inventory Object" for GetItemCount, and plain
+// "Parameter #1" while the function is still unknown. A single hardcoded path
+// therefore works for one function and silently writes nothing for the next -
+// which is a recipe that is always available, or never. So: try the names, and
+// read the value back. No read-back, no recipe.
+function PutCondParam(c: IInterface; src: IwbMainRecord): Boolean;
+var
+  names: TStringList;
+  i    : Integer;
+begin
+  Result := False;
+  names := TStringList.Create;
+  try
+    names.Add('CTDA\Perk');
+    names.Add('CTDA\Inventory Object');
+    names.Add('CTDA\Parameter #1');
+    for i := 0 to Pred(names.Count) do begin
+      if not Assigned(ElementByPath(c, names[i])) then Continue;
+      // PutFormID does the master mapping AND the read-back; a name that is
+      // not this function's takes the same route and simply fails it.
+      if PutFormID(c, names[i], src) then begin
+        Result := True;
+        Exit;
+      end;
+    end;
+  finally
+    names.Free;
+  end;
+end;
+
+// One condition on anything that has a Conditions container.
+procedure AddCond(rec: IInterface; funcIdx, op: Integer; cmp: Variant; param: IwbMainRecord);
+var
+  conds, c: IInterface;
+begin
+  conds := ElementByName(rec, 'Conditions');
+  if not Assigned(conds) then
+    conds := Add(rec, 'Conditions', True);
+  if not Assigned(conds) then begin
+    Problem('нет контейнера Conditions в ' + Name(rec));
+    Exit;
+  end;
+
+  c := ElementAssign(conds, HighInteger, nil, False);
+  if not Assigned(c) then begin
+    Problem('условие не создалось в ' + Name(rec));
+    Exit;
+  end;
+
+  // Function first: the parameter's name follows from it.
+  PutNative(c, 'CTDA\Function', funcIdx);
+  PutNative(c, 'CTDA\Type', op * 32);
+  PutNative(c, 'CTDA\Comparison Value', cmp);
+  PutNative(c, 'CTDA\Run On', 0);            // Subject = the player
+  if not PutCondParam(c, param) then
+    Problem('параметр условия не записался (функция ' + IntToStr(funcIdx)
+          + ') в ' + Name(rec));
+end;
+
 procedure DropElement(rec: IwbMainRecord; sig: string);
 var
   el: IInterface;
@@ -930,6 +828,29 @@ begin
   SetNativeValue(dst, GetNativeValue(src));
 end;
 
+// Carry one enum field across by its EDIT VALUE, source to destination.
+//
+// For a record we REUSE rather than recopy: everything a fresh copy would have
+// supplied has to be written back, or the record keeps whatever the last run
+// left in it. Only the enums need this - every other field the builders set by
+// hand already.
+//
+// An empty read is never written. That is not caution for its own sake: an
+// Actor Value once became "Aggression" because an empty string went in and the
+// enum took index 0.
+procedure ForceEnumFrom(dst, src: IwbMainRecord; path: string);
+var
+  v: string;
+begin
+  if not Assigned(dst) or not Assigned(src) then Exit;
+  v := GetElementEditValues(src, path);
+  if v = '' then begin
+    Problem('ForceEnumFrom: пусто у ' + EditorID(src) + ' -> ' + path);
+    Exit;
+  end;
+  PutEdit(dst, path, v);
+end;
+
 // "Hide in UI" = bit 0x8000 in Magic Effect Data\DATA\Flags. The monitor is
 // pure plumbing; without this it shows in the active-effects list.
 procedure HideInUI(rec: IwbMainRecord);
@@ -962,6 +883,48 @@ begin
     Exit;
   end;
   SetNativeValue(el, GetNativeValue(el) and not $00008000);
+end;
+
+// A copy inherits every flag of its source, and one library source is a POISON:
+// _RSL_MgefSpeed comes from AlchDamageSpeed, so it arrived Hostile and with
+// Resist Value = ResistPoison. It was the only one of the 39 library effects
+// carrying either - a hostile, resistable effect sitting on a constant-effect
+// self ability, at the mercy of whatever poison resistance the character has.
+//
+// Same class of mistake as the shieldChargeDamageStamina note above. Clearing
+// both on every library effect keeps the library uniform rather than
+// special-casing the one record that happened to be wrong.
+procedure MakeNonHostile(rec: IwbMainRecord);
+var
+  el: IInterface;
+begin
+  if not Assigned(rec) then Exit;
+
+  el := MgefFlags(rec);
+  if not Assigned(el) then begin
+    Problem('no Flags path on ' + EditorID(rec) + ' - stays hostile');
+    Exit;
+  end;
+  if (GetNativeValue(el) and FLAG_HOSTILE) <> 0 then begin
+    SetNativeValue(el, GetNativeValue(el) and not FLAG_HOSTILE);
+    Say('    cleared Hostile on ' + EditorID(rec));
+  end;
+
+  // Same nil-until-touched problem as Flags, so fall back to the raw DATA
+  // subrecord exactly as MgefFlags does.
+  el := ElementByPath(rec, 'Magic Effect Data\DATA\Resist Value');
+  if not Assigned(el) then begin
+    el := ElementBySignature(rec, 'DATA');
+    if Assigned(el) then el := ElementByPath(el, 'Resist Value');
+  end;
+  if not Assigned(el) then begin
+    Problem('no Resist Value path on ' + EditorID(rec));
+    Exit;
+  end;
+  if GetNativeValue(el) <> -1 then begin
+    Say('    cleared Resist Value (' + GetEditValue(el) + ') on ' + EditorID(rec));
+    SetNativeValue(el, -1);
+  end;
 end;
 
 // --- MGEF and SPEL: by copying a verified vanilla template --------------
@@ -1068,6 +1031,7 @@ function CopyVanillaMgef(srcFile, srcEdid, newEdid: string;
 var
   src, old : IwbMainRecord;
   stem : string;
+  fresh : Boolean;
 begin
   stem := Copy(newEdid, Length(PFX) + 5, Length(newEdid));   // strip "<PFX>Mgef"
   src := RecordByEDID(FileByName(srcFile), 'MGEF', srcEdid);
@@ -1077,19 +1041,27 @@ begin
   end;
   AddMasterIfMissing(tgt, srcFile);
 
-  // Always drop + deep-recopy. Reusing a record kept whatever a previous
-  // (buggy) run left in DATA - a shallow copy's unnavigable DATA, or an Actor
-  // Value clobbered to "Aggression" by a bad priming write. A fresh deep copy
-  // straight from the source is the only state we can trust. FormID churn is
-  // harmless: the SPELs that reference the library are rebuilt in the same run.
+  // KEEP THE FORMID. This used to drop the record and deep-recopy every run,
+  // on the grounds that a fresh copy is the only state worth trusting and that
+  // "FormID churn is harmless: the SPELs that reference the library are rebuilt
+  // in the same run". Inside one run that is still true. Across releases it is
+  // not: a player's save holds these ids, and a rerun that moves them moves
+  // the save's references with it.
+  //
+  // So the record is reused and the shape written back below - see the
+  // ForceEnumFrom block after the DATA tree is open. What the old comment
+  // warned about (unnavigable DATA, an Actor Value clobbered to "Aggression")
+  // is guarded there rather than avoided by starting over.
   old := RecordByEDID(tgt, 'MGEF', newEdid);
-  if Assigned(old) then Remove(old);
-  Result := wbCopyElementToFile(src, tgt, True, True);
-  if not Assigned(Result) then begin
-    Problem('CopyVanillaMgef: not copied ' + newEdid);
-    Exit;
-  end;
-  Inc(madeNew);
+  fresh := not Assigned(old);
+  if fresh then begin
+    Result := wbCopyElementToFile(src, tgt, True, True);
+    if not Assigned(Result) then begin
+      Problem('CopyVanillaMgef: not copied ' + newEdid);
+      Exit;
+    end;
+  end else
+    Result := old;
 
   ScrubTemplate(Result);           // VMAD/DNAM/KSIZ/KWDA/MDOB
   DropElement(Result, 'CTDA');     // some RFAB sources carry Peryite conditions
@@ -1109,6 +1081,19 @@ begin
   PutEdit(Result, 'Magic Effect Data\DATA\Casting Type', 'Constant Effect');
   PutEdit(Result, 'Magic Effect Data\DATA\Delivery',     'Self');
 
+  // Everything the deep copy used to supply, for a record we kept. After the
+  // Casting Type / Delivery writes above, because those are what force the
+  // DATA tree open.
+  if not fresh then begin
+    CopyFlagsFrom(Result, src);
+    ForceEnumFrom(Result, src, 'Magic Effect Data\DATA\Archtype');
+    ForceEnumFrom(Result, src, 'Magic Effect Data\DATA\Actor Value');
+  end;
+
+  // Must come after the Casting Type / Delivery writes above: they are what
+  // force the DATA tree open on a freshly-copied record.
+  MakeNonHostile(Result);
+
   // Library MGEFs are pure mechanics - hidden in the active-effects UI. Each
   // stage SPEL shows a single visible "face" MGEF (BuildFace) cloned off the
   // first of these, carrying the combined description.
@@ -1118,6 +1103,7 @@ begin
     AddDetrimental(Result);   // proven: ORs the bit, verifies by name via FlagsOf
 
   Remember(newEdid, Result);
+  if fresh then Inc(madeNew) else Inc(reused);
 end;
 
 // The whole reusable library. One MGEF per (actor value, sense). Magnitudes
@@ -1144,7 +1130,7 @@ begin
   CopyVanillaMgef('Skyrim.esm', 'BladesAbBlessing',           PFX + 'MgefMaxHealth',  True);
   CopyVanillaMgef('Skyrim.esm', 'AlchFortifyMagicka',         PFX + 'MgefMaxMagicka', True);
   CopyVanillaMgef('Skyrim.esm', 'AlchFortifyStamina',         PFX + 'MgefMaxStamina', True);
-  // school cost (цена = 100 - Mod; Detrimental -> Mod negative -> costs more)
+  // school cost (cost = 100 - Mod; Detrimental -> Mod negative -> costs more)
   CopyVanillaMgef('Skyrim.esm', 'MG02FortifyAlteration',      PFX + 'MgefCostAlt',    True);
   CopyVanillaMgef('Skyrim.esm', 'MG02FortifyConjuration',     PFX + 'MgefCostConj',   True);
   CopyVanillaMgef('Skyrim.esm', 'MG02FortifyDestruction',     PFX + 'MgefCostDest',   True);
@@ -1152,6 +1138,10 @@ begin
   CopyVanillaMgef('Skyrim.esm', 'MG02FortifyRestoration',     PFX + 'MgefCostRest',   True);
   // Peryite bonuses for wrapper stages 2/3 (stay Fortify)
   CopyVanillaMgef('Skyrim.esm', 'AbResistFrost',              PFX + 'MgefBonusFrost', False);
+  // The same vanilla effect flipped Detrimental: a cold you cannot shake
+  // leaves you worse at standing the cold, and that is an actor value rather
+  // than an invisible coefficient. See AB_AUDIT.md 5.1.
+  CopyVanillaMgef('Skyrim.esm', 'AbResistFrost',              PFX + 'MgefFrostWeak',  True);
   CopyVanillaMgef('RFAB.esp',   'RFAB_Effect_PeryiteAtaxia_ResistStagger_Hide',   PFX + 'MgefBonusPoise', False);
   CopyVanillaMgef('RFAB.esp',   'RFAB_Effect_PeryiteRockjoint_FortifyArmorRating', PFX + 'MgefBonusArmor', False);
   Say('  penalty library: 21 MGEF');
@@ -1457,16 +1447,28 @@ begin
 end;
 
 // Force a stage SPEL's SPIT to the shape the engine needs for AddSpell:
-// spitType ('Disease' or 'Ability') / Constant Effect / Self. Drops ETYP
-// (equipment slot) and the template's inherited DESC. Templates copied from
-// trap or hostile spells carry the wrong Target Type / description.
+// spitType ('Disease' or 'Ability') / Constant Effect / Self, plus an ETYP.
+// Templates copied from trap or hostile spells carry the wrong Target Type.
+//
+// ETYP is SET, not dropped. Dropping it is what broke hypothermia: the three
+// _RSL_AbHypo SPELs were added to the player (HasSpell stayed true across a
+// reload) and the engine never created a single ActiveEffect for them - not
+// even for their non-hostile hidden effects - so no status, no penalty, and
+// the native repair loop re-applied them once a second forever without ever
+// succeeding. _RSL_AbSleep, built without NormalizeSpit, kept its ETYP and
+// worked all along; that was the only structural difference between them.
+//
+// Vanilla is unanimous: all 250 Ability and all 13 Disease SPELs in Skyrim.esm
+// have an ETYP. This mod already learned the same lesson once for powers -
+// see _RSL_PowerCampfire, where "an empty ETYP is exactly what makes the RFAB
+// menu hand-cast it".
 procedure NormalizeSpit(rec: IwbMainRecord; spitType: string);
 begin
   if not Assigned(rec) then Exit;
   PutEdit(rec, 'SPIT\Type',        spitType);
   PutEdit(rec, 'SPIT\Cast Type',   'Constant Effect');
   PutEdit(rec, 'SPIT\Target Type', 'Self');
-  DropElement(rec, 'ETYP');
+  PutNative(rec, 'ETYP', EQUP_EITHER_HAND);
 end;
 
 // MESG record with the Message Box flag OFF -> shown by Message.Show() as a
@@ -1727,6 +1729,7 @@ end;
 function BuildFace(faceEdid, libStem, fullName, dnam: string): IwbMainRecord;
 var
   lib, old: IwbMainRecord;
+  fresh   : Boolean;
 begin
   Result := nil;
   lib := RecordByEDID(tgt, 'MGEF', PFX + libStem);
@@ -1734,21 +1737,39 @@ begin
     Problem('BuildFace: no library MGEF ' + PFX + libStem + ' for ' + faceEdid);
     Exit;
   end;
+  // KEEP THE FORMID: a save holds the id of the face effect it is showing, so
+  // a rerun that recreates the record moves the save's reference with it. The
+  // record is reused and the clone's own contribution - archetype, actor value
+  // and flags - written back from the library below.
   old := RecordByEDID(tgt, 'MGEF', faceEdid);
-  if Assigned(old) then Remove(old);
-  Result := wbCopyElementToFile(lib, tgt, True, True);
-  if not Assigned(Result) then begin
-    Problem('BuildFace: not copied ' + faceEdid);
-    Exit;
-  end;
-  Inc(madeNew);
+  fresh := not Assigned(old);
+  if fresh then begin
+    Result := wbCopyElementToFile(lib, tgt, True, True);
+    if not Assigned(Result) then begin
+      Problem('BuildFace: not copied ' + faceEdid);
+      Exit;
+    end;
+  end else
+    Result := old;
+
   PutEdit(Result, 'EDID', faceEdid);
   PutEdit(Result, 'FULL', fullName);
   PutEdit(Result, 'DNAM', dnam);
   PutEdit(Result, 'Magic Effect Data\DATA\Casting Type', 'Constant Effect');
   PutEdit(Result, 'Magic Effect Data\DATA\Delivery',     'Self');
+
+  // What the clone used to supply. libStem depends on the stage's first spec
+  // token, so a reused face can be a copy of a DIFFERENT library effect than
+  // the one it should carry now - this is what puts it right.
+  if not fresh then begin
+    CopyFlagsFrom(Result, lib);
+    ForceEnumFrom(Result, lib, 'Magic Effect Data\DATA\Archtype');
+    ForceEnumFrom(Result, lib, 'Magic Effect Data\DATA\Actor Value');
+  end;
+
   ShowInUI(Result);   // the library MGEF is hidden; the face must show
   Remember(faceEdid, Result);
+  if fresh then Inc(madeNew) else Inc(reused);
 end;
 
 // spitType: 'Disease' (our 5) or 'Ability' (hypothermia). flavour is one plain
@@ -1804,18 +1825,87 @@ begin
   if fresh then Inc(madeNew) else Inc(reused);
 end;
 
+// The hidden marker that keeps an advanced illness legible to the world.
+//
+// Stages 2 and 3 are abilities, so the engine stops seeing an advanced illness
+// as a disease at all - and the vanilla WICommentDiseased quest, which is what
+// makes strangers remark on a sick traveller, tests exactly that (condition 39,
+// GetDisease). This spell is Type=Disease and carries nothing else, so it keeps
+// that answer true while showing the player nothing.
+//
+// IT CARRIES ONE EFFECT, NOT NONE, and that is the whole point of writing this
+// by hand instead of calling AddStageSpell with an empty spec. An empty spec
+// generates cleanly, but it produces a SPEL the engine instantiates nothing
+// for - and this mod has already paid for that once: e275a60 found hypothermia
+// "never instantiated", where AddSpell was accepted and HasSpell stayed true
+// while no ActiveEffect was ever created. Whether GetDisease reads the spell
+// list or the active effects is the engine's business and cannot be read out of
+// the data, so the marker satisfies both readings.
+//
+// The effect is a library MGEF at magnitude ZERO: library effects are already
+// Hide-in-UI (see the builder), and a zero magnitude changes nothing while
+// still instantiating - RFAB's own diseases use exactly that trick for their
+// description carriers. HealRateMult is chosen because nothing in this mod or
+// in RFAB gates on it; SpeedMult would have been a poor choice, since RFAB
+// locks the player in place at SpeedMult <= 0.
+procedure BuildDiseaseMarker(disTpl: IwbMainRecord);
+var
+  rec     : IwbMainRecord;
+  effects : IInterface;
+  fresh   : Boolean;
+begin
+  rec := RecordByEDID(tgt, 'SPEL', PFX + 'DiseaseMarker');
+  fresh := not Assigned(rec);
+  if fresh then begin
+    rec := wbCopyElementToFile(disTpl, tgt, True, True);
+    if not Assigned(rec) then begin
+      Problem('disease marker SPEL not copied');
+      Exit;
+    end;
+  end;
+  ScrubTemplate(rec);
+  PutEdit(rec, 'EDID', PFX + 'DiseaseMarker');
+  PutEdit(rec, 'FULL', L('dz.Marker.name'));
+  PutEdit(rec, 'DESC', '');
+  NormalizeSpit(rec, 'Disease');
+
+  effects := ElementByName(rec, 'Effects');
+  while Assigned(effects) and (ElementCount(effects) > 0) do
+    RemoveByIndex(effects, 0, True);
+  AppendLibEffectsFrom(effects, 'MgefHealRegen=0', PFX + 'DiseaseMarker', 0);
+
+  Remember(PFX + 'DiseaseMarker', rec);
+  if fresh then Inc(madeNew) else Inc(reused);
+end;
+
 // Three disease-type stage SPELs + 4 MESG. All text from strings.txt
 // (dz.<key>.name.N / .flavour.N / .msg.*); the numeric penalties come from the
 // per-stage spec args and are auto-appended by AddStageSpell.
 procedure BuildDiseaseTriad(disTpl: IwbMainRecord; key, spec1, spec2, spec3: string);
 begin
+  // STAGE 1 IS A DISEASE. STAGES 2 AND 3 ARE ABILITIES, DELIBERATELY.
+  //
+  // The engine's Cure Disease strips every Type=Disease spell on the actor and
+  // asks nobody, so the type IS the cure switch. Stage 1 keeps it and stays
+  // curable by potion, spell or altar - that is the reward for noticing early.
+  // Past that a cure must not undo the illness, so the stages are abilities and
+  // the engine cannot see them: no strip, no P reset, no spurious notification.
+  //
+  // What that costs is the townsfolk remarking on a sick traveller: the vanilla
+  // WICommentDiseased quest tests condition 39, GetDisease, which reads the
+  // spell type. _RSL_DiseaseMarker below buys it back.
   AddStageSpell(disTpl, PFX + 'Disease' + key + '1', L('dz.' + key + '.name.1'), 'Disease', L('dz.' + key + '.flavour.1'), spec1);
-  AddStageSpell(disTpl, PFX + 'Disease' + key + '2', L('dz.' + key + '.name.2'), 'Disease', L('dz.' + key + '.flavour.2'), spec2);
-  AddStageSpell(disTpl, PFX + 'Disease' + key + '3', L('dz.' + key + '.name.3'), 'Disease', L('dz.' + key + '.flavour.3'), spec3);
+  AddStageSpell(disTpl, PFX + 'Disease' + key + '2', L('dz.' + key + '.name.2'), 'Ability', L('dz.' + key + '.flavour.2'), spec2);
+  AddStageSpell(disTpl, PFX + 'Disease' + key + '3', L('dz.' + key + '.name.3'), 'Ability', L('dz.' + key + '.flavour.3'), spec3);
   AddMsg(PFX + 'Msg' + key + '1',     L('dz.' + key + '.msg.contract'));
   AddMsg(PFX + 'Msg' + key + '2',     L('dz.' + key + '.msg.2'));
   AddMsg(PFX + 'Msg' + key + '3',     L('dz.' + key + '.msg.3'));
   AddMsg(PFX + 'Msg' + key + 'Cured', L('dz.' + key + '.msg.cured'));
+  // Stepping DOWN a stage said nothing at all before - v0.4.0 announces a
+  // worsening and a cure and stays silent when an illness eases, so the player
+  // watched a disease improve with no feedback. One message per downward step.
+  AddMsg(PFX + 'Msg' + key + 'Ease2', L('dz.' + key + '.msg.ease.2'));
+  AddMsg(PFX + 'Msg' + key + 'Ease1', L('dz.' + key + '.msg.ease.1'));
 end;
 
 // Hypothermia: 3 Ability SPEL (NOT Disease - engine cures must not touch it).
@@ -1844,12 +1934,92 @@ begin
   AddMsg(PFX + 'MsgHypo3',      L('hy.msg.3'));
   AddMsg(PFX + 'MsgHypoCured',  L('hy.msg.cured'));
   AddMsg(PFX + 'MsgHypoNoRest', L('hy.msg.noRest'));
+  // Same gap as the diseases: dropping from severe to moderate was silent.
+  AddMsg(PFX + 'MsgHypoEase2',  L('hy.msg.ease.2'));
+  AddMsg(PFX + 'MsgHypoEase1',  L('hy.msg.ease.1'));
 end;
 
 // Our 5 own diseases, 3 stages each, effects from the penalty library
 // (BuildPenaltyLib). Controller-side multipliers (cold-tolerance, sleep
 // efficiency, hunger accrual, food restore) are NOT effects - see the balance
 // spec in magical-seeking-garden.md.
+// --- COBJ: boil water ------------------------------------------------------
+//
+// A recipe with no components at all. That shape is real and vanilla uses it -
+// HearthFires' drafting-table layouts have no CNTO, and neither do two of the
+// Dark Brotherhood tempering recipes - and here it says the right thing: some
+// vessel is always to hand, and what you actually need is a fire, a pot and a
+// kettle.
+//
+// The gate is the two conditions instead. The kettle is never consumed:
+// carrying it IS the cost, and the same kettle is what Campfire::Light asks for
+// before it hangs a pot over the fire. One item, one rule, two places.
+//
+// The water itself is RFAB's own record, so the bandage recipe RFAB already
+// ships keeps working unchanged. What stops a pot over a fire from becoming an
+// income is RfabPatch::MakeWaterUnsellable, which puts VendorNoSale on it at
+// runtime.
+procedure BuildWaterRecipe;
+var
+  co, tpl, water, kwd, kettle, perk: IwbMainRecord;
+  items, cond: IInterface;
+begin
+  Say('');
+  Say('--- COBJ: вскипятить воду ---');
+
+  water  := RecordByEDID(FileByName('RFAB.esp'),   'ALCH', 'RFAB_Drink_Other_Water');
+  perk   := RecordByEDID(FileByName('RFAB.esp'),   'PERK', 'RFAB_Perk_Survival_BaseSurvival');
+  kettle := RecordByEDID(FileByName('Skyrim.esm'), 'MISC', 'Kettle01');
+  kwd    := RecordByEDID(FileByName('Skyrim.esm'), 'KYWD', 'CraftingCookpot');
+
+  if not Assigned(water)  then begin Problem('RFAB_Drink_Other_Water не найден'); Exit; end;
+  if not Assigned(perk)   then begin Problem('RFAB_Perk_Survival_BaseSurvival не найден'); Exit; end;
+  if not Assigned(kettle) then begin Problem('Kettle01 не найден');          Exit; end;
+  if not Assigned(kwd)    then begin Problem('CraftingCookpot не найден');   Exit; end;
+
+  AddMasterIfMissing(tgt, 'RFAB.esp');
+
+  co := RecordByEDID(tgt, 'COBJ', PFX + 'RecipeWater');
+  if Assigned(co) then begin
+    Inc(reused);
+  end else begin
+    // A vanilla cookpot recipe as the shell: BNAM is already CraftingCookpot
+    // and the record is the right shape.
+    tpl := RecordByEDID(FileByName('Skyrim.esm'), 'COBJ', 'RecipeFoodChickenCooked');
+    if not Assigned(tpl) then begin Problem('шаблон RecipeFoodChickenCooked не найден'); Exit; end;
+    co := wbCopyElementToFile(tpl, tgt, True, True);
+    if not Assigned(co) then begin Problem('RecipeWater COBJ не скопирован'); Exit; end;
+    PutEdit(co, 'EDID', PFX + 'RecipeWater');
+    Inc(madeNew);
+  end;
+
+  // No components: drop the container outright rather than leaving it empty,
+  // which is what the vanilla recipes without components look like.
+  items := ElementByName(co, 'Items');
+  if Assigned(items) then Remove(items);
+  DropElement(co, 'COCT');
+
+  cond := ElementByName(co, 'Conditions');
+  if Assigned(cond) then
+    while ElementCount(cond) > 0 do RemoveByIndex(cond, 0, True);
+
+  // PutFormID, not PutNative: the water lives in RFAB.esp, and that is the
+  // one case a raw formID gets wrong. See the comment on PutFormID.
+  PutFormID(co, 'CNAM', water);
+  PutFormID(co, 'BNAM', kwd);
+  PutNative(co, 'NAM1', 1);
+
+  AddCond(co, CTDA_FUNC_HASPERK,      CTDA_OP_EQ, 1.0, perk);
+  AddCond(co, CTDA_FUNC_GETITEMCOUNT, CTDA_OP_GE, 1.0, kettle);
+
+  Remember(PFX + 'RecipeWater', co);
+
+  Say('  water COBJ ' + LocalIDHex(co) + ': BNAM="' + GetElementEditValues(co, 'BNAM')
+    + '" CNAM="' + GetElementEditValues(co, 'CNAM')
+    + '" NAM1=' + GetElementEditValues(co, 'NAM1')
+    + ' условий=' + IntToStr(ElementCount(ElementByName(co, 'Conditions'))));
+end;
+
 procedure BuildDiseases;
 var
   disTpl: IwbMainRecord;
@@ -1862,11 +2032,20 @@ begin
     Exit;
   end;
 
-  // Common cold -> pneumonia. + cold-tolerance x0.85/0.7/0.5 (controller-side).
+  // Common cold -> pneumonia.
+  //
+  // Stages 2 and 3 carry an explicit FrostResist penalty rather than the old
+  // invisible cold-tolerance multiplier (x0.85/0.7/0.5, controller-side). The
+  // climate model was rewritten, so those numbers meant nothing any more, and
+  // an actor value is both visible to the player and tunable against the same
+  // formula as everything else that resists cold. AB_AUDIT.md 5.1.
   BuildDiseaseTriad(disTpl, 'ColdCommon',
     'MgefMagRegen=10',
-    'MgefMagRegen=40,MgefStamRegen=25',
-    'MgefMaxStamina=15,MgefMagRegen=70,MgefStamRegen=50');
+    'MgefFrostWeak=25,MgefMagRegen=40,MgefStamRegen=25',
+    'MgefFrostWeak=50,MgefMaxStamina=15,MgefMagRegen=70,MgefStamRegen=50');
+
+  // The hidden marker - see BuildDiseaseMarker for what it is and why.
+  BuildDiseaseMarker(disTpl);
 
   // Brown rot (draugr hits). + sleep efficiency x0.9/0.8/0.7 (controller-side).
   BuildDiseaseTriad(disTpl, 'BrownRot',
@@ -1906,9 +2085,10 @@ end;
 // Stage 1 = RFAB's own RFAB_Disease_X (untouched - its debuff + Peryite bonus
 // live). Stages 2/3 = _RSL_Dz<key>{2,3}: a 1:1 copy of RFAB_Disease_X's whole
 // effect list (debuff + Peryite CTDA effects + description), same SPIT
-// Type=Disease from the template, only FULL renamed. The controller swaps
-// base <-> our stage spell and drives P; a cure walks it back one stage
-// (engine strips the current Type=Disease spell, our tick re-adds one lower).
+// SPIT forced to Type=Ability, only FULL renamed. The controller swaps
+// base <-> our stage spell and drives P. A cure no longer walks these back at
+// all: stage 1 is RFAB's disease and answers to medicine, stages 2 and 3 are
+// abilities and only sleep, food and warmth reach them.
 
 procedure CopyEffectsFrom(dst, src: IwbMainRecord);
 var
@@ -2021,7 +2201,10 @@ begin
   ScrubTemplate(dst);
   PutEdit(dst, 'EDID', newEdid);
   PutEdit(dst, 'FULL', newFull);
-  NormalizeSpit(dst, 'Disease');   // trap template is Constant Effect / Touch
+  // Ability, not Disease - see the note in BuildDiseaseTriad. RFAB's own stage
+  // 1 stays a disease and stays curable; only the two stages this layer adds
+  // are out of the engine's reach.
+  NormalizeSpit(dst, 'Ability');   // trap template is Constant Effect / Touch
 
   CopyEffectsFrom(dst, src);
   effs := ElementByName(dst, 'Effects');
@@ -2186,6 +2369,8 @@ begin
     L('wrap.' + key + '.inherit'), spec3);
   AddMsg(PFX + 'MsgDz' + key + '2',     baseName + L('wrap.msg.2'));
   AddMsg(PFX + 'MsgDz' + key + '3',     baseName + L('wrap.msg.3'));
+  AddMsg(PFX + 'MsgDz' + key + 'Ease2', baseName + L('wrap.msg.ease.2'));
+  AddMsg(PFX + 'MsgDz' + key + 'Ease1', baseName + L('wrap.msg.ease.1'));
   AddMsg(PFX + 'MsgDz' + key + 'Cured', baseName + L('wrap.msg.cured'));
   Say('  wrapped ' + key + ' <- ' + srcEdid + '  "' + baseName + '"');
 end;
@@ -2265,6 +2450,19 @@ begin
       end;
     end;
 
+  // Nothing of ours belongs in EFSH. One lived here briefly and does not any
+  // more; anything found under our prefix is left over from a run that built it.
+  grp := GroupBySignature(tgt, 'EFSH');
+  if Assigned(grp) then
+    for i := Pred(ElementCount(grp)) downto 0 do begin
+      r := ElementByIndex(grp, i);
+      ed := EditorID(r);
+      if Pos(PFX, ed) = 1 then begin
+        Say('    removed EFSH ' + ed);
+        Remove(r);
+      end;
+    end;
+
   grp := GroupBySignature(tgt, 'SPEL');
   if Assigned(grp) then
     for i := Pred(ElementCount(grp)) downto 0 do begin
@@ -2275,65 +2473,38 @@ begin
         Remove(r);
       end;
     end;
-end;
 
-// Scans for cure-disease MGEFs and records them (as "hex6=filename") in the
-// global `cureForms`. WriteFormsScript turns that into _RSL_Forms.IsCureEffect,
-// which resolves each via GetFormFromFile - no master of ours needed, unlike a
-// FLST. Matched by "Cure Disease" archetype, a cure-disease EditorID, or the
-// display name (this pack is Russian - both vanilla 000FBFF5 and RFAB's
-// 070E463F are "Исцеление болезней"; the second has a non-standard archetype).
-procedure ScanCureEffects;
-var
-  i, k, found: Integer;
-  f  : IwbFile;
-  g  : IwbGroupRecord;
-  r  : IwbMainRecord;
-  eid, arch, full, hex6, fn: string;
-  names: TStringList;
-begin
-  Say('');
-  Say('--- cure-disease effects ---');
-  cureForms.Clear;
-
-  names := TStringList.Create;
-  names.Add('Skyrim.esm');
-  names.Add('Update.esm');
-  names.Add('Dawnguard.esm');
-  names.Add('Requiem.esp');
-  names.Add('RFAB.esp');   // merged mega-plugin (Requiem + DLC)
-  try
-    found := 0;
-    for k := 0 to Pred(names.Count) do begin
-      f := FileByName(names[k]);
-      if not Assigned(f) then Continue;
-      g := GroupBySignature(f, 'MGEF');
-      if not Assigned(g) then Continue;
-      for i := 0 to Pred(ElementCount(g)) do begin
-        r := ElementByIndex(g, i);
-        eid  := LowerCase(EditorID(r));
-        arch := GetElementEditValues(r, 'Magic Effect Data\DATA\Archtype');
-        full := GetElementEditValues(r, 'FULL');
-        if SameText(arch, 'Cure Disease')
-           or (Pos('curedisease', eid) > 0)
-           or (Pos('cure_disease', eid) > 0)
-           or ((Pos('cure', eid) > 0) and (Pos('disease', eid) > 0))
-           or (Pos('сцеление болезн', full) > 0) then begin
-          hex6 := IntToHex(GetLoadOrderFormID(MasterOrSelf(r)) and $00FFFFFF, 6);
-          fn   := GetFileName(GetFile(MasterOrSelf(r)));
-          if cureForms.IndexOf(hex6 + '=' + fn) < 0 then begin
-            cureForms.Add(hex6 + '=' + fn);
-            Inc(found);
-            Say('    + [' + hex6 + '] ' + EditorID(r) + '  "' + full + '"  (' + fn + ')');
-          end;
-        end;
+  // Sound descriptors are one per FILE now; the shape before it was one per
+  // voice, and those four names are no longer built. Rather than list them,
+  // the rule is the general one: every SNDR of ours is rebuilt and remembered
+  // on every run, so one under our prefix that nothing remembered is either
+  // left over from an older shape or half-built by a run that gave up.
+  grp := GroupBySignature(tgt, 'SNDR');
+  if Assigned(grp) then
+    for i := Pred(ElementCount(grp)) downto 0 do begin
+      r := ElementByIndex(grp, i);
+      ed := EditorID(r);
+      if (Pos(PFX, ed) = 1) and (ids.Values[ed] = '') then begin
+        Say('    removed SNDR ' + ed);
+        Remove(r);
       end;
     end;
-    if found = 0 then
-      Say('  none found - potion/spell cure will not be detected, warmth-decay still works');
-    Say('  cure effects: ' + IntToStr(found));
-  finally
-    names.Free;
+
+  // Every one of ours, unconditionally: settings moved to an ini the native
+  // plugin reads, so a GLOB left behind is a value nothing reads and nothing
+  // writes - and the MCM would still be able to find it.
+  grp := GroupBySignature(tgt, 'GLOB');
+  if Assigned(grp) then begin
+    for i := Pred(ElementCount(grp)) downto 0 do begin
+      r := ElementByIndex(grp, i);
+      ed := EditorID(r);
+      if Pos(PFX, ed) = 1 then begin
+        Say('    removed GLOB ' + ed);
+        Remove(r);
+      end;
+    end;
+    if ElementCount(grp) = 0 then
+      Remove(grp);
   end;
 end;
 
@@ -2433,9 +2604,13 @@ begin
 end;
 
 // Single-effect ability (AddAbility builds three). The effect is REBUILT on
-// every run, new or reused: CopyVanillaMgef churns the library MGEF FormIDs
-// each run, so a "reuse -> scrub -> exit" left the SPEL's EFID dangling (empty
-// effect list at runtime -> the ability does nothing). Same shape as AddAbility.
+// every run, new or reused, and stays that way now that CopyVanillaMgef keeps
+// its FormIDs: the rebuild is what carries a changed library effect or a
+// changed magnitude onto an ability that already exists, and it costs one
+// element assignment. It also used to be load-bearing for a worse reason - a
+// churned library id left the SPEL's EFID dangling and the ability did
+// nothing at runtime. That hazard is gone; the rebuild is kept on its own
+// merits. Same shape as AddAbility.
 function AddAbility1(tpl: IwbMainRecord; edid: string; fullName: string;
                      mgef: IwbMainRecord): IwbMainRecord;
 var
@@ -2581,6 +2756,9 @@ begin
   // a from-scratch ACTI (or a prior broken one) has no Model - drop it and copy
   // a template that does
   if Assigned(cfLit) and (GetElementEditValues(cfLit, 'Model\MODL') = '') then begin
+    // The one place a record's FormID still moves, and only as a repair:
+    // a modelless ACTI is unusable, so a new id is the lesser harm. A save
+    // that had one placed loses it. Never make this the normal path.
     Say('  _RSL_CampfireLit has no model - recreating from a template');
     Remove(cfLit);
     cfLit := nil;
@@ -2606,7 +2784,11 @@ begin
     if GetElementEditValues(cfLit, 'Model\MODL') <> 'Clutter\WoodFires\Campfire01Burning.nif' then
       Problem('_RSL_CampfireLit ACTI: MODL still wrong ("'
         + GetElementEditValues(cfLit, 'Model\MODL') + '")');
-    AttachScript(cfLit, '_RSL_CampfirePlaced');
+    // No script. Putting the fire out on activation is a native
+    // TESActivateEvent now (Core/Events.cpp -> Campfire::OnActivated), which
+    // asks the same MESG the Papyrus version asked. Dropping VMAD is what
+    // unbinds it on a plugin that was generated before this.
+    DropElement(cfLit, 'VMAD');
     Remember(PFX + 'CampfireLit', cfLit);
     flst := RecordByEDID(tgt, 'FLST', PFX + 'FireSources');
     if Assigned(flst) then begin
@@ -2617,10 +2799,10 @@ begin
       + '"], added to fire list');
   end;
 
-  // proven-working template: the same Constant-Effect script MGEF the monitor
-  // uses (its _RSL_Controller script runs fine). The campfire script self-
-  // Dispel()s after it fires, so it is still a one-shot. A "Fire and Forget"
-  // script template (VoiceDragonrendBlank...) does NOT run its VMAD script.
+  // A Constant-Effect script MGEF, kept as the template even though no script
+  // is attached any more: the native core recognises the fire by watching for
+  // this effect being applied, and a "Fire and Forget" template does not
+  // deliver reliably enough to be worth the change.
   mgefTpl := FindScriptArchetypeTemplate;
   ffTpl := False;
   spelTpl := FindLesserPowerTemplate;
@@ -2655,11 +2837,9 @@ begin
     + '" Cast="' + GetElementEditValues(mgef, 'Magic Effect Data\DATA\Casting Type')
     + '" Deliv="' + GetElementEditValues(mgef, 'Magic Effect Data\DATA\Delivery')
     + '" flags=[' + FlagsOf(mgef) + ']');
-  AttachScript(mgef, '_RSL_CampfireEffect');
-  Say('  campfire MGEF VMAD script[0] = "'
-    + GetElementEditValues(mgef, 'VMAD\Scripts\[0]\scriptName') + '"');
-  if not SameText(GetElementEditValues(mgef, 'VMAD\Scripts\[0]\scriptName'), '_RSL_CampfireEffect') then
-    Problem('_RSL_MgefLightCampfire VMAD did not bind _RSL_CampfireEffect');
+  // No script. The native core watches for this effect being applied and
+  // lights the fire itself (Core/Elemental.cpp -> Campfire::Light).
+  DropElement(mgef, 'VMAD');
   Remember(PFX + 'MgefLightCampfire', mgef);
 
   // lesser-power spell
@@ -2710,15 +2890,25 @@ begin
   Remember(PFX + 'PowerCampfire', spel);
 
   // notifications (feature 5/6/7)
+  // Wetness is the one axis with no bar and no icon. Two lines in the corner
+  // are the whole of what the player ever sees of it.
+  AddMsg(PFX + 'MsgWetSoaked',    L('wet.msg.soaked'));
+  AddMsg(PFX + 'MsgWetDry',       L('wet.msg.dry'));
   AddMsg(PFX + 'MsgCampLit',      L('msg.camp.lit'));
   AddMsg(PFX + 'MsgCampOut',      L('msg.camp.out'));
   AddMsg(PFX + 'MsgCampNoFuel',   L('msg.camp.nofuel'));
   AddMsg(PFX + 'MsgCampNoPerk',   L('msg.camp.noperk'));
+  AddMsg(PFX + 'MsgCampRain',     L('msg.camp.rain'));
   AddMsgConfirm(FindMsgBoxTemplate, PFX + 'MsgCampConfirm',
     L('msg.camp.confirm'), L('phrase.yes'), L('phrase.no'));
   AddMsg(PFX + 'MsgTreeCooldown', L('msg.tree.cooldown'));
 
-  Say('  campfire: PowerCampfire (Lesser Power) + MgefLightCampfire + 4 MESG');
+  // Shared by the fire and the bedroll: both refuse when the way ahead is
+  // solid, and both say the same thing about it.
+  AddMsg(PFX + 'MsgNoRoom',       L('msg.place.noroom'));
+  AddMsg(PFX + 'MsgNoTeleport',   L('msg.cold.noteleport'));
+
+  Say('  campfire: PowerCampfire (Lesser Power) + MgefLightCampfire + 6 MESG');
 end;
 
 // True if the FURN's KWDA holds a keyword whose EditorID contains `kwStem`.
@@ -2840,7 +3030,9 @@ begin
   PutEdit(mi, 'Model\MODL', 'Furniture\Bedroll\Bedroll01.nif');
   PutNative(mi, 'DATA\Value',  25);
   PutNative(mi, 'DATA\Weight', 4.0);
-  AttachScript(mi, '_RSL_BedrollItem');
+  // No script. Dropping it is a TESContainerChangedEvent in the native core
+  // (Core/Events.cpp -> Bedroll::Place).
+  DropElement(mi, 'VMAD');
   Remember(PFX + 'BedrollItem', mi);
 
   // FURN - a vanilla bedroll furniture, re-modelled to Bedroll01
@@ -2858,7 +3050,8 @@ begin
   DropElement(fu, 'VMAD');
   PutEdit(fu, 'FULL', L('bedroll.full'));
   PutEdit(fu, 'Model\MODL', 'Furniture\Bedroll\Bedroll01.nif');
-  AttachScript(fu, '_RSL_BedrollFurn');
+  // No script. Picking it back up is Bedroll::Update watching the grab.
+  // (DropElement above already ran on the copied template.)
   Remember(PFX + 'BedrollFurn', fu);
 
   // COBJ - tanning rack recipe: 4 Leather01 -> 1 BedrollItem
@@ -2948,7 +3141,21 @@ begin
   end;
 
   HideInUI(mon);
-  AttachScript(mon, '_RSL_Controller');
+
+  // _RSL_Controller is NOT bound any more. The native core replaced it, and
+  // while both were bound the two ran side by side: two survival mods on one
+  // player. That is what put camera effects and the frost shader on screen
+  // after a night in a bed with full needs, with nothing in _RSL_Core.log to
+  // show for it - the native side implements no image-space modifiers at all,
+  // so it could not have been the one doing it.
+  //
+  // Worse, the MCM toggle only ever reached the Papyrus side: it writes the
+  // _RSL_ModEnabled GLOB, and the native core reads settings.ini and never
+  // looks at a GLOB. So "mod off" switched off the OLD core and left the new
+  // one running - the exact opposite of what it says.
+  //
+  // ScrubTemplate above already drops VMAD, so not re-attaching here is what
+  // removes the binding on a regenerated record.
 
   // ability that carries this effect
   AddAbility1(spelTpl, PFX + 'AbMonitor', 'RSL Monitor', mon);
@@ -2977,7 +3184,11 @@ begin
     Inc(madeNew);
   end;
 
-  AttachScript(qst, '_RSL_Boot');
+  // Not bound, for the same reason as _RSL_Controller: the ability it exists
+  // to hand out carries a script that no longer does anything. The quest and
+  // the ability records stay - dropping a record breaks every save that has
+  // it, and an empty Start Game Enabled quest costs nothing.
+  DropElement(qst, 'VMAD');
 end;
 
 // MCM quest. Without it the menu never appears, whatever config.json says.
@@ -3018,10 +3229,8 @@ begin
   AttachScript(qst, '_RSL_MCM');
 end;
 
-// HUD widget quest. _RSL_HUDWidget extends SKI_WidgetBase; SkyUI loads and
-// positions the .swf, _RSL_Controller feeds values via UI.Invoke*. Like MCM,
-// registration is lost on save load - _RSL_Controller re-kicks it from
-// OnPlayerLoadGame.
+// HUD widget quest. Empty, and kept only so that saves made while the SkyUI
+// widget existed still resolve the record.
 procedure BuildWidgetQuest;
 var
   qst: IwbMainRecord;
@@ -3051,828 +3260,67 @@ begin
     Inc(madeNew);
   end;
 
-  AttachScript(qst, '_RSL_HUDWidget');
+  // Nothing is bound and nothing loads: the widget is the native menu's own
+  // SWF now, and both the SkyUI widget script and the SWF it loaded are gone
+  // from the mod. VMAD is dropped so a plugin from an older run stops binding
+  // a script that no longer exists.
+  DropElement(qst, 'VMAD');
+
+  // The quest record stays: dropping a record breaks every save that has it,
+  // and an empty Start Game Enabled quest costs nothing.
 end;
 
-// Emit _RSL_Forms.psc. Forms are resolved via GetFormFromFile rather than
-// VMAD properties: that keeps VMAD trivial (script name, zero properties) and
-// the formIDs come from the same run that created the records.
-
-procedure EmitFormGetter(sl: TStringList; papyrusType: string; fname: string; edid: string);
-begin
-  sl.Add(papyrusType + ' Function ' + fname + '() global');
-  sl.Add('    return Game.GetFormFromFile(0x00' + RecalledHex(edid) + ', "' + PLUGIN_NAME + '") as ' + papyrusType);
-  sl.Add('EndFunction');
-  sl.Add('');
-end;
-
-procedure EmitGlobalGetter(sl: TStringList; shortName: string);
-begin
-  EmitFormGetter(sl, 'GlobalVariable', shortName, PFX + shortName);
-end;
-
-// 3 stage SPEL + 4 MESG getters for one from-scratch disease (see
-// BuildScratchDisease). fname == EDID stem, e.g. 'BrownRot'.
-procedure EmitScratchDiseaseGetters(sl: TStringList; key: string);
-begin
-  EmitFormGetter(sl, 'Spell',   'Disease' + key + '1', PFX + 'Disease' + key + '1');
-  EmitFormGetter(sl, 'Spell',   'Disease' + key + '2', PFX + 'Disease' + key + '2');
-  EmitFormGetter(sl, 'Spell',   'Disease' + key + '3', PFX + 'Disease' + key + '3');
-  EmitFormGetter(sl, 'Message', 'Msg' + key + '1',     PFX + 'Msg' + key + '1');
-  EmitFormGetter(sl, 'Message', 'Msg' + key + '2',     PFX + 'Msg' + key + '2');
-  EmitFormGetter(sl, 'Message', 'Msg' + key + '3',     PFX + 'Msg' + key + '3');
-  EmitFormGetter(sl, 'Message', 'Msg' + key + 'Cured', PFX + 'Msg' + key + 'Cured');
-end;
-
-// RFAB wrapper stages 2/3 + their messages. Stage 1 is RFAB's own record,
-// emitted separately as a RfabDz<key> vanilla getter.
-procedure EmitRfabWrapperGetters(sl: TStringList; key: string);
-begin
-  EmitFormGetter(sl, 'Spell',   'Dz' + key + '2',       PFX + 'Dz' + key + '2');
-  EmitFormGetter(sl, 'Spell',   'Dz' + key + '3',       PFX + 'Dz' + key + '3');
-  EmitFormGetter(sl, 'Message', 'MsgDz' + key + '2',    PFX + 'MsgDz' + key + '2');
-  EmitFormGetter(sl, 'Message', 'MsgDz' + key + '3',    PFX + 'MsgDz' + key + '3');
-  EmitFormGetter(sl, 'Message', 'MsgDz' + key + 'Cured', PFX + 'MsgDz' + key + 'Cured');
-end;
-
-// Getter for a vanilla form by raw formID (holds, visual, diseases).
-procedure EmitVanillaGetter(sl: TStringList; papyrusType, fname, hex6, srcFile: string);
-begin
-  sl.Add(papyrusType + ' Function ' + fname + '() global');
-  sl.Add('    return Game.GetFormFromFile(0x00' + hex6 + ', "' + srcFile + '") as ' + papyrusType);
-  sl.Add('EndFunction');
-  sl.Add('');
-end;
-
-// KYWD getter resolved by EditorID in Skyrim.esm (formID baked at generate time).
-procedure EmitSkyrimKywd(sl: TStringList; fname, edid: string);
-var
-  kw  : IwbMainRecord;
-  hex : string;
-begin
-  hex := '000000';
-  kw := RecordByEDID(FileByName('Skyrim.esm'), 'KYWD', edid);
-  if Assigned(kw) then
-    hex := IntToHex(GetLoadOrderFormID(kw) and $00FFFFFF, 6)
-  else
-    Problem('KYWD ' + edid + ' not found in Skyrim.esm');
-  sl.Add('Keyword Function ' + fname + '() global');
-  sl.Add('    return Game.GetFormFromFile(0x00' + hex + ', "Skyrim.esm") as Keyword');
-  sl.Add('EndFunction');
-  sl.Add('');
-end;
-
-// A Skyrim.esm world object by EditorID, trying the signatures a placeable
-// clutter record could be (STAT / MSTT / FURN / ACTI). Baked at generate time.
-function SkyrimRecByEdidAnySig(edid: string): IwbMainRecord;
-var
-  f: IwbFile;
-begin
-  f := FileByName('Skyrim.esm');
-  Result := RecordByEDID(f, 'STAT', edid);
-  if not Assigned(Result) then Result := RecordByEDID(f, 'MSTT', edid);
-  if not Assigned(Result) then Result := RecordByEDID(f, 'FURN', edid);
-  if not Assigned(Result) then Result := RecordByEDID(f, 'ACTI', edid);
-end;
-
-procedure EmitSkyrimForm(sl: TStringList; fname, edid: string);
-var
-  r  : IwbMainRecord;
-  hex: string;
-begin
-  hex := '000000';
-  r := SkyrimRecByEdidAnySig(edid);
-  if Assigned(r) then
-    hex := IntToHex(GetLoadOrderFormID(r) and $00FFFFFF, 6)
-  else
-    Problem('форма ' + edid + ' не найдена в Skyrim.esm (STAT/MSTT/FURN/ACTI)');
-  sl.Add('Form Function ' + fname + '() global');
-  sl.Add('    return Game.GetFormFromFile(0x00' + hex + ', "Skyrim.esm") as Form');
-  sl.Add('EndFunction');
-  sl.Add('');
-end;
-
-procedure WriteFormsScript;
+// Emit native\src\Core\FormIDs.h - every formID this run created, as C++
+// constants.
+//
+// Before this existed the native plugin carried its ids as hand-typed
+// constexprs, which was a standing trap: CopyVanillaMgef drops and re-copies
+// each library MGEF on every run, so ids churn, and nothing connected the two
+// files. A regenerated plugin could silently stop matching the DLL. It also
+// meant every new record needed a manual round trip - run the generator, read
+// the ids back, retype them - which is exactly the sort of step that gets done
+// wrong once and then believed.
+//
+// Names are the EditorID with the mod prefix stripped, so _RSL_AbHypo1 becomes
+// FormIDs::AbHypo1.
+procedure WriteFormIdHeader;
 var
   sl  : TStringList;
-  path: string;
-  undeadHex: string;
-  src : IwbFile;
-  kw  : IwbMainRecord;
-  i, cp : Integer;
-  cf  : string;
-begin
-  Say('');
-  Say('--- emit _RSL_Forms.psc ---');
-
-  // ActorTypeUndead lives in Skyrim.esm; pull its formID too, not hardcode.
-  undeadHex := '000000';
-  src := FileByName('Skyrim.esm');
-  if Assigned(src) then begin
-    kw := RecordByEDID(src, 'KYWD', 'ActorTypeUndead');
-    if Assigned(kw) then
-      undeadHex := IntToHex(GetLoadOrderFormID(kw) and $00FFFFFF, 6)
-    else
-      Problem('KYWD ActorTypeUndead not found in Skyrim.esm');
-  end;
-
-  sl := TStringList.Create;
-  try
-    // Header kept ASCII: TStringList writes single-byte, Cyrillic would break.
-    sl.Add('Scriptname _RSL_Forms Hidden');
-    sl.Add('{AUTO-GENERATED by SSEEdit_Scripts\RFAB_SurvivalLayer_01_Records.pas');
-    sl.Add('');
-    sl.Add(' DO NOT EDIT BY HAND -- the next generator run overwrites this file.');
-    sl.Add('');
-    sl.Add(' Forms are resolved via GetFormFromFile instead of VMAD properties,');
-    sl.Add(' so formIDs come from the same run that created the records.}');
-    sl.Add('');
-    sl.Add('; --- settings ------------------------------------------------------');
-    sl.Add('');
-
-    EmitGlobalGetter(sl, 'ModEnabled');
-    EmitGlobalGetter(sl, 'SleepGrace');
-    EmitGlobalGetter(sl, 'SleepMax');
-    EmitGlobalGetter(sl, 'SleepRestorePerHour');
-    EmitGlobalGetter(sl, 'SleepMinHours');
-    EmitGlobalGetter(sl, 'CombatFatigueMult');
-    EmitGlobalGetter(sl, 'HungerGrace');
-    EmitGlobalGetter(sl, 'HungerMax');
-    EmitGlobalGetter(sl, 'HungerFoodPct');
-    EmitGlobalGetter(sl, 'HungerSpecialFoodPct');
-    EmitGlobalGetter(sl, 'RegionWinterhold');
-    EmitGlobalGetter(sl, 'RegionPale');
-    EmitGlobalGetter(sl, 'RegionEastmarch');
-    EmitGlobalGetter(sl, 'RegionReach');
-    EmitGlobalGetter(sl, 'RegionHjaalmarch');
-    EmitGlobalGetter(sl, 'RegionHaafingar');
-    EmitGlobalGetter(sl, 'RegionWhiterun');
-    EmitGlobalGetter(sl, 'RegionFalkreath');
-    EmitGlobalGetter(sl, 'RegionRift');
-    EmitGlobalGetter(sl, 'RegionDefault');
-    EmitGlobalGetter(sl, 'RegionSnowFloor');
-    EmitGlobalGetter(sl, 'RegionAltitude');
-    EmitGlobalGetter(sl, 'WeatherClear');
-    EmitGlobalGetter(sl, 'WeatherCloudy');
-    EmitGlobalGetter(sl, 'WeatherRain');
-    EmitGlobalGetter(sl, 'WeatherSnow');
-    EmitGlobalGetter(sl, 'NightMult');
-    EmitGlobalGetter(sl, 'SwimMult');
-    EmitGlobalGetter(sl, 'FireMult');
-    EmitGlobalGetter(sl, 'SevInterior');
-    EmitGlobalGetter(sl, 'SevColdInterior');
-    EmitGlobalGetter(sl, 'AltitudeLow');
-    EmitGlobalGetter(sl, 'AltitudeHigh');
-    EmitGlobalGetter(sl, 'FireRadius');
-    EmitGlobalGetter(sl, 'ColdRate');
-    EmitGlobalGetter(sl, 'WarmthPerSlot');
-    EmitGlobalGetter(sl, 'ResistWeight');
-    EmitGlobalGetter(sl, 'DryMinutes');
-    EmitGlobalGetter(sl, 'FrostHitCold');
-    EmitGlobalGetter(sl, 'FireHitWarm');
-    EmitGlobalGetter(sl, 'ElemLesionEnabled');
-    EmitGlobalGetter(sl, 'ElemLesionColdThr');
-    EmitGlobalGetter(sl, 'ElemLesionHypoChance');
-    EmitGlobalGetter(sl, 'ElemLesionHitP');
-    EmitGlobalGetter(sl, 'ElemLesionContractP');
-    EmitGlobalGetter(sl, 'ElemLesionBandageP');
-    EmitGlobalGetter(sl, 'PenaltyPrimary');
-    EmitGlobalGetter(sl, 'PenaltyCross');
-    EmitGlobalGetter(sl, 'PenaltyCap');
-    EmitGlobalGetter(sl, 'TierStep');
-    EmitGlobalGetter(sl, 'ColdGrace');
-    EmitGlobalGetter(sl, 'WarmupMult');
-    EmitGlobalGetter(sl, 'HudWidget');
-    EmitGlobalGetter(sl, 'HudColor');
-    EmitGlobalGetter(sl, 'HudWidgetAutoHide');
-    EmitGlobalGetter(sl, 'HudWidgetX');
-    EmitGlobalGetter(sl, 'HudWidgetY');
-    EmitGlobalGetter(sl, 'HudWidgetScale');
-    EmitGlobalGetter(sl, 'HudWidgetAlpha');
-    EmitGlobalGetter(sl, 'HudTempX');
-    EmitGlobalGetter(sl, 'HudTempY');
-    EmitGlobalGetter(sl, 'HudTempScale');
-    EmitGlobalGetter(sl, 'HudInvX');
-    EmitGlobalGetter(sl, 'HudInvY');
-    EmitGlobalGetter(sl, 'HudInvScale');
-    EmitGlobalGetter(sl, 'PollInterval');
-    EmitGlobalGetter(sl, 'DebugLog');
-
-    // v2
-    EmitGlobalGetter(sl, 'PenaltySpeed');
-    EmitGlobalGetter(sl, 'SpeedCap');
-    EmitGlobalGetter(sl, 'ColdVisualShader');
-    EmitGlobalGetter(sl, 'ColdVisualThreshold');
-    EmitGlobalGetter(sl, 'ColdVisDesatLo');
-    EmitGlobalGetter(sl, 'ColdVisDesatHi');
-    EmitGlobalGetter(sl, 'ColdVisTintLo');
-    EmitGlobalGetter(sl, 'ColdVisTintHi');
-    EmitGlobalGetter(sl, 'ColdVisBlurLo');
-    EmitGlobalGetter(sl, 'ColdVisBlurHi');
-    EmitGlobalGetter(sl, 'DiseaseEnabled');
-    EmitGlobalGetter(sl, 'DiseaseProgressHours');
-    EmitGlobalGetter(sl, 'DiseaseDecayHours');
-    EmitGlobalGetter(sl, 'DiseaseHitChance');
-    EmitGlobalGetter(sl, 'FoodPoisonChance');
-    EmitGlobalGetter(sl, 'RfabDzEnabled');
-    EmitGlobalGetter(sl, 'HypothermiaEnabled');
-    EmitGlobalGetter(sl, 'HypothermiaThreshold');
-    EmitGlobalGetter(sl, 'HypothermiaRecoverThr');
-    EmitGlobalGetter(sl, 'HypothermiaWorsenHours');
-    EmitGlobalGetter(sl, 'HypothermiaRecoverHours');
-    EmitGlobalGetter(sl, 'HypothermiaDrainPerSec');
-    EmitGlobalGetter(sl, 'HypothermiaDrainRamp');
-    EmitGlobalGetter(sl, 'ColdColdThreshold');
-    EmitGlobalGetter(sl, 'ColdColdChanceMin');
-    EmitGlobalGetter(sl, 'ColdColdChanceMax');
-    EmitGlobalGetter(sl, 'ColdColdChanceMaxAt');
-
-    // v3
-    EmitGlobalGetter(sl, 'BonusEnabled');
-    EmitGlobalGetter(sl, 'BonusRegenPct');
-    EmitGlobalGetter(sl, 'BonusThresholdPct');
-
-    // v4
-    EmitGlobalGetter(sl, 'WarmAnim');
-    EmitGlobalGetter(sl, 'WarmAnimDelay');
-    EmitGlobalGetter(sl, 'CampfireEnabled');
-    EmitGlobalGetter(sl, 'CampfireBurnHours');
-    EmitGlobalGetter(sl, 'CampfireFuel');
-    EmitGlobalGetter(sl, 'CampfireCooldown');
-    EmitGlobalGetter(sl, 'ShelterColdCap');
-    EmitGlobalGetter(sl, 'WoodFromTrees');
-    EmitGlobalGetter(sl, 'TreeChopCooldownH');
-    EmitGlobalGetter(sl, 'TreeChopYield');
-    EmitGlobalGetter(sl, 'TreeChopRadius');
-    EmitGlobalGetter(sl, 'ChopKey');
-
-    sl.Add('; --- abilities -----------------------------------------------------');
-    sl.Add('');
-    EmitFormGetter(sl, 'Spell', 'AbSleep',   PFX + 'AbSleep');
-    EmitFormGetter(sl, 'Spell', 'AbHunger',  PFX + 'AbHunger');
-    EmitFormGetter(sl, 'Spell', 'AbCold',      PFX + 'AbCold');
-    EmitFormGetter(sl, 'Spell', 'AbBonusWarm', PFX + 'AbBonusWarm');
-    EmitFormGetter(sl, 'Spell', 'AbBonusRest', PFX + 'AbBonusRest');
-    EmitFormGetter(sl, 'Spell', 'AbBonusFed',  PFX + 'AbBonusFed');
-    EmitFormGetter(sl, 'Spell', 'AbMonitor',   PFX + 'AbMonitor');
-    EmitFormGetter(sl, 'Spell', 'PowerCampfire', PFX + 'PowerCampfire');
-    EmitFormGetter(sl, 'MagicEffect', 'MgefLightCampfire', PFX + 'MgefLightCampfire');
-    EmitFormGetter(sl, 'Form',  'CampfireLit',   PFX + 'CampfireLit');
-    EmitFormGetter(sl, 'Form',      'BedrollItem', PFX + 'BedrollItem');
-    EmitFormGetter(sl, 'Furniture', 'BedrollFurn', PFX + 'BedrollFurn');
-    EmitFormGetter(sl, 'Message', 'MsgCampLit',     PFX + 'MsgCampLit');
-    EmitFormGetter(sl, 'Message', 'MsgCampOut',     PFX + 'MsgCampOut');
-    EmitFormGetter(sl, 'Message', 'MsgCampConfirm', PFX + 'MsgCampConfirm');
-    EmitFormGetter(sl, 'Message', 'MsgCampNoFuel',  PFX + 'MsgCampNoFuel');
-    EmitFormGetter(sl, 'Message', 'MsgCampNoPerk',  PFX + 'MsgCampNoPerk');
-    EmitFormGetter(sl, 'Message', 'MsgTreeCooldown', PFX + 'MsgTreeCooldown');
-
-    sl.Add('; --- misc ----------------------------------------------------------');
-    sl.Add('');
-    EmitFormGetter(sl, 'FormList', 'FireSources',   PFX + 'FireSources');
-    EmitFormGetter(sl, 'FormList', 'ColdInteriors', PFX + 'ColdInteriors');
-
-    // Controller re-kicks OnGameReload on the MCM quest after a save load,
-    // else the SKICP_configManagerReady subscription is lost for good.
-    EmitFormGetter(sl, 'Quest', 'QstMCM', PFX + 'QstMCM');
-    EmitFormGetter(sl, 'Quest', 'QstWidget', PFX + 'QstWidget');
-
-    sl.Add('; --- vanilla forms -----------------------------------------------');
-    sl.Add('');
-    // hold locations (Skyrim.esm)
-    EmitVanillaGetter(sl, 'Location', 'LocWinterhold', '01676B', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocPale',       '01676D', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocEastmarch',  '01676A', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocRift',       '01676C', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocFalkreath',  '01676F', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocWhiterun',   '016772', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocHaafingar',  '016770', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocHjaalmarch', '01676E', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Location', 'LocReach',      '016769', 'Skyrim.esm');
-    // cold visual: FrostIceFormFXShader (character ice shader)
-    EmitVanillaGetter(sl, 'EffectShader', 'FxColdShader', '0DC20D', 'Skyrim.esm');
-    // warm-hands-by-fire idle (IdleWarmHandsStanding)
-    EmitVanillaGetter(sl, 'Idle', 'IdleWarmHands', '0E8642', 'Skyrim.esm');
-    // v0.3.0 survival extras: perks (RFAB.esp originals), items, placement bases
-    EmitVanillaGetter(sl, 'Perk',       'PerkSurvivalBasics', '0CE266', 'RFAB.esp');
-    EmitVanillaGetter(sl, 'Perk',       'PerkCook',           '0CE264', 'RFAB.esp');
-    // v0.4.0: RFAB_Perk_Survival_Acclimatization - second half of the shelter gate
-    EmitVanillaGetter(sl, 'Perk',       'PerkAcclimatization', '0CE268', 'RFAB.esp');
-    // v0.4.0: cold screen stack - three vanilla IMADs applied additively
-    EmitVanillaGetter(sl, 'ImageSpaceModifier', 'ImodColdDesat', '0B7983', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'ImageSpaceModifier', 'ImodColdTint',  '0486F4', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'ImageSpaceModifier', 'ImodColdBlur',  '0B97F7', 'Skyrim.esm');
-    // RFAB_Blessing_Peryite - freezes the 6 base-game disease wrappers at stage 1
-    EmitVanillaGetter(sl, 'Spell',      'PeryiteBlessing',    '0060A5', 'RFAB.esp');
-    EmitVanillaGetter(sl, 'Form',       'Firewood',           '06F993', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Weapon',     'WoodAxe',             '02F2F4', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Armor',      'Backpack',            '0CD955', 'RFAB.esp');
-    // placed by _RSL_CampfireEffect: burning campfire, and (both perks) a cook
-    // spit + pot pair. Resolved by EditorID from Skyrim.esm at generate time.
-    // Campfire01Burning (no ground decal, unlike ...LandBurning).
-    EmitSkyrimForm(sl, 'BaseCampfire', 'Campfire01Burning');
-    EmitSkyrimForm(sl, 'BaseCookSpit', 'CookingSpitSm01');
-    EmitSkyrimForm(sl, 'BaseCookPot',  'CraftingCookingPotSm');
-    // v0.4.0: tent pitched over the portable bedroll when the player holds both
-    // "Основы выживания" and "Акклиматизация" (SmallNordicTent01.nif).
-    EmitSkyrimForm(sl, 'BaseTent',     'NorTentSmall');
-    // OnHit disease carriers (Skyrim.esm)
-    EmitVanillaGetter(sl, 'Race',    'RaceDraugr',        '000D53', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Race',    'RaceSlaughterfish', '013203', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Keyword', 'KwActorTypeTroll',  '0F5D16', 'Skyrim.esm');
-    // food classification keywords (RFAB.esp, master-free)
-    EmitVanillaGetter(sl, 'Keyword', 'KwRawFood',       '0CD63E', 'RFAB.esp');
-    EmitVanillaGetter(sl, 'Keyword', 'KwStrongStomach', '4CF31E', 'RFAB.esp');
-    EmitVanillaGetter(sl, 'Keyword', 'KwSpecialFood',   '0CD63D', 'RFAB.esp');
-    EmitVanillaGetter(sl, 'Keyword', 'KwSpecialDrink',  '0CE2AD', 'RFAB.esp');
-
-    sl.Add('Keyword Function ActorTypeUndead() global');
-    sl.Add('    return Game.GetFormFromFile(0x00' + undeadHex + ', "Skyrim.esm") as Keyword');
-    sl.Add('EndFunction');
-    sl.Add('');
-
-    // frost/fire hit -> cold-bar nudge; all three -> elemental-lesion P damage
-    EmitSkyrimKywd(sl, 'KwMagicDamageFrost', 'MagicDamageFrost');
-    EmitSkyrimKywd(sl, 'KwMagicDamageFire',  'MagicDamageFire');
-    EmitSkyrimKywd(sl, 'KwMagicDamageShock', 'MagicDamageShock');
-
-    sl.Add('; --- diseases: common cold --------------------------------------');
-    sl.Add('');
-    EmitFormGetter(sl, 'Spell', 'DiseaseColdCommon1', PFX + 'DiseaseColdCommon1');
-    EmitFormGetter(sl, 'Spell', 'DiseaseColdCommon2', PFX + 'DiseaseColdCommon2');
-    EmitFormGetter(sl, 'Spell', 'DiseaseColdCommon3', PFX + 'DiseaseColdCommon3');
-    EmitFormGetter(sl, 'Message', 'MsgColdCommon1',     PFX + 'MsgColdCommon1');
-    EmitFormGetter(sl, 'Message', 'MsgColdCommon2',     PFX + 'MsgColdCommon2');
-    EmitFormGetter(sl, 'Message', 'MsgColdCommon3',     PFX + 'MsgColdCommon3');
-    EmitFormGetter(sl, 'Message', 'MsgColdCommonCured', PFX + 'MsgColdCommonCured');
-
-    sl.Add('; --- diseases: OnHit ------------------------------------------');
-    sl.Add('');
-    EmitScratchDiseaseGetters(sl, 'BrownRot');
-    EmitScratchDiseaseGetters(sl, 'Gutworm');
-    EmitScratchDiseaseGetters(sl, 'Greenspore');
-    EmitScratchDiseaseGetters(sl, 'FoodPoison');
-    EmitScratchDiseaseGetters(sl, 'ElemLesion');
-
-    sl.Add('; --- RFAB disease wrappers (stage 1 = RFAB, stages 2/3 = ours) --');
-    sl.Add('');
-    // RFAB_Disease_* are RFAB's OVERRIDES of the vanilla Skyrim.esm Disease*
-    // records (DiseaseAtaxia etc.); Droops is DLC2DiseaseDroops in Dragonborn.
-    // GetFormFromFile needs the ORIGIN file, not RFAB.esp - it returns None for
-    // a form that does not originate from the named plugin.
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzAT',  '0B877C', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzRJ',  '0B8782', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzWB',  '0B8783', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzRA',  '0B8781', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzBF',  '0B877E', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzBRR', '0B877F', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'Spell', 'RfabDzDR',  '0285C1', 'Dragonborn.esm');
-    // Marker MGEF = the disease's first (unconditional) debuff effect. A disease
-    // applied by a creature's RACE ATKD attack spell lands as active effects
-    // WITHOUT the SPEL entering the spell list, so HasSpell misses it -
-    // HasMagicEffect on this marker is the reliable contract detector.
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkAT',  '0CD9BD', 'RFAB.esp');
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkRJ',  '0B877A', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkWB',  '0B877B', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkRA',  '0B8779', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkBF',  '0B8776', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkBRR', '0B8777', 'Skyrim.esm');
-    EmitVanillaGetter(sl, 'MagicEffect', 'RfabDzMarkDR',  '0285C0', 'Dragonborn.esm');
-    EmitRfabWrapperGetters(sl, 'AT');
-    EmitRfabWrapperGetters(sl, 'RJ');
-    EmitRfabWrapperGetters(sl, 'WB');
-    EmitRfabWrapperGetters(sl, 'RA');
-    EmitRfabWrapperGetters(sl, 'BF');
-    EmitRfabWrapperGetters(sl, 'BRR');
-    EmitRfabWrapperGetters(sl, 'DR');
-
-    sl.Add('; --- hypothermia ---------------------------------------------');
-    sl.Add('');
-    EmitFormGetter(sl, 'Spell',   'AbHypo1',      PFX + 'AbHypo1');
-    EmitFormGetter(sl, 'Spell',   'AbHypo2',      PFX + 'AbHypo2');
-    EmitFormGetter(sl, 'Spell',   'AbHypo3',      PFX + 'AbHypo3');
-    EmitFormGetter(sl, 'Message', 'MsgHypo1',     PFX + 'MsgHypo1');
-    EmitFormGetter(sl, 'Message', 'MsgHypo2',     PFX + 'MsgHypo2');
-    EmitFormGetter(sl, 'Message', 'MsgHypo3',     PFX + 'MsgHypo3');
-    EmitFormGetter(sl, 'Message', 'MsgHypoCured', PFX + 'MsgHypoCured');
-    EmitFormGetter(sl, 'Message', 'MsgHypoNoRest', PFX + 'MsgHypoNoRest');
-
-    sl.Add('; cure-disease effects (from ScanCureEffects). No FLST -> no master.');
-    sl.Add('bool Function IsCureEffect(Form f) global');
-    for i := 0 to Pred(cureForms.Count) do begin
-      cf := cureForms[i];
-      cp := Pos('=', cf);
-      sl.Add('    if f == Game.GetFormFromFile(0x00' + Copy(cf, 1, cp - 1)
-        + ', "' + Copy(cf, cp + 1, Length(cf)) + '")');
-      sl.Add('        return true');
-      sl.Add('    EndIf');
-    end;
-    sl.Add('    return false');
-    sl.Add('EndFunction');
-    sl.Add('');
-
-    path := MOD_DIR + 'scripts\source\_RSL_Forms.psc';
-    sl.SaveToFile(path);
-    Say('  written: ' + path);
-    Say('  REBUILD Papyrus after this: _build.bat');
-  finally
-    sl.Free;
-  end;
-end;
-
-// Emit _RSL_Balance.psc: ResetDefaults() applies every GLOB's plugin default.
-// Single source of truth - the defaults live only in BuildGlobals; balDefaults
-// captured each one via AddGlobal. Called by MigrateSettings + the MCM reset.
-procedure WriteBalanceScript;
-var
-  sl  : TStringList;
-  path, ln, edid, val: string;
+  path, edid, name: string;
   i, p: Integer;
 begin
   Say('');
-  Say('--- emit _RSL_Balance.psc ---');
+  Say('--- emit FormIDs.h ---');
   sl := TStringList.Create;
   try
-    sl.Add('Scriptname _RSL_Balance Hidden');
-    sl.Add('{AUTO-GENERATED by SSEEdit_Scripts\RFAB_SurvivalLayer_01_Records.pas');
+    sl.Add('#pragma once');
     sl.Add('');
-    sl.Add(' DO NOT EDIT BY HAND. Every GLOB default lives in BuildGlobals in the');
-    sl.Add(' generator; this file just re-applies them (new game / settings migration).}');
+    sl.Add('// AUTO-GENERATED by SSEEdit_Scripts\RFAB_SurvivalLayer_01_Records.pas');
+    sl.Add('//');
+    sl.Add('// DO NOT EDIT BY HAND -- the next generator run overwrites this file.');
+    sl.Add('//');
+    sl.Add('// Local formIDs of every record the generator built, so the plugin and the');
+    sl.Add('// .esp cannot drift apart. They do churn: CopyVanillaMgef drops and re-copies');
+    sl.Add('// the penalty library on every run.');
     sl.Add('');
-    sl.Add('Function ResetDefaults() global');
-    for i := 0 to Pred(balDefaults.Count) do begin
-      ln := balDefaults[i];
-      p := Pos('=', ln);
-      if p = 0 then Continue;
-      edid := Copy(ln, 1, p - 1);
-      val  := Copy(ln, p + 1, Length(ln));
-      // _RSL_Forms getters use the un-prefixed name (ModEnabled, not _RSL_ModEnabled)
-      if Copy(edid, 1, Length(PFX)) = PFX then
-        edid := Copy(edid, Length(PFX) + 1, Length(edid));
-      sl.Add('    _RSL_Forms.' + edid + '().SetValue(' + val + '.0)');
-    end;
-    sl.Add('EndFunction');
-    sl.Add('');
-    path := MOD_DIR + 'scripts\source\_RSL_Balance.psc';
-    sl.SaveToFile(path);
-    Say('  written: ' + path + ' (' + IntToStr(balDefaults.Count) + ' defaults)');
-  finally
-    sl.Free;
-  end;
-end;
-
-// Emit config.json for MCM Helper. Labels are $_RSL_Xxx keys, not text
-// (TStringList writes single-byte, Cyrillic in JSON would break); the real
-// labels live in Interface\Translations\RFAB_SurvivalLayer_*.txt.
-
-// TrimLastComma runs before each ']', so every Json* helper unconditionally
-// appends a comma - no need to track who is last.
-procedure TrimLastComma(sl: TStringList);
-var i: Integer; ln: string;
-begin
-  i := sl.Count - 1;
-  while (i >= 0) and (Trim(sl[i]) = '') do i := i - 1;
-  if i < 0 then Exit;
-  ln := sl[i];
-  if (Length(ln) > 0) and (ln[Length(ln)] = ',') then
-    sl[i] := Copy(ln, 1, Length(ln) - 1);
-end;
-
-procedure JsonSlider(sl: TStringList; edid: string; min: string; max: string; step: string);
-begin
-  sl.Add('        {');
-  sl.Add('          "text": "$' + edid + '",');
-  sl.Add('          "help": "$' + edid + '_help",');
-  sl.Add('          "type": "slider",');
-  sl.Add('          "valueOptions": {');
-  sl.Add('            "min": ' + min + ',');
-  sl.Add('            "max": ' + max + ',');
-  sl.Add('            "step": ' + step + ',');
-  sl.Add('            "sourceType": "GlobalValue",');
-  sl.Add('            "sourceForm": "' + SourceForm(edid) + '"');
-  sl.Add('          }');
-  sl.Add('        },');
-end;
-
-procedure JsonToggle(sl: TStringList; edid: string);
-begin
-  sl.Add('        {');
-  sl.Add('          "text": "$' + edid + '",');
-  sl.Add('          "help": "$' + edid + '_help",');
-  sl.Add('          "type": "toggle",');
-  sl.Add('          "valueOptions": {');
-  sl.Add('            "sourceType": "GlobalValue",');
-  sl.Add('            "sourceForm": "' + SourceForm(edid) + '"');
-  sl.Add('          }');
-  sl.Add('        },');
-end;
-
-// MCM Helper KeyMapControl. The stored value is a DirectX scan code; 0 keeps
-// the feature on its default control instead of a dedicated key.
-procedure JsonKeymap(sl: TStringList; edid: string);
-begin
-  sl.Add('        {');
-  sl.Add('          "text": "$' + edid + '",');
-  sl.Add('          "help": "$' + edid + '_help",');
-  sl.Add('          "type": "keymap",');
-  sl.Add('          "valueOptions": {');
-  sl.Add('            "sourceType": "GlobalValue",');
-  sl.Add('            "sourceForm": "' + SourceForm(edid) + '"');
-  sl.Add('          }');
-  sl.Add('        },');
-end;
-
-procedure JsonHeader(sl: TStringList; key: string);
-begin
-  sl.Add('        {');
-  sl.Add('          "text": "$' + key + '",');
-  sl.Add('          "type": "header"');
-  sl.Add('        },');
-end;
-
-// Read-only text row (MCM Helper "text" type, no action) - one line of help.
-procedure JsonInfo(sl: TStringList; key: string);
-begin
-  sl.Add('        {');
-  sl.Add('          "text": "$' + key + '",');
-  sl.Add('          "type": "text"');
-  sl.Add('        },');
-end;
-
-procedure WriteMcmConfig;
-var
-  sl  : TStringList;
-  path: string;
-begin
-  Say('');
-  Say('--- emit config.json ---');
-
-  sl := TStringList.Create;
-  try
+    sl.Add('namespace RSL::FormIDs');
     sl.Add('{');
-    sl.Add('  "modName": "RFAB_SurvivalLayer",');
-    // Plain text, not a $_RSL_ModName key: configs register early, before
-    // translations load, and an unresolved key in displayName silently keeps
-    // the mod out of the menu. Every working config in the pack does this too.
-    sl.Add('  "displayName": "RFAB Survival",');
-    sl.Add('  "pages": [');
-
-    // page: Help - read-only, condensed from README.md. Text keys $_RSL_Hlp*
-    // live in Interface/Translations/RFAB_SurvivalLayer_{russian,english}.txt.
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageHelp",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HlpHOverview');
-    JsonInfo(sl, '_RSL_Hlp01');  JsonInfo(sl, '_RSL_Hlp02');  JsonInfo(sl, '_RSL_Hlp03');
-    JsonInfo(sl, '_RSL_Hlp04');  JsonInfo(sl, '_RSL_Hlp05');  JsonInfo(sl, '_RSL_Hlp06');
-    JsonHeader(sl, '_RSL_HlpHNeeds');
-    JsonInfo(sl, '_RSL_Hlp07');  JsonInfo(sl, '_RSL_Hlp08');  JsonInfo(sl, '_RSL_Hlp09');
-    JsonInfo(sl, '_RSL_Hlp10');  JsonInfo(sl, '_RSL_Hlp11');  JsonInfo(sl, '_RSL_Hlp12');
-    JsonHeader(sl, '_RSL_HlpHCold');
-    JsonInfo(sl, '_RSL_Hlp13');  JsonInfo(sl, '_RSL_Hlp14');  JsonInfo(sl, '_RSL_Hlp15');
-    JsonInfo(sl, '_RSL_Hlp16');  JsonInfo(sl, '_RSL_Hlp17');  JsonInfo(sl, '_RSL_Hlp18');
-    JsonInfo(sl, '_RSL_Hlp19');  JsonInfo(sl, '_RSL_Hlp20');  JsonInfo(sl, '_RSL_Hlp21');
-    JsonInfo(sl, '_RSL_Hlp22');
-    JsonHeader(sl, '_RSL_HlpHDisease');
-    JsonInfo(sl, '_RSL_Hlp23');  JsonInfo(sl, '_RSL_Hlp24');  JsonInfo(sl, '_RSL_Hlp25');
-    JsonInfo(sl, '_RSL_Hlp26');  JsonInfo(sl, '_RSL_Hlp27');  JsonInfo(sl, '_RSL_Hlp28');
-    JsonInfo(sl, '_RSL_Hlp29');
-    JsonHeader(sl, '_RSL_HlpHHypo');
-    JsonInfo(sl, '_RSL_Hlp30');  JsonInfo(sl, '_RSL_Hlp31');  JsonInfo(sl, '_RSL_Hlp32');
-    JsonInfo(sl, '_RSL_Hlp33');
-    JsonHeader(sl, '_RSL_HlpHCamp');
-    JsonInfo(sl, '_RSL_Hlp36');  JsonInfo(sl, '_RSL_Hlp37');  JsonInfo(sl, '_RSL_Hlp38');
-    JsonInfo(sl, '_RSL_Hlp39');  JsonInfo(sl, '_RSL_Hlp40');  JsonInfo(sl, '_RSL_Hlp41');
-    JsonHeader(sl, '_RSL_HlpHTune');
-    JsonInfo(sl, '_RSL_Hlp34');  JsonInfo(sl, '_RSL_Hlp35');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: HUD
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageHud",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HdrHudWidget');
-    JsonToggle(sl, PFX + 'HudWidget');
-    JsonToggle(sl, PFX + 'HudColor');
-    JsonToggle(sl, PFX + 'HudWidgetAutoHide');
-    JsonHeader(sl, '_RSL_HdrHudPos');
-    JsonSlider(sl, PFX + 'HudWidgetX',      '0', '1280', '5');
-    JsonSlider(sl, PFX + 'HudWidgetY',      '0', '720',  '5');
-    JsonSlider(sl, PFX + 'HudWidgetScale',  '50', '200', '5');
-    JsonSlider(sl, PFX + 'HudWidgetAlpha',  '0', '100',  '5');
-    // No anchor rows: the widget is pinned top-left, exactly like RFAB's own
-    // widgets, so X/Y alone place it in the 1280x720 HUD space.
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: Sleep
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageSleep",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HdrSleepCurve');
-    JsonSlider(sl, PFX + 'SleepGrace',          '0',  '48',  '1');
-    JsonSlider(sl, PFX + 'SleepMax',            '24', '168', '1');
-    JsonHeader(sl, '_RSL_HdrSleepRecovery');
-    JsonSlider(sl, PFX + 'SleepRestorePerHour', '1',  '24',  '1');
-    JsonSlider(sl, PFX + 'SleepMinHours',       '0',  '8',   '1');
-    JsonHeader(sl, '_RSL_HdrCombat');
-    JsonSlider(sl, PFX + 'CombatFatigueMult',   '1',  '15',  '1');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: Hunger
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageHunger",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HdrHungerCurve');
-    JsonSlider(sl, PFX + 'HungerGrace', '0',  '48',  '1');
-    JsonSlider(sl, PFX + 'HungerMax',   '24', '168', '1');
-    JsonHeader(sl, '_RSL_HdrHungerFood');
-    JsonSlider(sl, PFX + 'HungerFoodPct',        '0', '200', '5');
-    JsonSlider(sl, PFX + 'HungerSpecialFoodPct', '0', '300', '5');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: Cold
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageCold",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HdrColdModel');
-    JsonSlider(sl, PFX + 'ColdRate',      '0.25', '3',  '0.25');  // overall rate multiplier
-    JsonSlider(sl, PFX + 'ColdGrace',     '0',    '100', '5');
-    JsonSlider(sl, PFX + 'WarmupMult',    '1',    '30',  '0.5');
-    JsonSlider(sl, PFX + 'WarmthPerSlot', '0',   '30',  '1');
-    JsonSlider(sl, PFX + 'ResistWeight',  '0',   '200', '5');   // % of FrostResist
-    JsonSlider(sl, PFX + 'DryMinutes',    '0',   '30',  '1');
-    JsonSlider(sl, PFX + 'FrostHitCold',  '0',   '20',  '1');
-    JsonSlider(sl, PFX + 'FireHitWarm',   '0',   '20',  '1');
-    JsonHeader(sl, '_RSL_HdrRegion');
-    JsonSlider(sl, PFX + 'RegionWinterhold', '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionPale',       '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionEastmarch',  '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionReach',      '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionHjaalmarch', '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionHaafingar',  '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionWhiterun',   '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionFalkreath',  '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionRift',       '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionDefault',    '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionSnowFloor',  '0', '150', '5');
-    JsonSlider(sl, PFX + 'RegionAltitude',   '0', '200', '5');
-    JsonHeader(sl, '_RSL_HdrMult');
-    JsonSlider(sl, PFX + 'WeatherClear',      '50',  '400', '5');
-    JsonSlider(sl, PFX + 'WeatherCloudy',     '50',  '400', '5');
-    JsonSlider(sl, PFX + 'WeatherRain',       '50',  '400', '5');
-    JsonSlider(sl, PFX + 'WeatherSnow',       '50',  '400', '5');
-    JsonSlider(sl, PFX + 'NightMult',         '100', '400', '5');
-    JsonSlider(sl, PFX + 'SwimMult',          '100', '1000', '10');
-    JsonSlider(sl, PFX + 'FireMult',          '0',   '100', '5');
-    JsonSlider(sl, PFX + 'SevInterior',       '0',   '150', '5');
-    JsonSlider(sl, PFX + 'SevColdInterior',   '0',   '150', '5');
-    JsonSlider(sl, PFX + 'AltitudeLow',       '0',   '25000', '500');
-    JsonSlider(sl, PFX + 'AltitudeHigh',      '0',   '30000', '500');
-    JsonSlider(sl, PFX + 'FireRadius',        '100', '2000',  '50');
-    // visual
-    JsonHeader(sl, '_RSL_HdrColdVisual');
-    JsonToggle(sl, PFX + 'ColdVisualShader');
-    JsonSlider(sl, PFX + 'ColdVisualThreshold', '0', '100', '5');
-    JsonHeader(sl, '_RSL_HdrWarmAnim');
-    JsonToggle(sl, PFX + 'WarmAnim');
-    JsonSlider(sl, PFX + 'WarmAnimDelay', '2', '20', '1');
-    JsonHeader(sl, '_RSL_HdrCampfire');
-    JsonToggle(sl, PFX + 'CampfireEnabled');
-    JsonSlider(sl, PFX + 'CampfireBurnHours', '1', '24', '1');
-    JsonSlider(sl, PFX + 'CampfireFuel',      '1', '5',  '1');
-    JsonSlider(sl, PFX + 'CampfireCooldown',  '0', '30', '1');
-    JsonSlider(sl, PFX + 'ShelterColdCap',    '0', '100', '5');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: Diseases
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageDisease",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HdrDisease');
-    JsonToggle(sl, PFX + 'DiseaseEnabled');
-    JsonSlider(sl, PFX + 'DiseaseProgressHours', '5', '120', '5');
-    JsonSlider(sl, PFX + 'DiseaseDecayHours',    '5', '240', '5');
-    JsonSlider(sl, PFX + 'DiseaseHitChance',     '0', '100', '5');
-    JsonSlider(sl, PFX + 'FoodPoisonChance',     '0', '100', '5');
-    JsonToggle(sl, PFX + 'RfabDzEnabled');
-    JsonToggle(sl, PFX + 'HypothermiaEnabled');
-    JsonSlider(sl, PFX + 'HypothermiaThreshold',    '0', '100', '5');
-    JsonSlider(sl, PFX + 'HypothermiaWorsenHours',  '1', '24',  '1');
-    JsonSlider(sl, PFX + 'HypothermiaRecoverHours', '1', '24',  '1');
-    JsonSlider(sl, PFX + 'HypothermiaDrainPerSec',  '0', '10',  '1');
-    JsonSlider(sl, PFX + 'HypothermiaDrainRamp',    '5', '120', '5');
-    JsonSlider(sl, PFX + 'ColdColdThreshold',        '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdColdChanceMin',    '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdColdChanceMax',    '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdColdChanceMaxAt',  '0', '100', '5');
-    JsonToggle(sl, PFX + 'ElemLesionEnabled');
-    JsonSlider(sl, PFX + 'ElemLesionHypoChance', '0', '100', '5');
-    JsonSlider(sl, PFX + 'ElemLesionHitP',       '0', '20',  '1');
-    sl.Add('        {');
-    sl.Add('          "text": "$_RSL_BtnCureCold",');
-    sl.Add('          "help": "$_RSL_BtnCureCold_help",');
-    sl.Add('          "type": "text",');
-    sl.Add('          "action": {');
-    sl.Add('            "type": "CallGlobalFunction",');
-    sl.Add('            "script": "_RSL_Controller",');
-    sl.Add('            "function": "CureColdDisease"');
-    sl.Add('          }');
-    sl.Add('        },');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: Penalties
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PagePenalty",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonHeader(sl, '_RSL_HdrPenalty');
-    JsonSlider(sl, PFX + 'PenaltyPrimary', '0', '100', '5');
-    JsonSlider(sl, PFX + 'PenaltyCross',   '0', '100', '5');
-    JsonSlider(sl, PFX + 'PenaltySpeed',   '0', '50',  '5');
-    JsonSlider(sl, PFX + 'SpeedCap',       '0', '80',  '5');
-    JsonSlider(sl, PFX + 'PenaltyCap',     '0', '95',  '5');
-    JsonSlider(sl, PFX + 'TierStep',       '5', '25',  '5');
-    JsonHeader(sl, '_RSL_HdrBonus');
-    JsonToggle(sl, PFX + 'BonusEnabled');
-    JsonSlider(sl, PFX + 'BonusRegenPct',      '0', '200', '5');
-    JsonSlider(sl, PFX + 'BonusThresholdPct',  '0', '50', '5');
-    JsonHeader(sl, '_RSL_HdrWood');
-    JsonToggle(sl, PFX + 'WoodFromTrees');
-    JsonKeymap(sl, PFX + 'ChopKey');
-    JsonSlider(sl, PFX + 'TreeChopCooldownH', '0', '72', '1');
-    JsonSlider(sl, PFX + 'TreeChopYield',     '1', '5',  '1');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    },');
-
-    // page: Debug - master switch + service controls + the reset button.
-    sl.Add('    {');
-    sl.Add('      "pageDisplayName": "$_RSL_PageDebug",');
-    sl.Add('      "cursorFillMode": "topToBottom",');
-    sl.Add('      "content": [');
-    JsonToggle(sl, PFX + 'ModEnabled');
-    JsonSlider(sl, PFX + 'PollInterval', '1', '30', '1');
-    JsonToggle(sl, PFX + 'DebugLog');
-    JsonSlider(sl, PFX + 'TreeChopRadius', '50', '400', '10');
-    // Cold screen stack, tuning only. Each effect ramps from Lo to Hi on the
-    // 0..100 cold bar. Freeze the numbers in BuildGlobals once the look is
-    // settled and delete this block.
-    JsonHeader(sl, '_RSL_HdrHudPlace');
-    JsonSlider(sl, PFX + 'HudTempX',     '0', '1280', '5');
-    JsonSlider(sl, PFX + 'HudTempY',     '0', '720',  '5');
-    JsonSlider(sl, PFX + 'HudTempScale', '25', '300', '5');
-    JsonSlider(sl, PFX + 'HudInvX',      '0', '1280', '5');
-    JsonSlider(sl, PFX + 'HudInvY',      '0', '720',  '5');
-    JsonSlider(sl, PFX + 'HudInvScale',  '25', '300', '5');
-    JsonHeader(sl, '_RSL_HdrColdVis');
-    JsonSlider(sl, PFX + 'ColdVisDesatLo', '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdVisDesatHi', '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdVisTintLo',  '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdVisTintHi',  '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdVisBlurLo',  '0', '100', '5');
-    JsonSlider(sl, PFX + 'ColdVisBlurHi',  '0', '100', '5');
-    sl.Add('        {');
-    sl.Add('          "text": "$_RSL_BtnReset",');
-    sl.Add('          "help": "$_RSL_BtnReset_help",');
-    sl.Add('          "type": "text",');
-    sl.Add('          "action": {');
-    sl.Add('            "type": "CallGlobalFunction",');
-    sl.Add('            "script": "_RSL_Controller",');
-    sl.Add('            "function": "ResetDefaults"');
-    sl.Add('          }');
-    sl.Add('        }');
-    TrimLastComma(sl);
-    sl.Add('      ]');
-    sl.Add('    }');
-
-    sl.Add('  ]');
+    for i := 0 to Pred(ids.Count) do begin
+      edid := ids.Names[i];
+      if edid = '' then Continue;
+      name := edid;
+      if Copy(name, 1, Length(PFX)) = PFX then
+        name := Copy(name, Length(PFX) + 1, Length(name));
+      sl.Add('    inline constexpr RE::FormID ' + name
+           + ' = 0x' + ids.Values[edid] + ';');
+    end;
     sl.Add('}');
+    sl.Add('');
 
-    path := MOD_DIR + 'MCM\Config\RFAB_SurvivalLayer\config.json';
+    path := MOD_DIR + 'native\src\Core\FormIDs.h';
     sl.SaveToFile(path);
-    Say('  записан: ' + path);
-    Say('  ВНИМАНИЕ: кнопки "Вылечить простуду" (Болезни) и "Сброс настроек"');
-    Say('  (Debug) зовут глобальные функции _RSL_Controller через');
-    Say('  CallGlobalFunction. Если не сработают - сверить с документацией');
-    Say('  MCM Helper и при необходимости перейти на CallFunction с квестом.');
+    Say('  written: ' + path + ' (' + IntToStr(ids.Count) + ' ids)');
+    Say('  REBUILD the native plugin after this.');
   finally
     sl.Free;
   end;
@@ -3901,6 +3349,12 @@ begin
   Result := nil;
   if not Assigned(src) then Exit;
   AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(src))));
+  // ...and the files the record's own fields POINT AT, which is a different
+  // list. HelpManualPC taught it: entry 24 of RFAB's 45 is a MESG from
+  // Update.esm, which was never a master here, so that one entry could not be
+  // mapped and the copy lost it. This is xEdit's own answer - its shipped
+  // "Copy as override.pas" calls exactly this before every wbCopyElementToFile.
+  AddRequiredElementMasters(src, tgt, False);
 
   old := RecordByEDID(tgt, Signature(src), EditorID(src));
   if Assigned(old) then begin
@@ -3961,7 +3415,181 @@ begin
     Problem(sig + ' ' + edid + ' не найден в RFAB.esp');
 end;
 
-// "Управление погодой" is flagged A100 by its own EditorID, but the effect
+// Our page in the game's own Help section (Journal -> Help).
+//
+// HOW THAT SECTION IS BUILT, measured rather than assumed: it is a FormList.
+// Skyrim's HelpManualPC (00000163) holds 42 MESG records, each one an entry -
+// FULL is the line in the list, DESC is the page behind it.
+//
+// RFAB does TWO different things to it, and they are easy to confuse. It
+// renames 22 vanilla entries (HelpAlchemyLong and the rest gain an "[RFAB]"
+// prefix), which adds nothing; and it appends three of its own, so its
+// HelpManualPC holds 45.
+//
+// WHICH IS WHY THE OVERRIDE IS TAKEN FROM RFAB AND NOT FROM THE MASTER. Copying
+// Skyrim's 42-entry version and appending ours would silently drop RFAB's three
+// - the same trap CureDiseaseMsg already taught this file. RfabRec hands us
+// their version; OverrideOf copies whatever it is given.
+//
+// HelpManualXBox (00000165) is the gamepad twin and is deliberately left alone.
+// The cough: one sound descriptor per FILE, twenty-three of them.
+//
+// WHY ONE PER FILE, and not one per voice with a list inside it. A SNDR can
+// hold a LIST of files (ANAM repeats) and the engine picks from it, which is
+// what this was written against first. It cannot be built from a script:
+//
+//   - xEdit refuses to ADD an entry to the 'Sound Files' array. Assigning into
+//     the container hands back the array itself, which carries no value of its
+//     own - the "Sound Files can not be edited" the first run died on - and a
+//     run that reached the array directly wrote nothing while reporting four
+//     tidy successes.
+//   - However many files a record really holds, the array reached from a
+//     script offers exactly ONE editable slot. Three templates, one rule:
+//     NPCDogIdleWhine (16 files in the saved record) counted 1 and tripped the
+//     check below; NPCWerewolfBreatheOut (2) counted 1, so the old code's
+//     "remove what the template brought" removed one file and left the other;
+//     NPCHumanCartExitA (1) counts 1 and comes out exactly right.
+//
+// So the template has to hold exactly one file, and each of our files needs a
+// record of its own. Why the array behaves this way is not established here -
+// what is established is that it does, on every template tried.
+//
+// Writing the value of the one slot that IS there works - xEdit's own
+// "Read Books Aloud" sets 'Sounds\Sound Files\ANAM - File Name' on a copied
+// SNDR exactly that way. So each file gets its own descriptor and the PLUGIN
+// picks between them, which costs nothing: the lists per voice live in
+// Cough.cpp, and the male files are shared by the orc and khajiit lists by
+// reference instead of being duplicated into three separate records.
+//
+// The template is NPCHumanCartExitA: a single-file human NPC sound whose
+// CNAM, GNAM (AudioCategorySFX), ONAM and LNAM are identical to the
+// NPCWerewolfBreatheOut this used to clone. Only BNAM differs - it is quieter
+// by design, and loudness is set from the plugin anyway.
+//
+// The files are 16-bit mono PCM at 44.1 kHz. They arrive as 24-bit stereo and
+// have to be converted - Skyrim plays neither 24-bit nor, positionally, stereo.
+procedure BuildCoughSound(edid, wav: string);
+var
+  src, rec       : IwbMainRecord;
+  anams, snd, el : IInterface;
+  i              : Integer;
+  fresh          : Boolean;
+  have, want, diag : string;
+begin
+  want := 'Data\Sound\FX\RSL\Cough\' + wav;
+
+  src := RecordByEDID(FileByName('Skyrim.esm'), 'SNDR', 'NPCHumanCartExitA');
+  if not Assigned(src) then begin
+    Problem('BuildCoughSound: шаблон NPCHumanCartExitA не найден');
+    Exit;
+  end;
+  // A new record, but its category, output model and conditions still point
+  // into Skyrim.esm - the same call, for the same reason, as OverrideOf.
+  AddRequiredElementMasters(src, tgt, False);
+
+  // KEEP THE FORMID, same reason as the rest: these are referenced from
+  // native/src/Core/FormIDs.h, and a released build's ids must not move under
+  // a player's save. Nothing else of the template is needed on a reuse - the
+  // category, output model and conditions are already on the record, and the
+  // one field that matters is rewritten and read back below.
+  rec := RecordByEDID(tgt, 'SNDR', edid);
+  fresh := not Assigned(rec);
+  if fresh then begin
+    rec := wbCopyElementToFile(src, tgt, True, True);
+    if not Assigned(rec) then begin
+      Problem('BuildCoughSound: SNDR не скопирован ' + edid);
+      Exit;
+    end;
+  end;
+  PutEdit(rec, 'EDID', edid);
+
+  // Resolved in two steps, not as one compound path: PutNativeIn documents
+  // above why a multi-level path can come back nil where the plain lookup on
+  // the container works. A miss prints what the record really holds.
+  snd := ElementByName(rec, 'Sounds');
+  anams := nil;
+  if Assigned(snd) then anams := ElementByName(snd, 'Sound Files');
+  if not Assigned(anams) then begin
+    if not Assigned(snd) then snd := rec;
+    diag := '';
+    for i := 0 to Pred(ElementCount(snd)) do
+      diag := diag + ' | ' + Name(ElementByIndex(snd, i));
+    Problem('BuildCoughSound: нет массива Sound Files в ' + edid + '. Есть:' + diag);
+    Exit;
+  end;
+  if ElementCount(anams) <> 1 then begin
+    Problem('BuildCoughSound: в копии ' + IntToStr(ElementCount(anams))
+      + ' слот(ов) вместо одного (' + edid + ')');
+    Exit;
+  end;
+
+  el := ElementByIndex(anams, 0);
+  SetEditValue(el, want);
+
+  // Read back. An earlier shape of this reported four tidy successes and left
+  // the template's own file in place, so nothing here is taken on trust.
+  have := GetEditValue(el);
+  if not SameText(have, want) then begin
+    Problem(edid + ': записалось "' + have + '", ожидалось "' + want + '"');
+    Exit;
+  end;
+
+  Remember(edid, rec);
+  if fresh then Inc(madeNew) else Inc(reused);
+end;
+
+procedure BuildCoughSounds;
+var
+  i, n : Integer;
+begin
+  Say('');
+  Say('--- SNDR: кашель ---');
+  n := madeNew;
+  for i := 1 to 9 do
+    BuildCoughSound(PFX + 'SndCoughFemale' + IntToStr(i),
+      'female_cough_' + IntToStr(i) + '.wav');
+  for i := 1 to 8 do
+    BuildCoughSound(PFX + 'SndCoughMale' + IntToStr(i),
+      'male_cough_' + IntToStr(i) + '.wav');
+  for i := 1 to 4 do
+    BuildCoughSound(PFX + 'SndCoughOrc' + IntToStr(i),
+      'orc_male_cough_' + IntToStr(i) + '.wav');
+  for i := 1 to 2 do
+    BuildCoughSound(PFX + 'SndCoughKhajiit' + IntToStr(i),
+      'khajiit_male_cough_' + IntToStr(i) + '.wav');
+  Say('  дескрипторов: ' + IntToStr(madeNew - n) + ' из 23 (по одному файлу в каждом)');
+end;
+
+procedure BuildHelpTopic;
+var
+  msg, src, flst : IwbMainRecord;
+  items          : IInterface;
+begin
+  Say('');
+  Say('--- help topic ---');
+
+  msg := AddMsg(PFX + 'MsgHelpSurvival', Multiline(L('help.survival.body')));
+  if not Assigned(msg) then Exit;
+  // A help entry needs both halves: AddMsg writes only the body.
+  PutEdit(msg, 'FULL', L('help.survival.title'));
+
+  src := RfabRec('FLST', 'HelpManualPC');
+  if not Assigned(src) then Exit;
+
+  flst := OverrideOf(src);
+  if not Assigned(flst) then Exit;
+
+  items := ElementByName(flst, 'FormIDs');
+  if not Assigned(items) then begin
+    Problem('HelpManualPC: нет контейнера FormIDs');
+    Exit;
+  end;
+  FlstAddRecord(items, msg);
+  Say('  HelpManualPC: +1 запись, теперь ' + IntToStr(ElementCount(items)));
+end;
+
+
+// WB_A100_ControlWeather_Effect is flagged A100 by its own EditorID, but it
 // still carries Minimum Skill Level 0 and the spell still points at the novice
 // half-cost perk - so the game lists it as a novice spell. Fix both; cost and
 // charge time stay as RFAB set them.
@@ -4001,8 +3629,20 @@ begin
   end;
 end;
 
+// v0.4.0. Everything this layer appends to an RFAB perk description starts
+// here, and a rerun cuts the description back to this seam before appending
+// again, so the text can never be doubled up.
+//
+// It used to be a const in this file, which made it the one piece of text the
+// player reads that did not live with the rest of it. The <br> stays here -
+// that is markup, not text.
+function PerkMark: string;
+begin
+  Result := '<br>' + L('perk.mark') + '<br>';
+end;
+
 // Append this layer's own line to an RFAB perk description. Additive and
-// idempotent: everything from PERK_MARK on is cut first, so the original RFAB
+// idempotent: everything from the marker on is cut first, so the original RFAB
 // text is preserved and a rerun replaces our block instead of stacking copies.
 procedure AppendPerkNote(edid, strKey: string);
 var
@@ -4015,6 +3655,10 @@ begin
   if not HasStr(strKey) then begin
     Problem('нет строки ' + strKey + ' - описание ' + edid + ' не тронуто'
           + ' (не забыт ли deploy.sh?)');
+    Exit;
+  end;
+  if not HasStr('perk.mark') then begin
+    Problem('нет строки perk.mark - описание ' + edid + ' не тронуто');
     Exit;
   end;
   note := Trim(L(strKey));
@@ -4030,11 +3674,11 @@ begin
   if not Assigned(ovr) then Exit;
 
   desc := GetElementEditValues(ovr, 'DESC');
-  cut := Pos(PERK_MARK, desc);
+  cut := Pos(PerkMark, desc);
   if cut > 0 then
     desc := Copy(desc, 1, cut - 1);
 
-  if PutEdit(ovr, 'DESC', desc + PERK_MARK + note) then
+  if PutEdit(ovr, 'DESC', desc + PerkMark + note) then
     Say('  ' + edid + ': описание дополнено (' + strKey + ')');
 end;
 
@@ -4045,6 +3689,7 @@ begin
   AppendPerkNote('RFAB_Perk_Survival_BaseSurvival',    'perk.BaseSurvival.add');
   AppendPerkNote('RFAB_Perk_Survival_Acclimatization', 'perk.Acclimatization.add');
   AppendPerkNote('RFAB_Perk_Survival_Chef',            'perk.Chef.add');
+  AppendPerkNote('RFAB_Perk_Survival_Cheerfulness',    'perk.Cheerfulness.add');
 end;
 
 // ---------------------------------------------------------------------------
@@ -4056,8 +3701,6 @@ begin
   madeNew  := 0;
   reused   := 0;
   ids      := TStringList.Create;
-  cureForms := TStringList.Create;
-  balDefaults := TStringList.Create;
 
   Say('============================================================');
   Say(' RFAB Survival Layer -- генератор записей, часть 1');
@@ -4071,7 +3714,6 @@ begin
     Exit;
   end;
 
-  BuildGlobals;
   BuildFireList;
   BuildColdInteriors;
   BuildEffectsAndSpells;
@@ -4079,19 +3721,19 @@ begin
   BuildBonusAbility;
   BuildCampfire;
   BuildBedroll;
+  BuildWaterRecipe;
   BuildDiseases;
   BuildRfabWrappers;
   BuildHypothermia;
+  BuildHelpTopic;
+  BuildCoughSounds;
   PatchControlWeather;
   PatchRfabPerks;
   PurgeStaleRecords;
-  ScanCureEffects;
   BuildMonitorAndQuest;
   BuildMcmQuest;
   BuildWidgetQuest;
-  WriteFormsScript;
-  WriteBalanceScript;
-  WriteMcmConfig;
+  WriteFormIdHeader;
 
   Say('');
   Say('============================================================');
@@ -4106,9 +3748,8 @@ begin
   Say('ДАЛЬШЕ:');
   Say('  1. Сохранить плагин.');
   Say('  2. Перенести его из Overwrite в mods\RFAB Survival Layer\.');
-  Say('  3. Пересобрать Papyrus: _build.bat');
-  Say('     (_RSL_Forms.psc только что перегенерирован -- без пересборки');
-  Say('      скрипты будут смотреть на старые formID)');
+  Say('  3. Пересобрать нативный плагин: FormIDs.h только что перегенерирован,');
+  Say('     без пересборки DLL будет смотреть на старые formID.');
   Say('  4. Включить мод и плагин в MO2, порядок -- ниже RFAB.esp.');
   Say('  5. ESL-флаг не ставить, пока всё не заработает (§11).');
 end;
@@ -4122,10 +3763,6 @@ function Finalize: Integer;
 begin
   if Assigned(ids) then
     ids.Free;
-  if Assigned(cureForms) then
-    cureForms.Free;
-  if Assigned(balDefaults) then
-    balDefaults.Free;
   if Assigned(strTbl) then
     strTbl.Free;
   Result := 0;

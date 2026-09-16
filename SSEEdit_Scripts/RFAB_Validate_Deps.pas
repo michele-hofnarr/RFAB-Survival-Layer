@@ -2,21 +2,28 @@
   RFAB Survival Layer - dependency validator.
 
   Apply Script against the active load order (any file selected). Prints a
-  PASS/FAIL report for every external record RFAB Survival Layer resolves at
-  runtime (baked into scripts/source/_RSL_Forms.psc as GetFormFromFile calls,
-  or looked up by EditorID by the generator).
+  PASS/FAIL report for every external record the mod resolves - the formIDs
+  native/src/Core/Forms.cpp hardcodes, and the EditorIDs the generator and
+  HasKeywordString() look up.
 
-  Run this after updating RFAB to see, in one pass, which dependencies moved
-  or were renamed. FAIL on a FormID line = that local id no longer holds the
-  expected kind of record in that file (RFAB reindexed / removed it). A name
-  change alone still PASSES but prints the new EditorID - eyeball the list.
+  The table is NOT here: it is RFAB_deps.txt, loaded below, and tools/check_deps.py
+  reads the same file. One table, two readers - a table kept in two places is a
+  table that disagrees with itself after the second RFAB update.
 
-  The dependency table is DepTable below - one edit to update it.
+  For the quick answer after an RFAB update, run tools/check_deps.py: it parses
+  the plugins directly, takes a second and needs no xEdit. This script is for
+  what only xEdit can say - the WINNING override of each record, and whether the
+  archetype templates the generator copies from still exist.
+
+  FAIL on a FormID line = that local id no longer holds the expected kind of
+  record in that file (RFAB reindexed / removed it). A rename alone still
+  PASSES but prints the new EditorID - eyeball the list.
 }
 unit RFAB_Validate_Deps;
 
 const
   SELF_PLUGIN = 'RFAB_SurvivalLayer.esp';
+  DEP_TABLE   = 'RFAB_deps.txt';
 
 var
   passN, failN, warnN: Integer;
@@ -26,105 +33,27 @@ begin
   AddMessage(s);
 end;
 
-// Every dependency, one per line:  file | key | SIG | note
-//   key '#<hex6>' -> match by local FormID (the value _RSL_Forms.psc hardcodes)
-//   key '<edid>'  -> match by EditorID (how the generator resolves templates)
+// The dependency table, read from RFAB_deps.txt next to this script.
+//   file | key | SIG | note
+//   key '#<hex6>' -> match by local FormID (what Forms.cpp hardcodes)
+//   key '<edid>'  -> match by EditorID (generator / HasKeywordString)
 procedure DepTable(sl: TStringList);
+var
+  raw : TStringList;
+  i   : Integer;
+  ln  : string;
 begin
-  // --- vanilla MGEF the penalty library deep-copies (generator, by EditorID) ---
-  sl.Add('Skyrim.esm|AbDamageMagickaRate|MGEF|regen -%: magicka');
-  sl.Add('Skyrim.esm|AbDamageStaminaRateVisible|MGEF|regen -%: stamina');
-  sl.Add('Skyrim.esm|AbDamageHealRateVisible|MGEF|regen -%: health');
-  sl.Add('Skyrim.esm|AlchDamageSpeed|MGEF|move speed (Peak Value Mod)');
-  sl.Add('Skyrim.esm|AbFortifySneak|MGEF|sneak (flip Detrimental)');
-  sl.Add('Skyrim.esm|AbResistMagic|MGEF|magic weakness (flip)');
-  sl.Add('Skyrim.esm|AbFortifyCarryWeight|MGEF|carry weight (flip)');
-  sl.Add('Skyrim.esm|AbFortifyHealRate|MGEF|health drain (flip)');
-  sl.Add('Skyrim.esm|BladesAbBlessing|MGEF|max health (flip)');
-  sl.Add('Skyrim.esm|AlchFortifyMagicka|MGEF|max magicka (flip)');
-  sl.Add('Skyrim.esm|AlchFortifyStamina|MGEF|max stamina (flip)');
-  sl.Add('Skyrim.esm|MG02FortifyAlteration|MGEF|school cost: alteration');
-  sl.Add('Skyrim.esm|MG02FortifyConjuration|MGEF|school cost: conjuration');
-  sl.Add('Skyrim.esm|MG02FortifyDestruction|MGEF|school cost: destruction');
-  sl.Add('Skyrim.esm|MG02FortifyIllusion|MGEF|school cost: illusion');
-  sl.Add('Skyrim.esm|MG02FortifyRestoration|MGEF|school cost: restoration');
-  sl.Add('Skyrim.esm|AbResistFrost|MGEF|frost-resist bonus (wrapper st.2/3)');
-  sl.Add('RFAB.esp|RFAB_Effect_PeryiteWitbane_DecreaseAttackSpeed|MGEF|attack speed');
-  sl.Add('RFAB.esp|RFAB_Effect_PeryiteWitbane_WeaknessCastSpeed|MGEF|cast speed');
-  sl.Add('RFAB.esp|RFAB_Effect_PeryiteAtaxia_ResistStagger_Hide|MGEF|poise / poise bonus');
-  sl.Add('RFAB.esp|RFAB_Effect_PeryiteRockjoint_FortifyArmorRating|MGEF|armor bonus');
-
-  // --- RFAB / DLC disease SPELs the wrappers wrap (generator, by EditorID) ---
-  sl.Add('RFAB.esp|RFAB_Disease_Ataxia|SPEL|wrapper AT source');
-  sl.Add('RFAB.esp|RFAB_Disease_Rockjoint|SPEL|wrapper RJ source');
-  sl.Add('RFAB.esp|RFAB_Disease_Witbane|SPEL|wrapper WB source');
-  sl.Add('RFAB.esp|RFAB_Disease_Rattles|SPEL|wrapper RA source');
-  sl.Add('RFAB.esp|RFAB_Disease_BoneBreakFever|SPEL|wrapper BF source');
-  sl.Add('RFAB.esp|RFAB_Disease_BrainRot|SPEL|wrapper BRR source');
-  sl.Add('Dragonborn.esm|DLC2DiseaseDroops|SPEL|wrapper DR source');
-
-  // --- hardcoded FormIDs in _RSL_Forms.psc: wrapper stage-1 spells ---
-  // (RFAB overrides these vanilla Disease* SPELs; resolved from Skyrim.esm)
-  sl.Add('Skyrim.esm|#0B877C|SPEL|RfabDzAT  stage-1 spell');
-  sl.Add('Skyrim.esm|#0B8782|SPEL|RfabDzRJ  stage-1 spell');
-  sl.Add('Skyrim.esm|#0B8783|SPEL|RfabDzWB  stage-1 spell');
-  sl.Add('Skyrim.esm|#0B8781|SPEL|RfabDzRA  stage-1 spell');
-  sl.Add('Skyrim.esm|#0B877E|SPEL|RfabDzBF  stage-1 spell');
-  sl.Add('Skyrim.esm|#0B877F|SPEL|RfabDzBRR stage-1 spell');
-  sl.Add('Dragonborn.esm|#0285C1|SPEL|RfabDzDR stage-1 spell');
-  sl.Add('RFAB.esp|#0060A5|SPEL|RFAB_Blessing_Peryite (disease-wrapper freeze)');
-
-  // --- wrapper marker MGEF (first unconditional debuff; HasMagicEffect probe) ---
-  sl.Add('RFAB.esp|#0CD9BD|MGEF|RfabDzMarkAT');
-  sl.Add('Skyrim.esm|#0B877A|MGEF|RfabDzMarkRJ');
-  sl.Add('Skyrim.esm|#0B877B|MGEF|RfabDzMarkWB');
-  sl.Add('Skyrim.esm|#0B8779|MGEF|RfabDzMarkRA');
-  sl.Add('Skyrim.esm|#0B8776|MGEF|RfabDzMarkBF');
-  sl.Add('Skyrim.esm|#0B8777|MGEF|RfabDzMarkBRR');
-  sl.Add('Dragonborn.esm|#0285C0|MGEF|RfabDzMarkDR');
-
-  // --- cure-disease MGEF (IsCureEffect: a cure = one stage back) ---
-  sl.Add('Skyrim.esm|#10E949|MGEF|cure disease (vanilla potion)');
-  sl.Add('Skyrim.esm|#0FBFF5|MGEF|cure disease (shrine blessing)');
-  sl.Add('Skyrim.esm|#0AE722|MGEF|cure disease (vampirism start)');
-  sl.Add('RFAB.esp|#005879|MGEF|cure disease (RFAB)');
-  sl.Add('RFAB.esp|#01ED5F|MGEF|cure disease (RFAB)');
-  sl.Add('RFAB.esp|#01ED62|MGEF|cure disease (RFAB)');
-  sl.Add('RFAB.esp|#0E463F|MGEF|cure disease (RFAB)');
-
-  // --- hold Locations (RegionBase parent-chain match) ---
-  sl.Add('Skyrim.esm|#016769|LCTN|hold location');
-  sl.Add('Skyrim.esm|#01676A|LCTN|hold location');
-  sl.Add('Skyrim.esm|#01676B|LCTN|hold location');
-  sl.Add('Skyrim.esm|#01676C|LCTN|hold location');
-  sl.Add('Skyrim.esm|#01676D|LCTN|hold location');
-  sl.Add('Skyrim.esm|#01676E|LCTN|hold location');
-  sl.Add('Skyrim.esm|#01676F|LCTN|hold location');
-  sl.Add('Skyrim.esm|#016770|LCTN|hold location');
-  sl.Add('Skyrim.esm|#016772|LCTN|hold location');
-
-  // --- races / keywords / shader ---
-  sl.Add('Skyrim.esm|#000D53|RACE|RaceDraugr (brown rot on hit)');
-  sl.Add('Skyrim.esm|#013203|RACE|RaceSlaughterfish (greenspore on hit)');
-  sl.Add('Skyrim.esm|#0F5D16|KYWD|ActorTypeTroll (gutworm on hit)');
-  sl.Add('Skyrim.esm|#013796|KYWD|ActorTypeUndead (vampire exemption)');
-  sl.Add('Skyrim.esm|MagicDamageFrost|KYWD|frost hit -> cold bar + lesion P');
-  sl.Add('Skyrim.esm|MagicDamageFire|KYWD|fire hit -> cold bar + lesion P');
-  sl.Add('Skyrim.esm|MagicDamageShock|KYWD|shock hit -> lesion P');
-  sl.Add('Skyrim.esm|#0DC20D|EFSH|FxColdShader (ice crust visual)');
-  sl.Add('RFAB.esp|#0CD63E|KYWD|KwRawFood (food poisoning trigger)');
-  sl.Add('RFAB.esp|#4CF31E|KYWD|KwStrongStomach (poison immunity)');
-  sl.Add('RFAB.esp|#0CD63D|KYWD|KwSpecialFood (HungerSpecialFoodPct per kg)');
-  sl.Add('RFAB.esp|#0CE2AD|KYWD|KwSpecialDrink (drinks carry no hunger)');
-  sl.Add('RFAB.esp|RFAB_Bandage|ALCH|Clean linen cloth - heals elemental-lesion P');
-
-  // --- v0.3.0: warm-hands idle, survival perks / items ---
-  sl.Add('Skyrim.esm|#0E8642|IDLE|IdleWarmHandsStanding (warm-hands idle)');
-  sl.Add('RFAB.esp|#0CE266|PERK|RFAB_Perk_Survival_BaseSurvival (campfire power, wood axe)');
-  sl.Add('RFAB.esp|#0CE264|PERK|RFAB_Perk_Survival_Chef (cook-pot campfire)');
-  sl.Add('Skyrim.esm|#06F993|MISC|Firewood01 (campfire fuel / tree yield)');
-  sl.Add('Skyrim.esm|#02F2F4|WEAP|Axe01 / RFAB wood axe (tree chopping)');
-  sl.Add('RFAB.esp|#0CD955|ARMO|RFAB_Skin_Leather_AdventurerBackPack (tree chopping)');
+  raw := TStringList.Create;
+  try
+    raw.LoadFromFile(ScriptsPath + DEP_TABLE);
+    for i := 0 to Pred(raw.Count) do begin
+      ln := Trim(raw[i]);
+      if (ln = '') or (Copy(ln, 1, 1) = '#') then Continue;
+      sl.Add(ln);
+    end;
+  finally
+    raw.Free;
+  end;
 end;
 
 // A record in `sig` group of `fileName` whose EditorID or local FormID matches
@@ -267,7 +196,7 @@ begin
     if Signature(r) = 'GLOB' then Inc(gl);
   end;
   Line('  _RSL_* records: ' + IntToStr(n) + '  (of which GLOB: ' + IntToStr(gl) + ')');
-  Line('  cross-check GLOB count against _RSL_Balance.ResetDefaults SetValue lines.');
+  Line('  GLOB should be 0 since v0.5.0 - settings live in the ini, not in globals.');
 end;
 
 function Initialize: Integer;

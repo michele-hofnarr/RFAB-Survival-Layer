@@ -36,6 +36,7 @@ for f in "$SRC"/*.pas; do
     recode "$f"
 done
 recode "$SRC/RFAB_SurvivalLayer_strings.txt"
+recode "$SRC/RFAB_deps.txt"
 
 if [ "$fail" != 0 ]; then
     echo "ERROR: some files not recoded. Remove non-CP1251 chars from the source."

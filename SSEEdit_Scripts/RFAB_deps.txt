@@ -1,0 +1,140 @@
+# RFAB Survival Layer - the external records the mod depends on.
+#
+# ONE table, two readers:
+#   tools/check_deps.py            reads the plugin files directly, no xEdit
+#   SSEEdit_Scripts/RFAB_Validate_Deps.pas   the same table inside xEdit
+#
+# Run the first after every RFAB update. FAIL on a FormID line means that local
+# id no longer holds that kind of record in that file - RFAB reindexed it, and
+# the hardcoded id in native/src/Core/Forms.cpp has to follow. A rename alone
+# still passes, but the report prints the EditorID it found: eyeball the list.
+#
+# Format:  file | key | SIG | note
+#   key '#<hex6>'  match by local FormID   - what the C++ hardcodes
+#   key '<edid>'   match by EditorID       - how the generator and
+#                                            HasKeywordString() resolve it
+# '#' starts a comment, blank lines are ignored.
+
+# --- vanilla MGEF the penalty library deep-copies (generator, by EditorID) ---
+Skyrim.esm|AbDamageMagickaRate|MGEF|regen -%: magicka
+Skyrim.esm|AbDamageStaminaRateVisible|MGEF|regen -%: stamina
+Skyrim.esm|AbDamageHealRateVisible|MGEF|regen -%: health
+Skyrim.esm|AlchDamageSpeed|MGEF|move speed (Peak Value Mod)
+Skyrim.esm|AbFortifySneak|MGEF|sneak (flip Detrimental)
+Skyrim.esm|AbResistMagic|MGEF|magic weakness (flip)
+Skyrim.esm|AbFortifyCarryWeight|MGEF|carry weight (flip)
+Skyrim.esm|AbFortifyHealRate|MGEF|health drain (flip)
+Skyrim.esm|BladesAbBlessing|MGEF|max health (flip)
+Skyrim.esm|AlchFortifyMagicka|MGEF|max magicka (flip)
+Skyrim.esm|AlchFortifyStamina|MGEF|max stamina (flip)
+Skyrim.esm|MG02FortifyAlteration|MGEF|school cost: alteration
+Skyrim.esm|MG02FortifyConjuration|MGEF|school cost: conjuration
+Skyrim.esm|MG02FortifyDestruction|MGEF|school cost: destruction
+Skyrim.esm|MG02FortifyIllusion|MGEF|school cost: illusion
+Skyrim.esm|MG02FortifyRestoration|MGEF|school cost: restoration
+Skyrim.esm|AbResistFrost|MGEF|frost-resist bonus (wrapper st.2/3)
+RFAB.esp|RFAB_Effect_PeryiteWitbane_DecreaseAttackSpeed|MGEF|attack speed
+RFAB.esp|RFAB_Effect_PeryiteWitbane_WeaknessCastSpeed|MGEF|cast speed
+RFAB.esp|RFAB_Effect_PeryiteAtaxia_ResistStagger_Hide|MGEF|poise / poise bonus
+RFAB.esp|RFAB_Effect_PeryiteRockjoint_FortifyArmorRating|MGEF|armor bonus
+
+# --- RFAB / DLC disease SPELs the wrappers wrap (generator, by EditorID) ---
+RFAB.esp|RFAB_Disease_Ataxia|SPEL|wrapper AT source
+RFAB.esp|RFAB_Disease_Rockjoint|SPEL|wrapper RJ source
+RFAB.esp|RFAB_Disease_Witbane|SPEL|wrapper WB source
+RFAB.esp|RFAB_Disease_Rattles|SPEL|wrapper RA source
+RFAB.esp|RFAB_Disease_BoneBreakFever|SPEL|wrapper BF source
+RFAB.esp|RFAB_Disease_BrainRot|SPEL|wrapper BRR source
+Dragonborn.esm|DLC2DiseaseDroops|SPEL|wrapper DR source
+
+# --- Forms.cpp: the stage-1 spell of each wrapper ---
+# (RFAB overrides these vanilla Disease* SPELs, so the id is Skyrim.esm's)
+Skyrim.esm|#0B877C|SPEL|RfabDzAT  stage-1 spell
+Skyrim.esm|#0B8782|SPEL|RfabDzRJ  stage-1 spell
+Skyrim.esm|#0B8783|SPEL|RfabDzWB  stage-1 spell
+Skyrim.esm|#0B8781|SPEL|RfabDzRA  stage-1 spell
+Skyrim.esm|#0B877E|SPEL|RfabDzBF  stage-1 spell
+Skyrim.esm|#0B877F|SPEL|RfabDzBRR stage-1 spell
+Dragonborn.esm|#0285C1|SPEL|RfabDzDR stage-1 spell
+RFAB.esp|#0060A5|SPEL|RFAB_Blessing_Peryite (freezes the wrappers at stage 1)
+
+# --- Forms.cpp: the wrapper marker MGEF (HasMagicEffect probe) ---
+RFAB.esp|#0CD9BD|MGEF|RfabDzMarkAT
+Skyrim.esm|#0B877A|MGEF|RfabDzMarkRJ
+Skyrim.esm|#0B877B|MGEF|RfabDzMarkWB
+Skyrim.esm|#0B8779|MGEF|RfabDzMarkRA
+Skyrim.esm|#0B8776|MGEF|RfabDzMarkBF
+Skyrim.esm|#0B8777|MGEF|RfabDzMarkBRR
+Dragonborn.esm|#0285C0|MGEF|RfabDzMarkDR
+
+# Cure-disease effects are NOT listed: Disease::ScanCureEffects walks every MGEF
+# and takes the ones whose archetype is Cure Disease, so no id is hardcoded and
+# a cure another mod adds is recognised too.
+
+# --- hold Locations (Climate.cpp, parent-chain match) ---
+Skyrim.esm|#016769|LCTN|Reach
+Skyrim.esm|#01676A|LCTN|Eastmarch
+Skyrim.esm|#01676B|LCTN|Winterhold
+Skyrim.esm|#01676C|LCTN|Rift
+Skyrim.esm|#01676D|LCTN|Pale
+Skyrim.esm|#01676E|LCTN|Hjaalmarch
+Skyrim.esm|#01676F|LCTN|Falkreath
+Skyrim.esm|#016770|LCTN|Haafingar
+Skyrim.esm|#016772|LCTN|Whiterun
+
+# --- races, keywords, shader ---
+Skyrim.esm|#000D53|RACE|RaceDraugr (brown rot on hit)
+Skyrim.esm|#013203|RACE|RaceSlaughterfish (greenspore on hit)
+Skyrim.esm|#0F5D16|KYWD|ActorTypeTroll (gutworm on hit)
+Skyrim.esm|#013796|KYWD|ActorTypeUndead (vampire exemption, by id)
+Skyrim.esm|ActorTypeUndead|KYWD|the same keyword by name (Needs.cpp)
+Skyrim.esm|MagicDamageFrost|KYWD|frost hit -> cold bar + lesion P
+Skyrim.esm|MagicDamageFire|KYWD|fire hit -> cold bar + lesion P
+Skyrim.esm|MagicDamageShock|KYWD|shock hit -> lesion P
+Skyrim.esm|#0DC20D|EFSH|FrostIceFormFXShader (ice crust)
+RFAB.esp|#0CD63E|KYWD|KwRawFood, by id (Forms.cpp)
+RFAB.esp|RFAB_RawFood|KYWD|the same keyword by name (Needs::Assess)
+RFAB.esp|#4CF31E|KYWD|KwStrongStomach, by id (Forms.cpp)
+RFAB.esp|#0CD63D|KYWD|RFAB_SpecialFood - the half of the hunger bar that keeps
+RFAB.esp|#06B0F8|MGEF|RFAB_Effect_Alteration3_Teleport - spell AND scroll
+RFAB.esp|#1AC746|MGEF|RFAB_Effect_Alteration3_MarkRecall - spell AND scroll
+RFAB.esp|#0CF133|ALCH|RFAB_Bandage - heals elemental-lesion P, matched by form
+Skyrim.esm|#0B6435|SNDR|ITMPotionUse - what marks an ALCH as a drink
+
+# --- camp kit: vanilla clutter we place, RFAB perks and gear ---
+Skyrim.esm|#035F49|MSTT|Campfire01Burning (the fire we place)
+Skyrim.esm|#1018E3|STAT|CookingSpitSm01 (with the Chef perk)
+Skyrim.esm|#1010B3|FURN|CraftingCookingPotSm (with the Chef perk)
+Skyrim.esm|#0800E2|STAT|NorTentSmall (tent over the bedroll)
+Skyrim.esm|#06F993|MISC|Firewood01 (campfire fuel / tree yield)
+Skyrim.esm|#02F2F4|WEAP|Axe01 (tree chopping)
+Skyrim.esm|#0E8642|IDLE|IdleWarmHandsStanding (warm-hands idle)
+Skyrim.esm|#0E4AD6|KYWD|FurnitureBedRoll (tells a bedroll from a bed)
+Skyrim.esm|NPCHumanCartExitA|SNDR|copied as the cough template (one descriptor per file)
+RFAB.esp|RFAB_Drink_Other_Water|ALCH|what boiling water yields (generator, by EditorID)
+RFAB.esp|#0CD955|ARMO|RFAB_Skin_Leather_AdventurerBackPack (tree chopping)
+RFAB.esp|#0CE266|PERK|RFAB_Perk_Survival_BaseSurvival, by id
+RFAB.esp|#0CE264|PERK|RFAB_Perk_Survival_Chef, by id
+RFAB.esp|#0CE268|PERK|RFAB_Perk_Survival_Acclimatization, by id
+RFAB.esp|#0CE45F|PERK|RFAB_Perk_Survival_Cheerfulness, by id
+
+# --- the RFAB records the generator overrides (keep this list short) ---
+#
+# '[override]' in the note is read by check_deps.py: our own .esp must override
+# EXACTLY these records and nothing else. RFAB is a living plugin, so every
+# record we overwrite is a record whose next RFAB fix we silently revert until
+# the generator runs again. The list is allowed to be short, not to grow quietly.
+RFAB.esp|RFAB_Perk_Survival_BaseSurvival|PERK|[override] perk description
+RFAB.esp|RFAB_Perk_Survival_Acclimatization|PERK|[override] perk description
+RFAB.esp|RFAB_Perk_Survival_Chef|PERK|[override] perk description
+RFAB.esp|RFAB_Perk_Survival_Cheerfulness|PERK|[override] perk description
+RFAB.esp|HelpManualPC|FLST|RFAB's 45-entry version is the one we copy
+# HelpManualPC belongs to Skyrim.esm, so OUR override is checked against that file,
+# not against RFAB - the top byte of 00000163 is an index into our own master list.
+Skyrim.esm|HelpManualPC|FLST|[override] our help topic appended to RFAB's 45
+RFAB.esp|RFAB_Spell_Alteration1_ControlWeather_PC|SPEL|[override] retiered to master
+RFAB.esp|WB_A100_ControlWeather_Effect|MGEF|[override] retiered to master
+RFAB.esp|#089704|BOOK|the control-weather tome, renamed at kDataLoaded
+
+# --- templates the generator copies from (each has a fallback) ---
+RFAB.esp|RFAB_Spell_BecomeTank|SPEL|lesser-power template (Voice ETYP)

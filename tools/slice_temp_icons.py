@@ -16,7 +16,8 @@ Usage:
     python3 tools/slice_temp_icons.py [source.png]
 
 Writes widget/icons/temp0.png .. temp4.png (128x128 RGBA), which
-widget/embed_icons.py then embeds into RSLHud.swf as "ico_temp0".."ico_temp4".
+tools/make_assets_swf.py then bakes into RSL_SurvivalHUD.swf as
+"ico_temp0".."ico_temp4".
 """
 import sys
 from pathlib import Path
