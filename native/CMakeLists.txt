@@ -72,6 +72,7 @@ add_library(${PROJECT_NAME} SHARED
     src/Core/Campfire.cpp
     src/Core/Bedroll.cpp
     src/Core/TakeDown.cpp
+    src/Core/Teardown.cpp
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

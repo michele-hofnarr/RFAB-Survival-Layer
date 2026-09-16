@@ -342,6 +342,28 @@ namespace RSL
         return _ready;
     }
 
+    bool Forms::Ours(const RE::TESForm* a_form)
+    {
+        if (!a_form || !g_handler) {
+            return false;
+        }
+
+        // Looked up once: the load order cannot change under a running game,
+        // and GetLoadedModIndex walks the file list every call.
+        static const auto full = g_handler->GetLoadedModIndex(PLUGIN);
+        static const auto light = g_handler->GetLoadedLightModIndex(PLUGIN);
+
+        const auto id = a_form->GetFormID();
+        if (full && (id >> 24) == *full) {
+            return true;
+        }
+        if (light && (id & 0xFF000000) == 0xFE000000 &&
+            ((id >> 12) & 0xFFF) == *light) {
+            return true;
+        }
+        return false;
+    }
+
     bool HasCampPerks()
     {
         auto* player = RE::PlayerCharacter::GetSingleton();

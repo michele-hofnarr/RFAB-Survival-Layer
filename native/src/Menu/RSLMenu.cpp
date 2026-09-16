@@ -20,6 +20,7 @@
 #include "Core/Trees.h"
 #include "Core/StagedDisease.h"
 #include "Core/TakeDown.h"
+#include "Core/Teardown.h"
 #include "Settings.h"
 
 namespace RSL
@@ -490,6 +491,15 @@ namespace RSL
                 Bedroll::GetSingleton().Update();
                 Campfire::GetSingleton().Extinguish();
                 Campfire::GetSingleton().Update();
+
+                // LAST, and by origin rather than by name. Everything
+                // above works from a list of records this build knows; this
+                // takes off anything of ours the list could not name - a
+                // record from an older build whose FormID has since moved, or
+                // one a bug left applied. See Core/Teardown.h for why it is
+                // the difference between a save that survives the uninstall
+                // and one that does not.
+                Teardown::StripEverythingOfOurs();
 
                 _toreDown = true;
                 Notify::GetSingleton().Clear();

@@ -58,6 +58,14 @@ namespace RSL
 
         [[nodiscard]] static bool Ready() { return _ready; }
 
+        // Did this form come out of our plugin?
+        //
+        // Asked of records this build may never have heard of - one left by an
+        // older version, say - so it goes by the FormID's origin rather than by
+        // comparing against the forms we are holding. Handles a light plugin
+        // too, in case the ESL flag is ever set.
+        [[nodiscard]] static bool Ours(const RE::TESForm* a_form);
+
         // The three penalty abilities. Each carries four effects in an order
         // the generator fixes and this code depends on:
         //     0 Health, 1 Magicka, 2 Stamina, 3 SpeedMult
