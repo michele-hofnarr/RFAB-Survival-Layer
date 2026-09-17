@@ -60,6 +60,7 @@ THE FILE. Little-endian throughout.
 plugin reads it by index, not by search - the grid is regular, so the cell and
 the triangle within it are arithmetic.
 """
+import math
 import struct
 import sys
 from pathlib import Path
@@ -125,14 +126,30 @@ def load_points():
         if sheet == "Справка":
             continue
         ws = wb[sheet]
+        # By header, never by position: the columns have moved before and
+        # will again, and an answer read off the wrong one is not an error
+        # anybody sees.
+        head = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
+        col = {h: c + 1 for c, h in enumerate(head) if h}
+        need = ["место", "X", "Y", "превышение", "снег", "защита",
+                "равновесие"] + F.FAMILIES
+        missing = [h for h in need if h not in col]
+        if missing:
+            raise SystemExit("%s: sheet %s has no column %s - regenerate the "
+                             "workbook with tools/control_points.py --xlsx"
+                             % (F.BOOK.name, sheet, ", ".join(missing)))
+        get = lambda i, h: ws.cell(i, col[h]).value
         pts = []
         for i in range(2, ws.max_row + 1):
-            v = [ws.cell(i, c).value for c in range(1, 11)]
-            if v[7] is None or v[8] is None:
+            prot, bar = get(i, "защита"), get(i, "равновесие")
+            if prot is None or bar is None:
                 continue
-            pts.append({"name": v[0], "x": float(v[1]), "y": float(v[2]),
-                        "rel": float(v[4]), "snow": float(v[5]),
-                        "T": F.temperature(v[7], float(v[8]))})
+            pts.append({"name": get(i, "место"),
+                        "x": float(get(i, "X")), "y": float(get(i, "Y")),
+                        "rel": float(get(i, "превышение")),
+                        "snow": float(get(i, "снег")),
+                        "fams": [float(get(i, n) or 0.0) for n in F.FAMILIES],
+                        "T": F.temperature(prot, float(bar))})
         out[sheet] = pts
     return out
 
@@ -148,6 +165,18 @@ def snow_textures():
     return ids
 
 
+def family_textures():
+    """{family: LTEX ids}, over both plugins, for fit_climate.FAMILIES."""
+    ids = {n: set() for n in F.FAMILIES}
+    for plugin in ("Skyrim.esm", "Dragonborn.esm"):
+        buf = (DATA / plugin).read_bytes()
+        groups = esm.top_groups(buf)
+        for n in F.FAMILIES:
+            ids[n] |= esm.textures_named(buf, groups, n)
+        del buf
+    return ids
+
+
 def ice_statics():
     ids = {}
     for plugin in ("Skyrim.esm", "Dragonborn.esm"):
@@ -159,7 +188,7 @@ def ice_statics():
     return ids
 
 
-def block(tag, plugin, worldspace, resid, trend, snowids, iceids):
+def block(tag, plugin, worldspace, resid, trend, snowids, iceids, famids):
     """Bake one worldspace and return its bytes."""
     print("  %s, from %s" % (tag, plugin))
     buf = (DATA / plugin).read_bytes()
@@ -167,12 +196,15 @@ def block(tag, plugin, worldspace, resid, trend, snowids, iceids):
     was = esm.TAMRIEL
     esm.TAMRIEL = worldspace
     try:
-        heights, snow = esm.land(buf, groups, snowids, iceids)
+        heights, snow, fams = esm.land(buf, groups, snowids, iceids, famids)
     finally:
         esm.TAMRIEL = was
     del buf
     print("    %d cells with terrain" % len(heights))
     snow = snow_field.smooth(snow)
+    fams = {n: snow_field.smooth(g) for n, g in fams.items()}
+    if fams:
+        print("    families here: %s" % ", ".join(sorted(fams)))
     print("    snow smoothed, radius %d vertices x %d passes"
           % (snow_field.RADIUS, snow_field.PASSES))
 
@@ -246,13 +278,17 @@ def block(tag, plugin, worldspace, resid, trend, snowids, iceids):
         hs = heights[(gx, gy)]
         cover = snow[(gx, gy)]
         base = near[(gx, gy)]
+        # a family this worldspace does not paint is zero everywhere
+        here = [fams[n][(gx, gy)] if n in fams else None for n in F.FAMILIES]
         ox, oy = gx * CELL, gy * CELL
         vals = []
         for j in range(SIDE):
             y = oy + j * 128.0
             for i in range(SIDE):
                 k = j * SIDE + i
-                t = trend(hs[k] - base, cover[k]) + residual_at(ox + i * 128.0, y)
+                t = trend(hs[k] - base, cover[k],
+                          [g[k] if g is not None else 0.0 for g in here]) \
+                    + residual_at(ox + i * 128.0, y)
                 lo = t if lo is None or t < lo else lo
                 hi = t if hi is None or t > hi else hi
                 vals.append(max(-32000, min(32000, int(round(t * 100.0)))))
@@ -276,16 +312,30 @@ def main():
     print("  %+.1f .. %+.1f degrees"
           % (min(p["T"] for p in everything), max(p["T"] for p in everything)))
 
+    names = ["intercept", "relief", "snow"] + F.FAMILIES
     coef, _ = F.least_squares(
-        [([1.0, p["rel"] / 10000.0, p["snow"]], p["T"]) for p in everything],
-        ["intercept", "relief", "snow"])
-    C0, CR, CS = coef
-    print("  T = %+.3f %+.3f * relief/10000 %+.3f * snow" % (C0, CR, CS))
+        [([1.0, p["rel"] / 10000.0, p["snow"]] + p["fams"], p["T"])
+         for p in everything], names)
+    if coef is None:
+        raise SystemExit("the fit is singular - a covariate is constant over "
+                         "every control point")
+    C0, CR, CS = coef[:3]
+    CF = coef[3:]
+    print("  T = %+.3f %+.3f * relief/10000 %+.3f * snow %s"
+          % (C0, CR, CS, " ".join("%+.3f * %s" % (c, n)
+                                    for c, n in zip(CF, F.FAMILIES))))
+    rms = math.sqrt(sum(
+        (p["T"] - sum(c * f for c, f in zip(
+            coef, [1.0, p["rel"] / 10000.0, p["snow"]] + p["fams"]))) ** 2
+        for p in everything) / len(everything))
+    print("  rms residual %.2f over %d points" % (rms, len(everything)))
 
-    def trend(rel, sc):
-        return C0 + CR * rel / 10000.0 + CS * sc
+    def trend(rel, sc, fams):
+        return (C0 + CR * rel / 10000.0 + CS * sc
+                + sum(c * f for c, f in zip(CF, fams)))
 
-    resid = {sheet: [(p["x"], p["y"], p["T"] - trend(p["rel"], p["snow"]))
+    resid = {sheet: [(p["x"], p["y"],
+                      p["T"] - trend(p["rel"], p["snow"], p["fams"]))
                      for p in pts]
              for sheet, pts in sheets.items()}
     for sheet, rs in resid.items():
@@ -295,12 +345,14 @@ def main():
 
     snowids = snow_textures()
     iceids = ice_statics()
-    print("  %d ground textures named as snow, %d ice records"
-          % (len(snowids), len(iceids)))
+    famids = family_textures()
+    print("  %d ground textures named as snow, %d ice records, families %s"
+          % (len(snowids), len(iceids),
+             ", ".join("%s %d" % (n, len(v)) for n, v in famids.items())))
 
     print("baking ...")
     blocks = [block(tag, plugin, ws, resid.get(sheet, []), trend,
-                    snowids, iceids)
+                    snowids, iceids, famids)
               for tag, plugin, ws, sheet in WORLDS]
 
     blob = bytearray()

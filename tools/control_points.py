@@ -43,6 +43,7 @@ MODS = GAME / "MO2" / "mods"
 sys.path.insert(0, str(ROOT / "tools"))
 import esm                     # noqa: E402
 import snow_field                 # noqa: E402
+import fit_climate as F           # noqa: E402
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -370,7 +371,7 @@ def around(heights, x, y):
     return total / n if n else None
 
 
-def collect(tag, worldspace, plugins, snowids, iceids):
+def collect(tag, worldspace, plugins, snowids, iceids, famids):
     """Every marker of one worldspace, with its covariates.
 
     Each plugin's markers are named from that plugin's own string table, so
@@ -381,6 +382,7 @@ def collect(tag, worldspace, plugins, snowids, iceids):
     marks = []
     regs = []
     heights = snow = None
+    fams = {}
     for plugin in plugins:
         path = DATA / plugin
         if not path.exists():
@@ -405,13 +407,14 @@ def collect(tag, worldspace, plugins, snowids, iceids):
             was = esm.TAMRIEL
             esm.TAMRIEL = worldspace
             try:
-                heights, snow = esm.land(
-                    buf, esm.top_groups(buf), snowids, iceids)
+                heights, snow, fams = esm.land(
+                    buf, esm.top_groups(buf), snowids, iceids, famids)
             finally:
                 esm.TAMRIEL = was
             # The same ruler the baking uses, so a point is measured the way
-            # the field around it will be built.
+            # the field around it will be built - the families included.
             snow = snow_field.smooth(snow)
+            fams = {n: snow_field.smooth(g) for n, g in fams.items()}
         del buf
         if found:
             print("#   %-16s %d markers" % (plugin, len(found)), file=sys.stderr)
@@ -434,7 +437,9 @@ def collect(tag, worldspace, plugins, snowids, iceids):
             # No strings for this plugin: say what it is and where.
             name = "%s %.0f, %.0f" % (
                 MARKER_TYPE.get(kind, "маркер"), x, y)
-        rows.append([name, x, y, h, rel, snow_at(snow, x, y) or 0.0, hit])
+        rows.append([name, x, y, h, rel, snow_at(snow, x, y) or 0.0, hit]
+                    + [(snow_at(fams[n], x, y) or 0.0) if n in fams else 0.0
+                       for n in F.FAMILIES])
     rows.sort(key=lambda r: -r[3])
     return rows
 
@@ -483,7 +488,7 @@ def existing_answers(path):
 
 
 HEAD = ["место", "X", "Y", "земля Z", "превышение", "снег", "регион (игра)",
-        "защита", "равновесие", "T, градусы"]
+        "защита", "равновесие", "T, градусы"] + F.FAMILIES
 
 
 def write_xlsx(sheets, path):
@@ -547,13 +552,16 @@ def write_xlsx(sheets, path):
             carried += 1 if a else 0
             ws.append([r[0], round(r[1]), round(r[2]), round(r[3]), round(r[4]),
                        round(r[5], 2), r[6],
-                       a[0] if a else None, a[1] if a else None, None])
+                       a[0] if a else None, a[1] if a else None, None]
+                      + [round(v, 2) for v in r[7:]])
         for i in range(2, ws.max_row + 1):
             f = filled if ws.cell(i, 8).value else blank
             ws.cell(i, 8).fill = f
             ws.cell(i, 9).fill = f
             ws.cell(i, 9).number_format = "0.00"
             ws.cell(i, 6).number_format = "0.00"
+            for c in range(11, 11 + len(F.FAMILIES)):
+                ws.cell(i, c).number_format = "0.00"
             ws.cell(i, 10).value = (
                 "=IFERROR(12-(1-I%d+VLOOKUP(H%d,Справка!$A$2:$B$%d,2,FALSE)"
                 "/100)/0.055,\"\")" % (i, i, last))
@@ -583,16 +591,19 @@ def write_xlsx(sheets, path):
 def main():
     snowids = set()
     iceids = {}
+    famids = {n: set() for n in F.FAMILIES}
     for plugin in ("Skyrim.esm", "Dragonborn.esm"):
         buf = (DATA / plugin).read_bytes()
         g = esm.top_groups(buf)
         if b"LTEX" in g:
             snowids |= esm.snow_textures(buf, g)
+            for n in F.FAMILIES:
+                famids[n] |= esm.textures_named(buf, g, n)
         if b"STAT" in g:
             iceids.update(esm.ice_statics(buf, g))
         del buf
 
-    sheets = [(tag, collect(tag, ws, plugins, snowids, iceids))
+    sheets = [(tag, collect(tag, ws, plugins, snowids, iceids, famids))
               for tag, ws, plugins in WORLDS]
 
     if "--xlsx" in sys.argv:

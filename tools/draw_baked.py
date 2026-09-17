@@ -101,7 +101,7 @@ def main():
         was = esm.TAMRIEL
         esm.TAMRIEL = worldspace
         try:
-            heights, _ = esm.land(buf, groups, set())
+            heights, _, _ = esm.land(buf, groups, set())
         finally:
             esm.TAMRIEL = was
         del buf

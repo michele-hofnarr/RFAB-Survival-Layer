@@ -56,18 +56,26 @@ def top_groups(buf):
         pos += gsize
     return out
 
-def snow_textures(buf, groups):
-    """LTEX form ids whose editor id mentions snow."""
+def textures_named(buf, groups, word):
+    """LTEX form ids whose editor id contains the word."""
     ids = set()
+    if b"LTEX" not in groups:
+        return ids
+    needle = word.encode().lower()
     gp, gs = groups[b"LTEX"]
     p, e = gp + 24, gp + gs
     while p + 24 <= e:
         s, size, flags, formid, _, _ = struct.unpack_from("<4sIIIHH", buf, p)
         for ss, v in subrecords(payload(buf, p, size, flags)):
-            if ss == b"EDID" and b"snow" in v.lower():
+            if ss == b"EDID" and needle in v.lower():
                 ids.add(formid)
         p += 24 + size
     return ids
+
+
+def snow_textures(buf, groups):
+    """LTEX form ids whose editor id mentions snow."""
+    return textures_named(buf, groups, "snow")
 
 # Ice that lies on the ground or on the water, as opposed to ice that hangs
 # off a cliff. Matched on the editor id, within Landscape\Ice models only.
@@ -180,8 +188,15 @@ def regions(buf, groups):
     out.sort(key=lambda r: (-r[1], sum(len(x) for x in r[2])))
     return out
 
-def land(buf, groups, snowids, iceids=None):
-    """{(gx, gy): (heights, snow)} - both 33x33, snow as 0..1 coverage.
+def land(buf, groups, snowids, iceids=None, families=None):
+    """heights, snow and families per cell - each 33x33, cover as 0..1.
+
+    `families` is {name: LTEX ids}. Each family is painted exactly as snow
+    is - a base texture of the family covers its quadrant, a layer of it
+    composites in by its alpha, a layer of anything else composites it out -
+    and comes back as {name: {(gx, gy): grid}}. A family with no ids in this
+    plugin is left out of the result rather than returned as zeros, so a
+    worldspace that has none of them costs nothing extra.
 
     `iceids` is ice_statics()' {form id: radius}. When given, every placed
     reference to one of those records paints full cover over its own
@@ -192,6 +207,8 @@ def land(buf, groups, snowids, iceids=None):
     heights = {}
     snow = {}
     floes = []
+    active = [(name, ids) for name, ids in (families or {}).items() if ids]
+    fams = {name: {} for name, _ in active}
 
     def walk(off, end, in_world, pending):
         while off + 24 <= end:
@@ -230,6 +247,7 @@ def land(buf, groups, snowids, iceids=None):
                 pending[0] = None
                 hs = None
                 cover = array.array("f", [0.0] * (33 * 33))
+                grids = [array.array("f", [0.0] * (33 * 33)) for _ in active]
                 layer = None
                 for s, pl in subrecords(payload(buf, off, size, flags)):
                     if s == b"VHGT" and len(pl) >= 4 + 33 * 33:
@@ -238,21 +256,28 @@ def land(buf, groups, snowids, iceids=None):
                         tex, quad = struct.unpack_from("<IB", pl, 0)
                         if tex in snowids:
                             paint_quad(cover, quad, None, 1.0)
+                        for n, (_, ids) in enumerate(active):
+                            if tex in ids:
+                                paint_quad(grids[n], quad, None, 1.0)
                     elif s == b"ATXT" and len(pl) >= 6:
                         tex, quad = struct.unpack_from("<IB", pl, 0)
-                        layer = (quad, tex in snowids)
+                        layer = (quad, tex)
                     elif s == b"VTXT" and layer is not None:
-                        quad, issnow = layer
+                        quad, tex = layer
                         layer = None
-                        paint_quad(cover, quad, pl, 1.0 if issnow else 0.0)
+                        paint_quad(cover, quad, pl, 1.0 if tex in snowids else 0.0)
+                        for n, (_, ids) in enumerate(active):
+                            paint_quad(grids[n], quad, pl, 1.0 if tex in ids else 0.0)
                 if hs is not None:
                     heights[key] = hs
                     snow[key] = cover
+                    for n, (name, _) in enumerate(active):
+                        fams[name][key] = grids[n]
             off += 24 + size
 
     walk(0, len(buf), False, [None])
     paint_ice(snow, floes)
-    return heights, snow
+    return heights, snow, fams
 
 
 def paint_ice(snow, floes):

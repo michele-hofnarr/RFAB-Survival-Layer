@@ -49,6 +49,25 @@ LOAD_PER_DEGREE = 0.055
 # one truth, and nothing answered in two places at once.
 EXTRA = []
 
+# Ground-texture families that carry a temperature of their own, on top of
+# what snow says. Bethesda named the province's textures after its regions -
+# LFallForest*, LPineForest*, LVolcanicTundra* - so a family is the word the
+# editor ids share. Each one is a column of the workbook and a term of the
+# trend, in this order. Measured exactly as snow is: painted per vertex and
+# blurred with the same radius, so a control point is read the way the field
+# around it is built.
+#
+# Only the three whose sign is beyond argument: the Rift's autumn forest, the
+# pine forest of Falkreath and the hot springs of Eastmarch. The Reach, the
+# tundra and the field grass were tried and left out - two textures paint
+# the same plains and the fit split hairs between them on two points each.
+#
+# The word has to be the whole of "volcanictundra", not "volcanic":
+# Dragonborn names Solstheim's ash wastes LVolcanicAsh*, and the shorter
+# word put four of its points - cold ones - under the hot-spring family,
+# which took the springs from +30 to +8.
+FAMILIES = ["fallforest", "pineforest", "volcanictundra"]
+
 
 def temperature(protection, bar):
     """The workbook's inversion: a wanted bar reading becomes degrees."""
