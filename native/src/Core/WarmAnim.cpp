@@ -166,13 +166,13 @@ namespace RSL
 
             // Heading 0 faces +Y, so the bearing is atan2(dx, dy), not (dy, dx).
             const float bearing = std::atan2(at.x - from.x, at.y - from.y);
-            float       diff = bearing - player->GetAngleZ();
-            while (diff > PI) {
-                diff -= 2.0f * PI;
-            }
-            while (diff < -PI) {
-                diff += 2.0f * PI;
-            }
+
+            // remainder() puts the difference into [-PI, PI] in one step.
+            // It replaces two "take 2PI off until it fits" loops, which had
+            // no end if an angle ever came back as infinity - the same shape
+            // of fault as the replay loop in Needs::Update.
+            const float diff = std::remainder(bearing - player->GetAngleZ(),
+                2.0f * PI);
             ready = std::abs(diff) <= FACING_DEGREES * PI / 180.0f;
         }
 

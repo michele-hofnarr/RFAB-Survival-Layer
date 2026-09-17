@@ -57,8 +57,7 @@ namespace RSL
         }
 
         // Which way an element pushes the cold bar, and which resistance
-        // softens it. Both were switch statements inside the event handler;
-        // Tick() needs the same answers, so they live on their own.
+        // softens the lesion counter.
         [[nodiscard]] float SignOf(Element a_kind)
         {
             switch (a_kind) {
@@ -78,7 +77,9 @@ namespace RSL
         }
 
         // Resistance scales the hit down, and past 100% it stops scaling: a
-        // negative factor would turn a resisted hit into its opposite.
+        // negative factor would turn a resisted hit into its opposite. Used by
+        // the LESION counter only - the cold bar is charged what the engine
+        // actually took, which has been through resistance already.
         [[nodiscard]] float ResistFactor(RE::ActorValue a_av)
         {
             auto* player = RE::PlayerCharacter::GetSingleton();
@@ -100,39 +101,6 @@ namespace RSL
             return owner ? owner->GetPermanentActorValue(RE::ActorValue::kHealth) : 0.0f;
         }
 
-        // What the engine settled on for this effect, on this player.
-        //
-        // This is the whole point of reading it rather than using a flat number
-        // per hit: a stronger spell IS a bigger number here, and resistances
-        // have already been taken off it. A ward that repels the spell is the
-        // clearest case of all - the effect is never added to the player, so
-        // there is nothing here to find and nothing reaches the bar.
-        [[nodiscard]] float LandedMagnitude(const RE::EffectSetting* a_effect)
-        {
-            auto* player = RE::PlayerCharacter::GetSingleton();
-            // Through MagicTarget: PlayerCharacter inherits it twice over and
-            // the name is ambiguous without saying which - the same reason
-            // Hypothermia reaches the list this way.
-            auto* target = player ? player->AsMagicTarget() : nullptr;
-            auto* list = target ? target->GetActiveEffectList() : nullptr;
-            if (!list) {
-                return 0.0f;
-            }
-
-            float worst = 0.0f;
-            for (auto* active : *list) {
-                if (!active || active->GetBaseObject() != a_effect) {
-                    continue;
-                }
-                if (active->flags.any(RE::ActiveEffect::Flag::kInactive,
-                        RE::ActiveEffect::Flag::kDispelled)) {
-                    continue;
-                }
-                worst = std::max(worst, std::abs(active->magnitude));
-            }
-            return worst;
-        }
-
         class ApplySink : public RE::BSTEventSink<RE::TESMagicEffectApplyEvent>
         {
         public:
@@ -149,6 +117,75 @@ namespace RSL
         private:
             ApplySink() = default;
         };
+
+        // ModifyActorValue, index 0x20 of the ValueModifierEffect vtable: the
+        // one place an effect of that family changes an actor value, whether it
+        // does it once at the start or every second it lasts.
+        //
+        // EVERY CLASS IN THE FAMILY, not just the two that override it. A
+        // vtable belongs to a class, not to a hierarchy: a subclass that
+        // inherits ModifyActorValue still has its own table with its own copy
+        // of the pointer, and patching the base leaves every one of them
+        // untouched. Hooking ValueModifierEffect and DualValueModifierEffect
+        // alone was heard by nothing at all - the hooks installed, the lesion
+        // counter recorded the hit, and not one damage line was written.
+        struct Slot
+        {
+            const char*    name;
+            REL::VariantID vtable;
+        };
+
+        constexpr std::array SLOTS{
+            Slot{ "ValueModifier", RE::VTABLE_ValueModifierEffect[0] },
+            Slot{ "DualValueModifier", RE::VTABLE_DualValueModifierEffect[0] },
+            Slot{ "PeakValueModifier", RE::VTABLE_PeakValueModifierEffect[0] },
+            Slot{ "TargetValueModifier", RE::VTABLE_TargetValueModifierEffect[0] },
+            Slot{ "AccumulatingValueModifier",
+                RE::VTABLE_AccumulatingValueModifierEffect[0] },
+            Slot{ "ValueAndConditions", RE::VTABLE_ValueAndConditionsEffect[0] },
+            Slot{ "Absorb", RE::VTABLE_AbsorbEffect[0] },
+            Slot{ "Paralysis", RE::VTABLE_ParalysisEffect[0] },
+        };
+
+        // One thunk per slot, each keeping its own original: two tables can
+        // hold the same pointer, and they still have to be called back through
+        // the entry they came from.
+        template <std::size_t I>
+        struct ModifyHook
+        {
+            static void Thunk(RE::ValueModifierEffect* a_this, RE::Actor* a_actor,
+                float a_value, RE::ActorValue a_actorValue)
+            {
+                Elemental::GetSingleton().NoteDamage(a_this, a_actor, a_value,
+                    a_actorValue, SLOTS[I].name);
+                _Thunk(a_this, a_actor, a_value, a_actorValue);
+            }
+
+            static inline REL::Relocation<decltype(Thunk)> _Thunk;
+        };
+
+        template <std::size_t I>
+        void HookOne()
+        {
+            REL::Relocation<std::uintptr_t> vtbl{ SLOTS[I].vtable };
+
+            // What the slot held before the swap, as an offset into the game.
+            // Two classes that both inherit the same implementation show the
+            // same number here, and a number that is the same everywhere would
+            // mean the index is wrong rather than that nobody overrides it.
+            const auto was = *reinterpret_cast<std::uintptr_t*>(
+                vtbl.address() + 0x20 * sizeof(void*));
+
+            ModifyHook<I>::_Thunk = vtbl.write_vfunc(0x20, ModifyHook<I>::Thunk);
+            logger::info("elemental: hooked {:<26} slot held +{:X}", SLOTS[I].name,
+                was - REL::Module::get().base());
+        }
+
+        template <std::size_t... I>
+        void HookAll(std::index_sequence<I...>)
+        {
+            (HookOne<I>(), ...);
+        }
     }
 
     Elemental& Elemental::GetSingleton()
@@ -162,6 +199,9 @@ namespace RSL
         if (auto* source = RE::ScriptEventSourceHolder::GetSingleton()) {
             source->AddEventSink<RE::TESMagicEffectApplyEvent>(ApplySink::GetSingleton());
         }
+
+        HookAll(std::make_index_sequence<SLOTS.size()>{});
+        logger::info("elemental damage read at the source ({} vtables)", SLOTS.size());
     }
 
     float Elemental::TakeLesionP()
@@ -192,9 +232,9 @@ namespace RSL
         logger::info("bandage used -> lesion P {:+.1f}", held);
     }
 
-    // The campfire power arrives as a magic effect on the player, and this is
-    // already the place that watches those - so it is caught here rather than
-    // by standing up a second sink for the same event.
+    // The campfire power arrives as a magic effect on the player, and the apply
+    // sink is already the place that watches those - so it is caught there
+    // rather than by standing up a second sink for the same event.
     void Elemental::NoteCampfire(const RE::EffectSetting* a_effect)
     {
         if (a_effect && a_effect == Forms::mgefLightCampfire) {
@@ -202,7 +242,7 @@ namespace RSL
         }
     }
 
-    // Damage into bar, in one place, whichever path found the damage.
+    // Damage into bar.
     void Elemental::Queue(float a_sign, float a_damage)
     {
         const float maxHealth = MaxHealth();
@@ -226,46 +266,67 @@ namespace RSL
         }
     }
 
-    // Everything that damages over time, integrated against the seconds that
-    // actually passed. A concentration effect's magnitude is damage per second,
-    // so this is exactly what it was worth - no debounce, and no assumption
-    // about how often the engine chooses to re-announce it. A ward that
-    // repelled it left nothing in the list to find.
-    void Elemental::Tick()
+    void Elemental::NoteDamage(const RE::ValueModifierEffect* a_effect,
+        const RE::Actor* a_actor, float a_value, RE::ActorValue a_actorValue,
+        const char* a_from)
     {
-        const auto  now = std::chrono::steady_clock::now();
-        const float dt =
-            _tickedOnce ? std::chrono::duration<float>(now - _ticked).count() : 0.0f;
-        _ticked = now;
-        _tickedOnce = true;
-
-        if (!Settings::bModEnabled || dt <= 0.0f || dt > TICK_LIMIT) {
+        // This runs for every value-modifier effect on every actor in the
+        // world, so the cheap tests come first.
+        if (!Settings::bModEnabled) {
+            return;
+        }
+        if (!a_effect || a_actor != RE::PlayerCharacter::GetSingleton()) {
             return;
         }
 
-        auto* player = RE::PlayerCharacter::GetSingleton();
-        auto* target = player ? player->AsMagicTarget() : nullptr;
-        auto* list = target ? target->GetActiveEffectList() : nullptr;
-        if (!list) {
+        const float sign = SignOf(KindOf(a_effect->GetBaseObject()));
+        if (sign == 0.0f) {
             return;
         }
 
-        for (auto* active : *list) {
-            if (!active || active->flags.any(RE::ActiveEffect::Flag::kInactive,
-                              RE::ActiveEffect::Flag::kDispelled)) {
-                continue;
-            }
-            const auto* base = active->GetBaseObject();
-            if (!base ||
-                base->data.castingType != RE::MagicSystem::CastingType::kConcentration) {
-                continue;
-            }
+        // kNone IS NOT "no actor value". It means "the one this effect
+        // carries", and the caller passes it nearly every time - which is why
+        // filtering on it threw every hit away.
+        //
+        // The engine resolves it in the first instructions of the function
+        // this hook sits in front of:
+        //
+        //     +00567AC6  cmp  r9d, -1
+        //     +00567ACA  jne  +00567AD2
+        //     +00567ACC  mov  esi, dword ptr [rcx + 0x90]
+        //
+        // 0x90 is ValueModifierEffect::actorValue, and the header agrees with
+        // the binary about that offset. So this reads it the same way.
+        const RE::ActorValue actorValue = a_actorValue != RE::ActorValue::kNone
+                                              ? a_actorValue
+                                              : a_effect->actorValue;
 
-            const float sign = SignOf(KindOf(base));
-            if (sign != 0.0f) {
-                Queue(sign, std::abs(active->magnitude) * dt);
-            }
+        if (Settings::bDebugLog) {
+            const auto* base = a_effect->GetBaseObject();
+            const char* edid = base ? base->GetFormEditorID() : nullptr;
+            logger::info("elemental: {} [{:08X}] through {} - {:+.2f} to av {} "
+                         "(asked for {})",
+                (edid && *edid) ? edid : "<no editor id>",
+                base ? base->GetFormID() : 0, a_from, a_value,
+                static_cast<int>(actorValue), static_cast<int>(a_actorValue));
         }
+
+        // HEALTH ONLY, deliberately. A frost spell takes stamina in the same
+        // breath - the dual effect calls the engine a second time for it, with
+        // its own weight - and paying for both would charge one hit two ways.
+        // "The share of the player's health it took" is the model, and it is
+        // the health that is meant.
+        if (actorValue != RE::ActorValue::kHealth) {
+            return;
+        }
+
+        // Damage takes health away. A restore is somebody healing and has
+        // nothing to say about the cold.
+        if (a_value >= 0.0f) {
+            return;
+        }
+
+        Queue(sign, -a_value);
     }
 
     void Elemental::Note(const RE::EffectSetting* a_effect)
@@ -279,24 +340,9 @@ namespace RSL
             return;
         }
 
-        // WHAT MOVES THE BAR IS THE DAMAGE, NOT THE FACT OF BEING HIT.
-        //
-        // It used to be a flat number per hit, the same for a candle and for a
-        // dragon, and it was paid whether or not anything got through - a ward
-        // could swallow the spell whole and the bar moved anyway. Now a hit is
-        // worth the share of the player's health it actually took.
-        //
-        // Which is why nothing is debounced for the bar any more: a trap that
-        // applied its effect thirty times really did apply it thirty times, and
-        // thirty small numbers are the right answer. Damage over time is the one
-        // thing not counted here - Tick() integrates it instead.
-        if (a_effect->data.castingType != RE::MagicSystem::CastingType::kConcentration) {
-            Queue(SignOf(kind), LandedMagnitude(a_effect));
-        }
-
-        // THE LESION COUNTER STILL COUNTS HITS, not damage, so it still needs
-        // the debounce: one application is one wound there, and a cloak effect
-        // would otherwise open thirty a second.
+        // THE LESION COUNTER COUNTS HITS, not damage, so it needs the debounce
+        // the cold bar has no use for: one application is one wound here, and a
+        // cloak effect would otherwise open thirty a second.
         const auto now = std::chrono::steady_clock::now();
         if (_seenAny &&
             std::chrono::duration<float>(now - _last).count() < EVENT_GAP) {

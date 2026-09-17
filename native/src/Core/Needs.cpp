@@ -208,6 +208,15 @@ namespace RSL
 
         const float now = calendar->GetCurrentGameTime();
 
+        // A clock that reads back as infinity or not-a-number is not a span
+        // to integrate, it is a broken reading - and it must not be written
+        // into the state, or every pass after it inherits the break.
+        if (!std::isfinite(now)) {
+            logger::error("clock: the game time reads {} - this pass does nothing",
+                now);
+            return;
+        }
+
         // First reading after a load or a new game: take the clock, integrate
         // nothing. Otherwise the gap between saving and loading would be
         // charged to the player.
@@ -236,11 +245,36 @@ namespace RSL
         if (hours > 0.0f) {
             _hoursThisTick = hours;
 
+            // THE SLICES ARE COUNTED, not subtracted down to zero. A float
+            // stops moving when one is taken from it once it passes 2^24 -
+            // 16777216 and 16777215 are the same number to it - so
+            // "remaining -= step" on a delta that large never reaches zero
+            // and this becomes a loop with no end, spinning one core for as
+            // long as the game is left running. It takes a bad clock reading
+            // to get there, and a bad reading must not be able to hang the
+            // game.
+            //
+            // The bound throws nothing away. Past it the rest of the span
+            // goes in a single step rather than many: the same hours reach
+            // the model, only the resolution drops, and MAX_SLICES is ten
+            // game days - no pass is within sight of it.
+            constexpr int MAX_SLICES = 256;
+
             float remaining = _hoursThisTick;
-            while (remaining > 0.0f) {
+            for (int slice = 0; slice < MAX_SLICES && remaining > 0.0f; ++slice) {
                 const float step = std::min(REPLAY_STEP, remaining);
                 remaining -= step;
                 Advance(step, true);
+            }
+
+            if (remaining > 0.0f) {
+                // Loud, and at warn so it is written with the debug log off.
+                // Nothing legitimate lands here; if this line ever appears,
+                // the clock is what to look at.
+                logger::warn("clock: {:.1f}h in one pass, {:.1f}h of it taken "
+                             "in a single step",
+                    hours, remaining);
+                Advance(remaining, true);
             }
         }
 
@@ -487,9 +521,9 @@ namespace RSL
         // land, so every change to the axis goes through one place. They land
         // on the reserve: a firebolt is heat, not borrowed time.
         //
-        // Tick() first: it is what turns the burning-over-time effects into
-        // queued damage, and it has to run before the queue is drained.
-        Elemental::GetSingleton().Tick();
+        // Nothing is worked out here any more. The damage arrives from the
+        // hook on ModifyActorValue as the engine takes it - see
+        // Core/Elemental.h - and this only drains what it left.
         if (const float nudge = Elemental::GetSingleton().TakeQueued(); nudge != 0.0f) {
             _state.cold = std::clamp(_state.cold + nudge, 0.0f, 1.0f);
             _state.coldTemp = std::min(_state.coldTemp, 1.0f - _state.cold);
