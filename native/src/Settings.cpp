@@ -14,6 +14,28 @@ namespace RSL
     {
         ReadFile(DEFAULTS_INI);
         ReadFile(USER_INI);
+
+        // THE SWITCH HAS TO MEAN IT. Nearly everything this mod says about
+        // what it is doing goes out at info - a hundred and twenty calls, some
+        // of them once a pass - so leaving the sink at info made "debug log
+        // off" a label on a log that went on filling up all the same. Nearly a
+        // megabyte in one session, which is what it was switched off to stop.
+        //
+        // Off is warnings and errors only, not silence. The README sends a
+        // player to this file when something is wrong, and what it sends them
+        // for - a form that would not resolve, a plugin that is not enabled -
+        // is written at error. That has to keep working with the switch down.
+        //
+        // The startup block above this point is written before any settings
+        // exist and stays either way. It is six lines, and it is the evidence
+        // that the plugin loaded at all.
+        if (auto* log = spdlog::default_logger_raw()) {
+            const auto level = bDebugLog ? spdlog::level::info : spdlog::level::warn;
+            log->set_level(level);
+            log->flush_on(level);
+        }
+
+        // After the level, so it is one of the lines the switch governs.
         logger::info("settings read (hud {:.3f}/{:.3f} scale {:.2f})", fHudX, fHudY, fHudScale);
     }
 
