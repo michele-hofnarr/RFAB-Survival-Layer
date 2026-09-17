@@ -940,7 +940,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -953,7 +953,7 @@
           "valueOptions": {
             "min": 5,
             "max": 120,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -966,7 +966,7 @@
           "valueOptions": {
             "min": 5,
             "max": 240,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -979,7 +979,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1001,7 +1001,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1044,7 +1044,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1057,7 +1057,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1104,8 +1104,8 @@
           "type": "slider",
           "valueOptions": {
             "min": 0.0,
-            "max": 1.0,
-            "step": 0.05,
+            "max": 5.0,
+            "step": 0.01,
             "formatString": "{2}",
             "sourceType": "ModSettingFloat"
           }
@@ -1144,7 +1144,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1170,7 +1170,7 @@
           "valueOptions": {
             "min": 10,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1310,7 +1310,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1323,7 +1323,7 @@
           "valueOptions": {
             "min": 0,
             "max": 100,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1336,7 +1336,7 @@
           "valueOptions": {
             "min": 0,
             "max": 50,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1349,7 +1349,7 @@
           "valueOptions": {
             "min": 0,
             "max": 80,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1362,7 +1362,7 @@
           "valueOptions": {
             "min": 0,
             "max": 95,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1401,7 +1401,7 @@
           "valueOptions": {
             "min": 0,
             "max": 200,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }
@@ -1414,7 +1414,7 @@
           "valueOptions": {
             "min": 0,
             "max": 50,
-            "step": 5,
+            "step": 1,
             "formatString": "{0}",
             "sourceType": "ModSettingFloat"
           }

@@ -13,6 +13,7 @@
 #include "Core/Hypothermia.h"
 #include "Core/Notify.h"
 #include "Core/StagedDisease.h"
+#include "Core/TakeDown.h"
 #include "Settings.h"
 
 namespace RSL
@@ -24,6 +25,13 @@ namespace RSL
         constexpr std::uint32_t RECORD_DISEASE = 'DISE';
         constexpr std::uint32_t RECORD_CAMP = 'CAMP';
         constexpr std::uint32_t RECORD_TREES = 'TREE';
+        constexpr std::uint32_t RECORD_TAKEDOWN = 'TAKE';
+
+        // The version below is per RECORD, and a NEW record needs no bump:
+        // an older build meets one it does not know and skips it by name,
+        // and a newer build meets a co-save without it and starts empty.
+        // RECORD_TAKEDOWN is such a record - it arrived after version 5.
+        //
         // 2: the camp record carries every bedroll, not one.
         // 3: hunger became two halves, so the needs record is a different
         //    shape. Only that record changed, which is why a version 2 co-save
@@ -672,9 +680,9 @@ namespace RSL
         // above, which is what makes sleeping rough a trade rather than a
         // swap.
         //
-        // Note this is deliberately NOT what food does: eating a meal does not
-        // displace fast food, and that is intended there. Sleep is not food -
-        // one good night IS meant to undo the bad ones.
+        // Food does the same, and for the same reason: a meal displaces what
+        // was snacked. All three axes agree now - the half you worked for
+        // takes over the half you scraped together, never the reverse.
         //
         // Brown rot takes its cut off the top: rotting flesh sleeps badly, so
         // the night is worth 0.9 / 0.8 / 0.7 of itself by stage. v0.4.0's
@@ -876,13 +884,29 @@ namespace RSL
 
     void Needs::OnAte(float a_restore, bool a_special)
     {
-        // Only what fits. The bar is the cap, not each half: a full stomach
-        // takes nothing, however the fullness is made up.
-        const float room = std::max(0.0f, 1.0f - Hunger());
+        // A MEAL DISPLACES WHAT WAS SNACKED, the way a night in a bed
+        // displaces a nap and a fire displaces bought warmth. Its room is
+        // the room in the LOWER half alone, and whatever of the upper half
+        // will not fit underneath is pushed out.
+        //
+        // The SUM does not move for it. A full stomach still takes
+        // nothing, and eating half a bar's worth on a bar that is nine
+        // tenths full still leaves it full - so HungerPreview, which
+        // promises the sum, is right without knowing any of this. What
+        // changes is which half holds it: an apple becomes dinner, and
+        // dinner is the half that keeps.
+        //
+        // Not the other way round. Fast food cannot push a meal out, so
+        // its room is the room in the whole bar, as it always was.
+        const float room = a_special
+                               ? std::max(0.0f, 1.0f - _state.hungerSpecial)
+                               : std::max(0.0f, 1.0f - Hunger());
         const float ate = std::min(a_restore, room);
 
         if (a_special) {
             _state.hungerSpecial += ate;
+            _state.hungerFast = std::min(
+                _state.hungerFast, std::max(0.0f, 1.0f - _state.hungerSpecial));
         } else {
             _state.hungerFast += ate;
         }
@@ -975,6 +999,26 @@ namespace RSL
                 a_intfc->WriteRecordData(id);
                 a_intfc->WriteRecordData(when);
             }
+
+            // What is still owed a take-down. A reference in a cell the
+            // engine does not currently have cannot be disabled or deleted,
+            // so the work waits for it - and a wait that cannot cross a save
+            // is a fire left burning in a cell the player saved away from.
+            // v0.4.0 kept this list in StorageUtil on the player, which is to
+            // say in the save; it is here for the same reason.
+            const auto owed = TakeDown::Outstanding();
+            if (!a_intfc->OpenRecord(RECORD_TAKEDOWN, RECORD_VERSION)) {
+                logger::error("could not open the take-down record for writing");
+                return;
+            }
+            const auto queued = static_cast<std::uint32_t>(owed.size());
+            a_intfc->WriteRecordData(queued);
+            for (const auto& entry : owed) {
+                a_intfc->WriteRecordData(entry.id);
+                const auto length = static_cast<std::uint32_t>(entry.what.size());
+                a_intfc->WriteRecordData(length);
+                a_intfc->WriteRecordData(entry.what.data(), length);
+            }
         }
 
         static void Load(SKSE::SerializationInterface* a_intfc)
@@ -1032,6 +1076,32 @@ namespace RSL
                         }
                     }
                     logger::info("{} cut trees restored", kept);
+                    continue;
+                }
+
+                if (type == RECORD_TAKEDOWN) {
+                    std::uint32_t queued = 0;
+                    a_intfc->ReadRecordData(queued);
+
+                    std::uint32_t kept = 0;
+                    for (std::uint32_t i = 0; i < queued; ++i) {
+                        RE::FormID    id = 0;
+                        std::uint32_t nameLength = 0;
+                        a_intfc->ReadRecordData(id);
+                        a_intfc->ReadRecordData(nameLength);
+                        std::string what(nameLength, '\0');
+                        if (nameLength) {
+                            a_intfc->ReadRecordData(what.data(), nameLength);
+                        }
+                        // Same rule as the camp below: an id that will not
+                        // resolve points at whatever now sits in that slot.
+                        if (id && a_intfc->ResolveFormID(id, id)) {
+                            TakeDown::Restore(id, what);
+                            ++kept;
+                        }
+                    }
+
+                    logger::info("{} take-down(s) restored", kept);
                     continue;
                 }
 
@@ -1164,6 +1234,7 @@ namespace RSL
             ColdVisual::GetSingleton().Forget();
             Campfire::GetSingleton().Reset();
             Bedroll::GetSingleton().Reset();
+            TakeDown::Forget();
         }
     };
 

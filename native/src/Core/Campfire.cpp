@@ -141,9 +141,16 @@ namespace RSL
 
     void Campfire::Retire(const State& a_old)
     {
-        TakeDown::Now(Deref(a_old.fire), "fire");
-        TakeDown::Now(Deref(a_old.spit), "spit");
-        TakeDown::Now(Deref(a_old.pot), "pot");
+        // The ID, not the pointer. A fire burns out on the clock, and the
+        // clock does not care which cell the player is standing in: at the
+        // moment its hours are up the reference may be one the engine does
+        // not currently have, and Deref answers null for it. That null used
+        // to end the take-down silently - the fire was announced as out, its
+        // ids were dropped, and it went on burning where nothing could reach
+        // it. TakeDown holds the number until the reference turns up.
+        TakeDown::Now(a_old.fire, "fire");
+        TakeDown::Now(a_old.spit, "spit");
+        TakeDown::Now(a_old.pot, "pot");
     }
 
     void Campfire::Extinguish()

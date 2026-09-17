@@ -103,6 +103,11 @@ namespace RSL
         // Food was eaten; a_restore is a fraction of a full bar. a_special
         // decides which half of the bar it goes into - and the bar cannot pass
         // full, so what does not fit is simply lost.
+        //
+        // A meal displaces fast food out of the bar rather than stacking on
+        // top of it, so eating properly converts what was snacked into
+        // something that keeps. The sum is unchanged by that; only the split
+        // is. Fast food does not displace a meal.
         void OnAte(float a_restore, bool a_special);
 
         // Raw food on a weak stomach: the bar goes to empty, it is not merely

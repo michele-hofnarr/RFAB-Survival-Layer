@@ -194,17 +194,20 @@ namespace RSL
             return;
         }
 
-        auto* furn = Deref(found->first);
-        auto* tent = Deref(found->second);
+        const RE::FormID furnID = found->first;
+        const RE::FormID tentID = found->second;
 
         // Both go in one pass. v0.4.0 had the bedroll's own script take the
         // tent away, which meant two removals racing - and a bedroll that is
         // still activatable while being taken is a sleep menu nobody asked for.
-        if (furn) {
+        //
+        // By id, because the mod going off takes every camp down at once and
+        // they are not all in loaded cells. See Core/TakeDown.h.
+        if (auto* furn = Deref(furnID)) {
             furn->SetActivationBlocked(true);
         }
-        TakeDown::Now(furn, "bedroll");
-        TakeDown::Now(tent, "tent");
+        TakeDown::Now(furnID, "bedroll");
+        TakeDown::Now(tentID, "tent");
 
         _camps.erase(found);
 

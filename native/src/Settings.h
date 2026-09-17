@@ -27,10 +27,10 @@ namespace RSL
         // whatever an older one left on it before anything new is
         // applied. Defaulting to on would start the mod on top of
         // those leftovers instead.
-        static inline bool bModEnabled{ false };
+        static inline bool bModEnabled{ true };
         // On while the model is being tuned; the cold sample is what needs
         // watching and there is no other way to see its terms.
-        static inline bool bDebugLog{ true };
+        static inline bool bDebugLog{ false };
 
         // Logs a marker before each step of the gameplay pass. Only for
         // locating a crash inside it: the pass runs every frame, so this
@@ -85,7 +85,7 @@ namespace RSL
         // interior and a snowfield, which the axis hues do not: those are bar
         // fills, sitting under a lightening ramp and a white marker, and on
         // their own against the HUD they are too dark to read as text.
-        static inline std::uint32_t uNotifyColour{ 0xADD8E6 };
+        static inline std::uint32_t uNotifyColour{ 0x99FFFF };
 
 
         // --- needs ---
@@ -161,7 +161,7 @@ namespace RSL
         // full, the matching pool regenerates fBonusRegenPct faster. Flat, not
         // ramped.
         static inline bool  bBonusEnabled{ true };
-        static inline float fBonusRegenPct{ 25.0f };
+        static inline float fBonusRegenPct{ 15.0f };
         static inline float fBonusThresholdPct{ 15.0f };
 
         // --- cold ---
@@ -183,7 +183,7 @@ namespace RSL
         // warmth they were giving is gone - v0.4.0 folded the same idea into
         // WetnessFactor as a multiplier on warmth. Not solved: only two target
         // rows are wet and both wear nothing, so the table cannot see it.
-        static inline float fWetWarmthLoss{ 0.60f };
+        static inline float fWetWarmthLoss{ 0.25f };
 
         // BEING IN THE WATER, which is not the same thing as being wet.
         //
@@ -462,7 +462,7 @@ namespace RSL
         // stage. One knob rather than three, because what anyone ever wants to
         // say is "more of this" or "less".
         static inline float fCoughRateMult{ 1.0f };
-        static inline float fCoughVolume{ 1.0f };
+        static inline float fCoughVolume{ 1.25f };
         static inline bool  bElemLesionEnabled{ true };
         static inline float fElemLesionColdAt{ 0.10f };      // reserve, = v0.4.0's 90
         static inline float fElemLesionHypoChance{ 50.0f };  // %/hour at hypothermia 2+

@@ -30,15 +30,51 @@
 // reference to actually report itself down, which is checked on the next pass
 // of the tick. There is no completion callback to subscribe to - the VM gets
 // one and we do not - so the next pass is the wait.
+//
+// WHY THE TAKE-DOWN OUTLIVES THE CALL THAT ASKED FOR IT.
+//
+// A take-down is asked for at the moment the fire's hours run out, and that
+// moment has nothing to do with where the player is standing. LookupByID
+// answers for a reference the engine currently has; a reference whose cell is
+// not loaded is not one of them, so the take-down reached a null pointer and
+// did nothing at all - silently, because "no reference" read as "nothing to
+// do". The fire was announced as out, its ids were dropped, and it went on
+// burning in a cell nobody was in, no longer known to anything that could put
+// it out. Measured: campfire out at 22:28:06.853 with not one take-down line
+// logged, and the same fire found standing four minutes later, disabled false,
+// deleted false.
+//
+// v0.4.0 had already met this and said so, in _RSL_Controller.DropCampRef:
+//
+//     Queue a placed ref for deletion instead of deleting it inline:
+//     Disable/Delete do NOT process on a ref whose cell is unloaded (light a
+//     campfire outside, go into a cave, light another - the outdoor one would
+//     never die). CampfireGC retries every tick and clears entries once the
+//     cell loads and the ref is gone.
+//
+// Its queue was a FormList in StorageUtil on the player, which is to say in the
+// save; this one is a list in the co-save. Same mechanism: the id is taken on
+// trust, retried every pass, and let go only once the reference has actually
+// been reached and taken down.
 
 namespace RSL::TakeDown
 {
-    // Disable now; the delete mark follows once the reference is down.
+    // One reference still owed a take-down. This is what goes in the co-save.
+    struct Entry
+    {
+        RE::FormID  id{ 0 };
+        std::string what;
+    };
+
+    // Take it down: disable now if it can be reached, and keep the id until
+    // that has actually happened. The delete mark follows once it is down.
+    void Now(RE::FormID a_id, std::string_view a_what);
     void Now(RE::TESObjectREFR* a_ref, std::string_view a_what);
 
     // Disable only, for the old fire that has to stop being something a
     // downward ray can hit while the new one is still being sited. It is
-    // handed to Now() afterwards.
+    // handed to Now() afterwards. Best effort by design: a reference that
+    // cannot be reached is not in the ray's way either.
     void Hide(RE::TESObjectREFR* a_ref, std::string_view a_what);
 
     // From the tick, before anything else and whether or not the mod is
@@ -49,4 +85,11 @@ namespace RSL::TakeDown
     // The player reached for something. If it is a piece of camp of ours that
     // nothing of ours knows about, name it - once.
     void Inspect(const RE::TESObjectREFR* a_ref);
+
+    // The co-save. Outstanding() is every take-down still owed; Restore() puts
+    // one back on load; Forget() drops the lot, for the revert that precedes
+    // a load.
+    [[nodiscard]] std::vector<Entry> Outstanding();
+    void                             Restore(RE::FormID a_id, std::string_view a_what);
+    void                             Forget();
 }
