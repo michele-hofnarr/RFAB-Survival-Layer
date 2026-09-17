@@ -132,7 +132,7 @@ def load_points():
         head = [ws.cell(1, c).value for c in range(1, ws.max_column + 1)]
         col = {h: c + 1 for c, h in enumerate(head) if h}
         need = ["место", "X", "Y", "превышение", "снег", "защита",
-                "равновесие"] + F.FAMILIES
+                "равновесие"] + F.FAMILY_NAMES
         missing = [h for h in need if h not in col]
         if missing:
             raise SystemExit("%s: sheet %s has no column %s - regenerate the "
@@ -148,7 +148,7 @@ def load_points():
                         "x": float(get(i, "X")), "y": float(get(i, "Y")),
                         "rel": float(get(i, "превышение")),
                         "snow": float(get(i, "снег")),
-                        "fams": [float(get(i, n) or 0.0) for n in F.FAMILIES],
+                        "fams": [float(get(i, n) or 0.0) for n in F.FAMILY_NAMES],
                         "T": F.temperature(prot, float(bar))})
         out[sheet] = pts
     return out
@@ -167,12 +167,12 @@ def snow_textures():
 
 def family_textures():
     """{family: LTEX ids}, over both plugins, for fit_climate.FAMILIES."""
-    ids = {n: set() for n in F.FAMILIES}
+    ids = {n: set() for n in F.FAMILY_NAMES}
     for plugin in ("Skyrim.esm", "Dragonborn.esm"):
         buf = (DATA / plugin).read_bytes()
         groups = esm.top_groups(buf)
-        for n in F.FAMILIES:
-            ids[n] |= esm.textures_named(buf, groups, n)
+        for n, word, _ in F.FAMILIES:
+            ids[n] |= esm.textures_named(buf, groups, word)
         del buf
     return ids
 
@@ -196,7 +196,8 @@ def block(tag, plugin, worldspace, resid, trend, snowids, iceids, famids):
     was = esm.TAMRIEL
     esm.TAMRIEL = worldspace
     try:
-        heights, snow, fams = esm.land(buf, groups, snowids, iceids, famids)
+        heights, snow, fams = esm.land(buf, groups, snowids, iceids,
+                                       F.families_for(worldspace, famids))
     finally:
         esm.TAMRIEL = was
     del buf
@@ -279,7 +280,7 @@ def block(tag, plugin, worldspace, resid, trend, snowids, iceids, famids):
         cover = snow[(gx, gy)]
         base = near[(gx, gy)]
         # a family this worldspace does not paint is zero everywhere
-        here = [fams[n][(gx, gy)] if n in fams else None for n in F.FAMILIES]
+        here = [fams[n][(gx, gy)] if n in fams else None for n in F.FAMILY_NAMES]
         ox, oy = gx * CELL, gy * CELL
         vals = []
         for j in range(SIDE):
@@ -312,7 +313,7 @@ def main():
     print("  %+.1f .. %+.1f degrees"
           % (min(p["T"] for p in everything), max(p["T"] for p in everything)))
 
-    names = ["intercept", "relief", "snow"] + F.FAMILIES
+    names = ["intercept", "relief", "snow"] + F.FAMILY_NAMES
     coef, _ = F.least_squares(
         [([1.0, p["rel"] / 10000.0, p["snow"]] + p["fams"], p["T"])
          for p in everything], names)
@@ -323,7 +324,7 @@ def main():
     CF = coef[3:]
     print("  T = %+.3f %+.3f * relief/10000 %+.3f * snow %s"
           % (C0, CR, CS, " ".join("%+.3f * %s" % (c, n)
-                                    for c, n in zip(CF, F.FAMILIES))))
+                                    for c, n in zip(CF, F.FAMILY_NAMES))))
     rms = math.sqrt(sum(
         (p["T"] - sum(c * f for c, f in zip(
             coef, [1.0, p["rel"] / 10000.0, p["snow"]] + p["fams"]))) ** 2

@@ -408,7 +408,8 @@ def collect(tag, worldspace, plugins, snowids, iceids, famids):
             esm.TAMRIEL = worldspace
             try:
                 heights, snow, fams = esm.land(
-                    buf, esm.top_groups(buf), snowids, iceids, famids)
+                    buf, esm.top_groups(buf), snowids, iceids,
+                    F.families_for(worldspace, famids))
             finally:
                 esm.TAMRIEL = was
             # The same ruler the baking uses, so a point is measured the way
@@ -439,7 +440,7 @@ def collect(tag, worldspace, plugins, snowids, iceids, famids):
                 MARKER_TYPE.get(kind, "маркер"), x, y)
         rows.append([name, x, y, h, rel, snow_at(snow, x, y) or 0.0, hit]
                     + [(snow_at(fams[n], x, y) or 0.0) if n in fams else 0.0
-                       for n in F.FAMILIES])
+                       for n in F.FAMILY_NAMES])
     rows.sort(key=lambda r: -r[3])
     return rows
 
@@ -488,7 +489,7 @@ def existing_answers(path):
 
 
 HEAD = ["место", "X", "Y", "земля Z", "превышение", "снег", "регион (игра)",
-        "защита", "равновесие", "T, градусы"] + F.FAMILIES
+        "защита", "равновесие", "T, градусы"] + F.FAMILY_NAMES
 
 
 def write_xlsx(sheets, path):
@@ -560,7 +561,7 @@ def write_xlsx(sheets, path):
             ws.cell(i, 9).fill = f
             ws.cell(i, 9).number_format = "0.00"
             ws.cell(i, 6).number_format = "0.00"
-            for c in range(11, 11 + len(F.FAMILIES)):
+            for c in range(11, 11 + len(F.FAMILY_NAMES)):
                 ws.cell(i, c).number_format = "0.00"
             ws.cell(i, 10).value = (
                 "=IFERROR(12-(1-I%d+VLOOKUP(H%d,Справка!$A$2:$B$%d,2,FALSE)"
@@ -591,14 +592,14 @@ def write_xlsx(sheets, path):
 def main():
     snowids = set()
     iceids = {}
-    famids = {n: set() for n in F.FAMILIES}
+    famids = {n: set() for n in F.FAMILY_NAMES}
     for plugin in ("Skyrim.esm", "Dragonborn.esm"):
         buf = (DATA / plugin).read_bytes()
         g = esm.top_groups(buf)
         if b"LTEX" in g:
             snowids |= esm.snow_textures(buf, g)
-            for n in F.FAMILIES:
-                famids[n] |= esm.textures_named(buf, g, n)
+            for n, word, _ in F.FAMILIES:
+                famids[n] |= esm.textures_named(buf, g, word)
         if b"STAT" in g:
             iceids.update(esm.ice_statics(buf, g))
         del buf

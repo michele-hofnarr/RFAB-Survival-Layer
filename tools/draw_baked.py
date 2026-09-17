@@ -39,6 +39,7 @@ ASSET = ROOT / "SKSE" / "Plugins" / "_RSL_Climate.bin"
 sys.path.insert(0, str(ROOT / "tools"))
 import bake_climate as B        # noqa: E402  - the colour ramp lives there
 import esm                     # noqa: E402
+import mesh_clouds             # noqa: E402
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -121,6 +122,16 @@ def main():
         gx1 = min(max(k[0] for k in land) + MARGIN, max(k[0] for k in have))
         gy0 = max(min(k[1] for k in land) - MARGIN, min(k[1] for k in have))
         gy1 = min(max(k[1] for k in land) + MARGIN, max(k[1] for k in have))
+        # And no wider than where anything is placed. Solstheim's worldspace
+        # carries a low-detail copy of Skyrim's coast for the view across
+        # the sea: terrain, some of it snow-painted, and nothing on it. It
+        # is bigger than the island and was the picture.
+        buf = (DATA / plugin).read_bytes()
+        refs, _ = mesh_clouds.world_refs(buf, esm.top_groups(buf), worldspace)
+        del buf
+        rx0, rx1, ry0, ry1 = mesh_clouds.window(refs, MARGIN)
+        gx0, gx1 = max(gx0, rx0), min(gx1, rx1)
+        gy0, gy1 = max(gy0, ry0), min(gy1, ry1)
         have = [k for k in have if gx0 <= k[0] <= gx1 and gy0 <= k[1] <= gy1]
         if len(land) < len(tops):
             print("    land taken as above %.0f: %d cells of %d"

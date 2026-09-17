@@ -66,7 +66,34 @@ EXTRA = []
 # Dragonborn names Solstheim's ash wastes LVolcanicAsh*, and the shorter
 # word put four of its points - cold ones - under the hot-spring family,
 # which took the springs from +30 to +8.
-FAMILIES = ["fallforest", "pineforest", "volcanictundra"]
+#
+# A FAMILY BELONGS TO A WORLDSPACE. Each entry is (column, word, worldspace):
+# the column is measured only in that worldspace and is zero everywhere
+# else, so its coefficient is decided by that worldspace's points alone.
+# Solstheim uses Skyrim's LPineForest textures for its own woods, and with
+# one shared pine term Kagrumez was being warmed by Falkreath: +17 for a
+# forest that is -10.7 in the workbook. Its ash was tried as a family and
+# adds nothing (-1.4) - no snow already says where its south is. What it
+# does need is snow of its own: the island's north is 6.5 degrees colder
+# than Skyrim's snow coefficient makes it, and one extra term takes its
+# nine points from rms 5.97 to 3.06.
+TAMRIEL, SOLSTHEIM = 0x0000003C, 0x02000800
+FAMILIES = [
+    ("fallforest",     "fallforest",     TAMRIEL),
+    ("pineforest",     "pineforest",     TAMRIEL),
+    ("volcanictundra", "volcanictundra", TAMRIEL),
+    ("snow_solstheim", "snow",           SOLSTHEIM),
+]
+FAMILY_NAMES = [f[0] for f in FAMILIES]
+
+
+def families_for(worldspace, ids):
+    """{column: LTEX ids} for the families measured in this worldspace.
+
+    `ids` is {column: ids} over every plugin - the texture a family is
+    painted with may belong to Skyrim.esm even on Solstheim."""
+    return {name: ids[name] for name, _, ws in FAMILIES
+            if ws == worldspace and ids.get(name)}
 
 
 def temperature(protection, bar):
