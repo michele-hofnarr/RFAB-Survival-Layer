@@ -77,20 +77,29 @@ namespace RSL
             return;
         }
 
+        // Capped at the ceiling P can actually reach. Set higher - which only
+        // a hand-edited ini can do, the slider stops at 100 - the counter would
+        // sit at its floor for ever and the lesion could never be caught, with
+        // nothing anywhere saying why.
+        //
+        // Read before the fold below rather than after, so the fold can say
+        // what P is heading for as well as where it is.
+        const float limit = std::min(100.0f, Settings::fElemLesionContractP);
+
         // Fold in what the hits and bandages did since the last pass. This is
         // done before the drift so a burst of damage counts even if the tick
         // that follows it is a healing one.
         if (const float pending = Elemental::GetSingleton().TakeLesionP();
             pending != 0.0f) {
             diseases.AddP(ID, pending);
+            if (Settings::bDebugLog) {
+                logger::info("elemental lesions: {:+.1f} folded in, P {:+.1f} "
+                             "of -{:.0f} (stage {})",
+                    pending, diseases.Get(ID).prog, limit, stage);
+            }
         }
 
-        // Capped at the ceiling P can actually reach. Set higher - which only
-        // a hand-edited ini can do, the slider stops at 100 - the counter would
-        // sit at its floor for ever and the lesion could never be caught, with
-        // nothing anywhere saying why.
-        const float limit = std::min(100.0f, Settings::fElemLesionContractP);
-        const bool  coldDeep = a_cold <= Settings::fElemLesionColdAt;
+        const bool coldDeep = a_cold <= Settings::fElemLesionColdAt;
 
         float drift = 0.0f;
         if (coldDeep) {
@@ -111,30 +120,49 @@ namespace RSL
         // an illness. So a lesion at stage 2 or 3 has already had what a
         // potion is worth to it by the time this runs.
         //
-        // Which is why the fallback below stops at stage one. Past it the
+        // Which is why the cure half below stops at stage one. Past it the
         // spell is an ability no cure can take off, and a missing one is
-        // evidence of a console removespell, not of medicine.
+        // evidence of a console removespell, not of medicine - so it is put
+        // back instead of being read as a cure, and the pass carries on to
+        // the drift below.
         //
         // What was wrong: nobody spent it at all. ElemLesion read P and drift
         // and never asked. Measured - "cure counted for EL" at 15:04:28, and
         // the stage did not move until 15:11:54, when P crossed the threshold
         // on its own. The potion did take the stage-1 effect off; our own
         // stage stayed where it was and went on dripping.
-        if (stage == 1) {
+        //
+        // AND THE STAGE-2/3 HALF WAS SIMPLY ABSENT. The three other illnesses
+        // all carry it - StagedDisease::Advance, CommonCold::Update and
+        // RfabDisease::Update each put a missing ability back and say so -
+        // and the lesions were written without it for no reason anyone can
+        // name. The cost: an ability taken off at stage 2 or 3 never came
+        // back, so the illness went on running with no penalty on the player
+        // and nothing anywhere saying it was still there.
+        if (stage >= 1) {
             auto*      player = RE::PlayerCharacter::GetSingleton();
-            auto*      current = forms.stage[0];
+            auto*      current = forms.stage[stage - 1];
             const bool spellMissing = !current || !player || !player->HasSpell(current);
 
-            auto cures = diseases.TakeCures(ID);
-            if (cures == 0 && spellMissing) {
-                cures = 1;
-            }
+            if (stage >= 2) {
+                if (spellMissing && current && player) {
+                    player->AddSpell(current);
+                    logger::info("elemental lesions: stage {} ability put back",
+                        stage);
+                }
+            } else {
+                auto cures = diseases.TakeCures(ID);
+                if (cures == 0 && spellMissing) {
+                    cures = 1;
+                }
 
-            if (cures > 0) {
-                StagedDisease::SetStage(forms, 0, stage);
-                diseases.HalveP(ID);
-                logger::info("elemental lesions: {} cure(s), stage 1 -> 0", cures);
-                return;
+                if (cures > 0) {
+                    StagedDisease::SetStage(forms, 0, stage);
+                    diseases.HalveP(ID);
+                    logger::info("elemental lesions: {} cure(s), stage 1 -> 0",
+                        cures);
+                    return;
+                }
             }
         }
 
@@ -145,9 +173,17 @@ namespace RSL
             state.prog = std::clamp(state.prog + drift * a_gameHours, -100.0f, 0.0f);
 
             if (state.prog <= -limit) {
+                // TAKEN BEFORE THE RESET, because state is a reference into
+                // the table and ResetP zeroes that same object. Logging
+                // state.prog afterwards printed "contracted (P 0)" for every
+                // contraction there has ever been, which is a line that
+                // cannot tell a threshold that was reached from one that was
+                // not. The ill branch below already does this correctly.
+                const float caught = state.prog;
                 StagedDisease::SetStage(forms, 1, 0);
                 diseases.ResetP(ID);
-                logger::info("elemental lesions: contracted (P {:.0f})", state.prog);
+                logger::info("elemental lesions: contracted (P {:.0f} of -{:.0f})",
+                    caught, limit);
                 return;
             }
 

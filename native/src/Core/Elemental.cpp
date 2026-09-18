@@ -67,6 +67,16 @@ namespace RSL
             }
         }
 
+        [[nodiscard]] std::string_view NameOf(Element a_kind)
+        {
+            switch (a_kind) {
+            case Element::kFrost: return "frost"sv;
+            case Element::kFire:  return "fire"sv;
+            case Element::kShock: return "shock"sv;
+            default:              return "nothing"sv;
+            }
+        }
+
         [[nodiscard]] RE::ActorValue ResistOf(Element a_kind)
         {
             switch (a_kind) {
@@ -357,6 +367,21 @@ namespace RSL
             const float held =
                 std::clamp(_lesionP.load() + damage, -LESION_LIMIT, LESION_LIMIT);
             _lesionP.store(held);
+
+            // THIS PATH SAID NOTHING AT ALL. Not a word for a counted
+            // hit, not a word for what it was worth, while the cold bar
+            // beside it printed two lines for every tick of the same
+            // damage. The only line the lesions ever wrote was the one at
+            // the moment of contracting, so a log could show an illness
+            // arriving with nothing whatever leading up to it - which is
+            // exactly how it read when one was reported.
+            if (Settings::bDebugLog) {
+                const char* edid = a_effect->GetFormEditorID();
+                logger::info("lesion: {} hit {} [{:08X}] worth {:+.1f} "
+                             "(resist x{:.2f}), holding {:+.1f}",
+                    NameOf(kind), (edid && *edid) ? edid : "<no editor id>",
+                    a_effect->GetFormID(), damage, resist, held);
+            }
         }
     }
 
