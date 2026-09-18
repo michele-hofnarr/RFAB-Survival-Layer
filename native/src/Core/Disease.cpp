@@ -547,10 +547,12 @@ namespace RSL
                                                                     : "MISSING";
 
             const auto running = EffectsOf(spell);
+            const auto made = EffectsRunning(spell);
 
             logger::info("  {} stage {} P {:+.1f} cures {} - stage spell {}, "
-                         "{} effect(s) running{}{}{}",
-                id, state.stage, state.prog, state.cures, worn, running.count,
+                         "{} of {} effect(s) running{}{}{}",
+                id, state.stage, state.prog, state.cures, worn, made.running,
+                made.carried,
                 running.inactive ? ", INACTIVE" : "",
                 running.dispelled ? ", DISPELLED" : "",
                 running.conditionFalse ? ", CONDITION FALSE" : "");
@@ -570,11 +572,35 @@ namespace RSL
         }
     }
 
-    std::size_t Disease::RunningEffects(RE::SpellItem* a_spell)
+    Disease::SpellEffects Disease::EffectsRunning(RE::SpellItem* a_spell)
     {
-        // The same walk the report does, so the number the illnesses act on and
-        // the number the log prints cannot disagree.
-        return static_cast<std::size_t>(EffectsOf(a_spell).count);
+        // The same walk the report's detail lines do, so the number an illness
+        // acts on and the number in the log cannot disagree.
+        SpellEffects out;
+        if (!a_spell) {
+            return out;
+        }
+
+        auto* player = Player();
+        auto* target = player ? player->AsMagicTarget() : nullptr;
+        auto* list = target ? target->GetActiveEffectList() : nullptr;
+        if (!list) {
+            return out;
+        }
+
+        for (const auto* effect : a_spell->effects) {
+            if (!effect) {
+                continue;
+            }
+            ++out.carried;
+            for (auto* active : *list) {
+                if (active && active->effect == effect) {
+                    ++out.running;
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     void Disease::Clear()

@@ -65,6 +65,12 @@ namespace RSL
 
     void Illness::MoveTo(std::int32_t a_stage, std::int32_t a_old)
     {
+        // A new stage is a different spell, so the repair starts over. Without
+        // this, three failed attempts at stage 1 left stage 2 unrepairable for
+        // the rest of the session.
+        _restarts = 0;
+        _checked = false;
+
         // Announced before the stage is applied: nothing a stage does should be
         // able to get in front of its own message.
         Announce(a_stage, a_old);
@@ -222,11 +228,14 @@ namespace RSL
         // Nothing else in the mod recovers from this. The repair above only
         // fires when the SPELL is gone, and here it is not.
         //
-        // ONLY WHEN NOTHING AT ALL IS RUNNING, deliberately. An effect can be
-        // legitimately absent - displaced by another the engine ranks above it -
-        // and re-applying the spell would not bring that one back and would
-        // throw away the ones that did arrive. Zero is the unambiguous case: a
-        // spell on the player doing literally nothing.
+        // ANY MISSING EFFECT, not only a spell that runs nothing at all.
+        //
+        // The first version of this asked whether the count was zero, and that
+        // was wrong within one run of the game: a green spore came back from
+        // the save with its hidden effect running and its VISIBLE one missing -
+        // one of two - so it counted as healthy and the player saw no illness.
+        // Which effect goes missing is not something this can rank, and the one
+        // that carries the name is as likely as any.
         if (!MayRestart(a_stage)) {
             return;
         }
@@ -249,11 +258,25 @@ namespace RSL
         _checkedAt = now;
         _checked = true;
 
-        if (Disease::RunningEffects(spell) > 0) {
+        const auto made = Disease::EffectsRunning(spell);
+
+        // A record with no effect entries has nothing to be missing, and
+        // WhollyRunning says false for it - so without this the repair would
+        // spend its three attempts on a spell there was never anything to fix.
+        if (made.carried == 0) {
             _restarts = 0;
             return;
         }
 
+        if (made.WhollyRunning()) {
+            _restarts = 0;
+            return;
+        }
+
+        // The cap is only lifted by a spell that comes back WHOLE, above. An
+        // effect the engine will never instantiate would otherwise be retried
+        // every couple of seconds for the rest of the session, cycling the ones
+        // that do work each time.
         if (_restarts >= ATTEMPTS) {
             return;
         }
@@ -262,14 +285,16 @@ namespace RSL
         player->RemoveSpell(spell);
         player->AddSpell(spell);
 
-        const auto nowRunning = Disease::RunningEffects(spell);
-        if (nowRunning > 0) {
-            logger::info("dz {}: stage {} had no effects running - put back, {} now",
-                Id(), a_stage, nowRunning);
+        const auto after = Disease::EffectsRunning(spell);
+        if (after.WhollyRunning()) {
+            logger::info("dz {}: stage {} was running {} of {} effects - put back, "
+                         "all {} now",
+                Id(), a_stage, made.running, made.carried, after.carried);
         } else {
-            logger::warn("dz {}: stage {} has no effects running and re-applying "
-                         "changed nothing (attempt {} of {})",
-                Id(), a_stage, _restarts, ATTEMPTS);
+            logger::warn("dz {}: stage {} runs {} of {} effects and re-applying made "
+                         "it {} (attempt {} of {})",
+                Id(), a_stage, made.running, made.carried, after.running, _restarts,
+                ATTEMPTS);
         }
     }
 

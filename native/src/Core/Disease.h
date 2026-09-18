@@ -79,16 +79,36 @@ namespace RSL
 
         [[nodiscard]] static bool IsCureEffect(RE::FormID a_effect);
 
-        // HOW MANY OF THIS SPELL'S EFFECTS THE ENGINE IS ACTUALLY RUNNING.
+        // WHAT THE ENGINE MADE OF THIS SPELL, against what the record says it
+        // should have.
         //
         // Not the same question as HasSpell, and the difference is not
         // theoretical: a spell can sit in the player's list with nothing
-        // instantiated behind it at all. An ability's effects are created when
-        // the spell is ADDED, so once that moment has passed nothing revisits
-        // it - a save written against one set of records and loaded against
-        // another keeps the spell and loses the effects, and every check the
-        // mod had said the illness was fine.
-        [[nodiscard]] static std::size_t RunningEffects(RE::SpellItem* a_spell);
+        // instantiated behind it. An ability's effects are created when the
+        // spell is ADDED, so once that moment has passed nothing revisits it -
+        // a save written against one set of records and loaded against another
+        // keeps the spell and loses the effects, and every check the mod had
+        // said the illness was fine.
+        //
+        // BOTH NUMBERS, because either alone is the wrong question. "How many
+        // are running" cannot tell three-of-three from three-of-five, and the
+        // first version of the repair asked only whether the count was zero -
+        // so a green spore with its hidden effect running and its VISIBLE one
+        // missing counted as healthy, and the player saw no illness at all.
+        struct SpellEffects
+        {
+            std::size_t carried{ 0 };   // effect entries the record holds
+            std::size_t running{ 0 };   // of those, instantiated on the player
+
+            [[nodiscard]] bool WhollyRunning() const
+            {
+                return carried > 0 && running == carried;
+            }
+        };
+
+        // Counted per EFFECT ENTRY, not per active effect: the question is
+        // whether each thing the record asks for is there.
+        [[nodiscard]] static SpellEffects EffectsRunning(RE::SpellItem* a_spell);
 
         // A cure landed. Every illness currently running takes one step back,
         // which is what a counted cure means.

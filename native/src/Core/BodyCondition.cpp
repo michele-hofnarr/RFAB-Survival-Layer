@@ -47,6 +47,10 @@ namespace RSL
     {
         const std::int32_t old = Stage();
 
+        // A new stage is a different spell - the repair starts over.
+        _restarts = 0;
+        _checked = false;
+
         // Announced first, so the message is queued before anything a stage
         // does can stop it being displayed - and at stage three that is not
         // hypothetical: it drops the player on the floor.
@@ -131,7 +135,17 @@ namespace RSL
         _checkedAt = now;
         _checked = true;
 
-        if (Disease::RunningEffects(spell) > 0) {
+        const auto made = Disease::EffectsRunning(spell);
+
+        // A record with no effect entries has nothing to be missing, and
+        // WhollyRunning says false for it - so without this the repair would
+        // spend its three attempts on a spell there was never anything to fix.
+        if (made.carried == 0) {
+            _restarts = 0;
+            return;
+        }
+
+        if (made.WhollyRunning()) {
             _restarts = 0;
             return;
         }
@@ -144,14 +158,16 @@ namespace RSL
         player->RemoveSpell(spell);
         player->AddSpell(spell);
 
-        const auto nowRunning = Disease::RunningEffects(spell);
-        if (nowRunning > 0) {
-            logger::info("{}: stage {} had no effects running - put back, {} now",
-                Id(), a_stage, nowRunning);
+        const auto after = Disease::EffectsRunning(spell);
+        if (after.WhollyRunning()) {
+            logger::info("{}: stage {} was running {} of {} effects - put back, "
+                         "all {} now",
+                Id(), a_stage, made.running, made.carried, after.carried);
         } else {
-            logger::warn("{}: stage {} has no effects running and re-applying "
-                         "changed nothing (attempt {} of {})",
-                Id(), a_stage, _restarts, ATTEMPTS);
+            logger::warn("{}: stage {} runs {} of {} effects and re-applying made it "
+                         "{} (attempt {} of {})",
+                Id(), a_stage, made.running, made.carried, after.running, _restarts,
+                ATTEMPTS);
         }
     }
 
