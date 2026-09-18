@@ -93,6 +93,8 @@ namespace RSL
             return;
         }
 
+        RestartDeadEffects(stage);
+
         const std::int32_t step = Progress(a_tick, a_realSeconds);
 
         Trace(a_tick, stage, step != 0);
@@ -105,6 +107,52 @@ namespace RSL
         }
 
         Maintain(a_tick, a_realSeconds);
+    }
+
+    void BodyCondition::RestartDeadEffects(std::int32_t a_stage)
+    {
+        // Same fault, same repair, same reasoning as Illness - see the note
+        // there. Written twice rather than shared because the two bases have
+        // no common ancestor, and inventing one to hold six lines would put
+        // hypothermia back under the illnesses it was just taken out of.
+        auto* spell = StageSpell(a_stage);
+        auto* player = Player();
+        if (!spell || !player || !player->HasSpell(spell)) {
+            return;
+        }
+
+        constexpr int  ATTEMPTS = 3;
+        constexpr auto GAP = std::chrono::seconds(2);
+
+        const auto now = std::chrono::steady_clock::now();
+        if (_checked && now - _checkedAt < GAP) {
+            return;
+        }
+        _checkedAt = now;
+        _checked = true;
+
+        if (Disease::RunningEffects(spell) > 0) {
+            _restarts = 0;
+            return;
+        }
+
+        if (_restarts >= ATTEMPTS) {
+            return;
+        }
+        ++_restarts;
+
+        player->RemoveSpell(spell);
+        player->AddSpell(spell);
+
+        const auto nowRunning = Disease::RunningEffects(spell);
+        if (nowRunning > 0) {
+            logger::info("{}: stage {} had no effects running - put back, {} now",
+                Id(), a_stage, nowRunning);
+        } else {
+            logger::warn("{}: stage {} has no effects running and re-applying "
+                         "changed nothing (attempt {} of {})",
+                Id(), a_stage, _restarts, ATTEMPTS);
+        }
     }
 
     void BodyCondition::Trace(const Tick& a_tick, std::int32_t a_stage, bool a_force) const

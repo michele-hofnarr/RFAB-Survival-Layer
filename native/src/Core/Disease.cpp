@@ -178,7 +178,7 @@ namespace RSL
             return lines;
         }
 
-        [[nodiscard]] Running RunningEffects(RE::SpellItem* a_spell)
+        [[nodiscard]] Running EffectsOf(RE::SpellItem* a_spell)
         {
             Running out;
 
@@ -546,7 +546,7 @@ namespace RSL
                                : (player && player->HasSpell(spell)) ? "in the list"
                                                                     : "MISSING";
 
-            const auto running = RunningEffects(spell);
+            const auto running = EffectsOf(spell);
 
             logger::info("  {} stage {} P {:+.1f} cures {} - stage spell {}, "
                          "{} effect(s) running{}{}{}",
@@ -568,6 +568,13 @@ namespace RSL
             logger::info("illnesses ({}): none - {} ids carried, all clear",
                 a_why, _states.size());
         }
+    }
+
+    std::size_t Disease::RunningEffects(RE::SpellItem* a_spell)
+    {
+        // The same walk the report does, so the number the illnesses act on and
+        // the number the log prints cannot disagree.
+        return static_cast<std::size_t>(EffectsOf(a_spell).count);
     }
 
     void Disease::Clear()

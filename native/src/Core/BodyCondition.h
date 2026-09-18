@@ -103,6 +103,12 @@ namespace RSL
         std::string_view _drive{ "hold"sv };
 
     private:
+        // A stage spell on the player with nothing running behind it is
+        // put back on. Hypothermia is where this was first measured, in
+        // e275a60: AddSpell accepted, HasSpell true across a reload, and
+        // no ActiveEffect ever created.
+        void RestartDeadEffects(std::int32_t a_stage);
+
         void Announce(std::int32_t a_stage, std::int32_t a_old) const;
         void Trace(const Tick& a_tick, std::int32_t a_stage, bool a_force) const;
 
@@ -110,5 +116,9 @@ namespace RSL
 
         mutable std::chrono::steady_clock::time_point _tracedAt{};
         mutable bool                                  _traced{ false };
+
+        std::chrono::steady_clock::time_point _checkedAt{};
+        bool                                  _checked{ false };
+        int                                   _restarts{ 0 };
     };
 }

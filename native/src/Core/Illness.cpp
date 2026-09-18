@@ -190,6 +190,8 @@ namespace RSL
             }
         }
 
+        RestartDeadEffects(stage);
+
         const std::int32_t step = Progress(a_tick);
 
         // Before the move, so the line shows the state that produced it.
@@ -202,6 +204,72 @@ namespace RSL
         const auto target = std::clamp(stage + step, 0, 3);
         if (target != stage) {
             MoveTo(target, stage);
+        }
+    }
+
+    void Illness::RestartDeadEffects(std::int32_t a_stage)
+    {
+        // A STAGE SPELL IN THE LIST WITH NOTHING RUNNING BEHIND IT.
+        //
+        // An ability's effects are instantiated when the spell is ADDED, and
+        // nothing revisits that moment afterwards. So a save written against
+        // one set of records and loaded against another keeps the spell and
+        // loses the effects: HasSpell says yes, the illness advances, the
+        // player has no penalty, no icon and no way to be rid of it. Measured -
+        // a tissue stress at stage 1 with 0 of 3 effects running, one of them
+        // with nothing whatever competing for its actor value.
+        //
+        // Nothing else in the mod recovers from this. The repair above only
+        // fires when the SPELL is gone, and here it is not.
+        //
+        // ONLY WHEN NOTHING AT ALL IS RUNNING, deliberately. An effect can be
+        // legitimately absent - displaced by another the engine ranks above it -
+        // and re-applying the spell would not bring that one back and would
+        // throw away the ones that did arrive. Zero is the unambiguous case: a
+        // spell on the player doing literally nothing.
+        if (!MayRestart(a_stage)) {
+            return;
+        }
+
+        auto* spell = StageSpell(a_stage);
+        auto* player = Player();
+        if (!spell || !player || !player->HasSpell(spell)) {
+            return;   // the spell itself is missing - somebody else's repair
+        }
+
+        // Three attempts, then it is the engine's answer and not a glitch, and
+        // saying so once beats saying nothing for ever.
+        constexpr int  ATTEMPTS = 3;
+        constexpr auto GAP = std::chrono::seconds(2);
+
+        const auto now = std::chrono::steady_clock::now();
+        if (_checked && now - _checkedAt < GAP) {
+            return;
+        }
+        _checkedAt = now;
+        _checked = true;
+
+        if (Disease::RunningEffects(spell) > 0) {
+            _restarts = 0;
+            return;
+        }
+
+        if (_restarts >= ATTEMPTS) {
+            return;
+        }
+        ++_restarts;
+
+        player->RemoveSpell(spell);
+        player->AddSpell(spell);
+
+        const auto nowRunning = Disease::RunningEffects(spell);
+        if (nowRunning > 0) {
+            logger::info("dz {}: stage {} had no effects running - put back, {} now",
+                Id(), a_stage, nowRunning);
+        } else {
+            logger::warn("dz {}: stage {} has no effects running and re-applying "
+                         "changed nothing (attempt {} of {})",
+                Id(), a_stage, _restarts, ATTEMPTS);
         }
     }
 

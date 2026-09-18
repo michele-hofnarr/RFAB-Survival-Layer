@@ -69,6 +69,11 @@ namespace RSL
         [[nodiscard]] bool StageSpellGone(std::int32_t a_stage) const override;
         [[nodiscard]] bool Held(std::int32_t a_stage) override;
 
+        // Stage 1 is RFAB's own disease record. Their scripts watch it,
+        // and taking it off the player to restart OUR effects is not ours
+        // to do. Stages 2 and 3 are our copies and may be restarted.
+        [[nodiscard]] bool MayRestart(std::int32_t a_stage) const override;
+
         void Announce(std::int32_t a_stage, std::int32_t a_old) override;
         void OnStageChanged(std::int32_t a_old, std::int32_t a_stage) override;
 

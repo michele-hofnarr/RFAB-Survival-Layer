@@ -79,6 +79,17 @@ namespace RSL
 
         [[nodiscard]] static bool IsCureEffect(RE::FormID a_effect);
 
+        // HOW MANY OF THIS SPELL'S EFFECTS THE ENGINE IS ACTUALLY RUNNING.
+        //
+        // Not the same question as HasSpell, and the difference is not
+        // theoretical: a spell can sit in the player's list with nothing
+        // instantiated behind it at all. An ability's effects are created when
+        // the spell is ADDED, so once that moment has passed nothing revisits
+        // it - a save written against one set of records and loaded against
+        // another keeps the spell and loses the effects, and every check the
+        // mod had said the illness was fine.
+        [[nodiscard]] static std::size_t RunningEffects(RE::SpellItem* a_spell);
+
         // A cure landed. Every illness currently running takes one step back,
         // which is what a counted cure means.
         void ApplyCure();

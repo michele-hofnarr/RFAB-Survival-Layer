@@ -144,6 +144,13 @@ namespace RSL
         // get in front of its own message.
         virtual void Announce(std::int32_t a_stage, std::int32_t a_old);
 
+        // May the stage spell be taken off and put back to restart its effects?
+        //
+        // Only the RFAB wrappers say no, and only at stage 1: that is RFAB's
+        // own record, their scripts watch it, and pulling it out from under
+        // them to fix our problem is not ours to do.
+        [[nodiscard]] virtual bool MayRestart(std::int32_t) const { return true; }
+
         // Is the illness pinned where it is this pass? Only the Peryite
         // blessing does this, freezing RFAB's six at stage 1 because that is
         // RFAB's own balance and this layer does not get to touch it.
@@ -196,5 +203,16 @@ namespace RSL
         // trace and a quiet one still reports.
         mutable std::chrono::steady_clock::time_point _tracedAt{};
         mutable bool                                  _traced{ false };
+
+        // A stage spell on the player with nothing running behind it is put
+        // back on. See the definition for the state this recovers from.
+        void RestartDeadEffects(std::int32_t a_stage);
+
+        // The check walks the player's active effects, so it is not free, and a
+        // case the engine will never satisfy must not be retried every frame
+        // for the rest of the session.
+        std::chrono::steady_clock::time_point _checkedAt{};
+        bool                                  _checked{ false };
+        int                                   _restarts{ 0 };
     };
 }

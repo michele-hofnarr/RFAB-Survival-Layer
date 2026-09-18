@@ -150,6 +150,11 @@ namespace RSL
         return Illness::StageSpellGone(a_stage);
     }
 
+    bool RfabIllness::MayRestart(std::int32_t a_stage) const
+    {
+        return a_stage >= 2;
+    }
+
     bool RfabIllness::Held(std::int32_t a_stage)
     {
         auto* player = Player();
