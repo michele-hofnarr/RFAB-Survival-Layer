@@ -57,15 +57,20 @@ add_library(${PROJECT_NAME} SHARED
     src/Core/Cough.cpp
     src/Core/ColdScreen.cpp
     src/Core/Teleport.cpp
-    src/Core/CommonCold.cpp
     src/Core/Disease.cpp
+    src/Core/Illness.cpp
+    src/Core/Illnesses.cpp
+    src/Core/HitIllness.cpp
+    src/Core/ColdIllness.cpp
+    src/Core/LesionIllness.cpp
+    src/Core/RfabIllness.cpp
+    src/Core/Player.cpp
+    src/Core/Random.cpp
     src/Core/Elemental.cpp
+    src/Core/BodyCondition.cpp
     src/Core/Hypothermia.cpp
     src/Core/Forms.cpp
     src/Core/Penalties.cpp
-    src/Core/StagedDisease.cpp
-    src/Core/ElemLesion.cpp
-    src/Core/RfabDisease.cpp
     src/Core/WarmAnim.cpp
     src/Core/Shelter.cpp
     src/Core/Placement.cpp

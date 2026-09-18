@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Core/BodyCondition.h"
+
 // Hypothermia: what happens once the cold bar bottoms out.
 //
 // Ported from AdvanceHypothermia. Three stages, entered the moment cold passes
@@ -12,62 +14,70 @@
 //
 // Rest is blocked from stage 1, with one exception: indoors and warming up. A
 // warm shelter is exactly where hypothermia is meant to be slept off.
+//
+// It is the only BodyCondition there is. That is not an argument for folding it
+// back in with the illnesses - see the note on the base for the four ways it is
+// not one of them, every one of which had to be written as an exception inside
+// the illnesses while it was filed as one.
 
 namespace RSL
 {
-    class Hypothermia
+    class Hypothermia : public BodyCondition
     {
     public:
         static Hypothermia& GetSingleton();
 
-        // a_cold is the reserve, 0..1. a_realSeconds is wall time since the
-        // last call, which is what the stage-3 drain is measured in.
+        // a_realSeconds is wall time since the last call, which is what the
+        // stage-3 drain is measured in.
         //
         // a_warmthSlow is Climate::ChillSlow() - the same divisor the cold axis
         // falls by. Warmth does not only decide how fast you get here; it
-        // decides how fast it gets worse once you are. Passed in rather than
-        // read, so the illness and the axis cannot end up using two different
+        // decides how fast it gets worse once you are. PASSED IN rather than
+        // read, so the condition and the axis cannot end up using two different
         // readings of the same surroundings.
-        void Update(float a_cold, float a_gameHours, float a_realSeconds, bool a_undead,
-            float a_warmthSlow);
+        void Update(const Tick& a_tick, float a_realSeconds, float a_warmthSlow);
 
         // Lift everything: the lockdown, the rest block, the stage spells.
-        void ClearAll();
+        void Clear() override;
 
-        // Drop what we believe about the ENGINE - rest blocked, controls
-        // locked. A loaded game brings its own answers to both, so ours are
-        // dropped and re-applied by the next tick rather than carried across
-        // from the last one.
-        void Forget();
+        void Forget() override;
 
-        [[nodiscard]] std::int32_t Stage() const;
+    protected:
+        [[nodiscard]] bool Enabled() const override;
+        [[nodiscard]] bool Onsets(const Tick& a_tick) override;
+
+        [[nodiscard]] std::int32_t Progress(const Tick& a_tick,
+            float a_realSeconds) override;
+
+        void Maintain(const Tick& a_tick, float a_realSeconds) override;
+        void OnStageChanged(std::int32_t a_old, std::int32_t a_stage) override;
+
+        [[nodiscard]] std::string TraceExtra(const Tick& a_tick) const override;
 
     private:
-        void SetStage(std::int32_t a_stage);
+        // The records are a static that Forms::Load fills, and the base
+        // holds a reference to it - so the singleton may be constructed
+        // before or after the resolve without caring which.
+        Hypothermia() :
+            BodyCondition(Forms::hypothermia)
+        {}
+
         void SetLock(bool a_on, bool a_nudge);
         void SyncRestBlock();
 
-
-        [[nodiscard]] static RE::SpellItem* StageSpell(std::int32_t a_stage);
+        // This pass's reading of how much the character's clothing is slowing
+        // the cold down. Handed in by the caller with the rest of the tick.
+        float _warmthSlow{ 1.0f };
 
         bool _restBlocked{ false };
 
         // Whether that cached answer means anything yet. It describes the
         // ENGINE's state, and a load replaces the engine's - so after one, the
-        // first tick applies whatever it decides instead of comparing against a
+        // first pass applies whatever it decides instead of comparing against a
         // value inherited from the last game. Without this the block stuck: the
-        // log showed rest blocked once, and a later stage one made no call at
-        // all because the stale cache already said "blocked".
+        // log showed rest blocked once, and a later stage made no call at all
+        // because the stale cache already said "blocked".
         bool _restKnown{ false };
         bool _locked{ false };
-
-        // Stage three announces itself before it drops the player. The
-        // collapse is held for a moment so the message is on screen first -
-        // see the note in SetStage.
-        // Last attempt at restarting an ability the engine accepted but never
-        // ran. Throttled so a genuinely impossible case does not thrash.
-
-
-
     };
 }

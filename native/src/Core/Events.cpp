@@ -9,7 +9,8 @@
 #include "Core/Campfire.h"
 #include "Core/Trees.h"
 #include "Core/WarmAnim.h"
-#include "Core/StagedDisease.h"
+#include "Core/Illnesses.h"
+#include "Core/Player.h"
 #include "Core/TakeDown.h"
 #include "Settings.h"
 
@@ -162,8 +163,9 @@ namespace RSL
                 if (meal.rawWeak) {
                     // The roll is deliberately flat - v0.4.0 applies disease
                     // resistance to a hit and not to this.
-                    StagedDisease::Roll(Forms::hitDisease[3], Settings::fFoodPoisonChance,
-                        "from raw food");
+                    if (auto* poison = Illnesses::GetSingleton().Find("FP"sv)) {
+                        poison->Roll(Settings::fFoodPoisonChance, "from raw food");
+                    }
                     // Straight to empty, not merely no nourishment. v0.4.0's
                     // HungerAfterEating returns the maximum for raw food on a
                     // weak stomach - "return mx ; straight to empty, not a
@@ -443,14 +445,21 @@ namespace RSL
                     return RE::BSEventNotifyControl::kContinue;
                 }
 
-                const DiseaseForms* caught = nullptr;
+                // v0.4.0 matches the aggressor's race for draugr and
+                // slaughterfish and a keyword for trolls, because troll
+                // variants are several races but all carry ActorTypeTroll.
+                std::string_view carries;
                 if (race == Forms::raceDraugr) {
-                    caught = &Forms::hitDisease[0];        // brown rot
+                    carries = "BR"sv;                      // brown rot
                 } else if (Forms::kwTroll && race->HasKeyword(Forms::kwTroll)) {
-                    caught = &Forms::hitDisease[1];        // gutworm
+                    carries = "GW"sv;                      // gutworm
                 } else if (race == Forms::raceSlaughterfish) {
-                    caught = &Forms::hitDisease[2];        // green spore
+                    carries = "GS"sv;                      // green spore
                 }
+
+                auto* caught = carries.empty()
+                                   ? nullptr
+                                   : Illnesses::GetSingleton().Find(carries);
                 if (!caught) {
                     return RE::BSEventNotifyControl::kContinue;
                 }
@@ -462,15 +471,13 @@ namespace RSL
                 // sides of the pack.
                 if (Settings::bBlockStopsDisease &&
                     a_event->flags.any(RE::TESHitEvent::Flag::kHitBlocked)) {
-                    logger::info("hit: blocked, no {} caught", caught->id);
+                    logger::info("hit: blocked, no {} caught", caught->Id());
                     return RE::BSEventNotifyControl::kContinue;
                 }
 
-                auto* owner = player->AsActorValueOwner();
-                const float resist =
-                    owner ? owner->GetActorValue(RE::ActorValue::kResistDisease) : 0.0f;
-                StagedDisease::Roll(*caught,
-                    Settings::fDiseaseHitChance * (1.0f - resist * 0.01f), "on a hit");
+                caught->Roll(
+                    Settings::fDiseaseHitChance * (1.0f - DiseaseResist() * 0.01f),
+                    "on a hit");
 
                 return RE::BSEventNotifyControl::kContinue;
             }

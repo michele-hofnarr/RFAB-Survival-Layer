@@ -3,17 +3,13 @@
 #include "Core/Penalties.h"
 
 #include "Core/Forms.h"
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
 {
     namespace
     {
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
-
         [[nodiscard]] float Clamp(float a_v, float a_cap)
         {
             return std::clamp(a_v, 0.0f, a_cap);

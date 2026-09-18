@@ -4,6 +4,8 @@
 
 #include "Core/Disease.h"
 #include "Core/Forms.h"
+#include "Core/Player.h"
+#include "Core/Random.h"
 #include "Settings.h"
 
 namespace RSL
@@ -20,28 +22,6 @@ namespace RSL
 
         // Coughs per game hour, by stage. Index 0 is unused - stage 0 is well.
         constexpr float PER_HOUR[] = { 0.0f, 1.0f, 2.0f, 4.0f };
-
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
-
-        [[nodiscard]] std::mt19937& Rng()
-        {
-            static std::mt19937 gen{ std::random_device{}() };
-            return gen;
-        }
-
-        [[nodiscard]] float RandomUnit()
-        {
-            static std::uniform_real_distribution<float> dist{ 0.0f, 1.0f };
-            return dist(Rng());
-        }
-
-        [[nodiscard]] std::size_t RandomIndex(std::size_t a_count)
-        {
-            return std::uniform_int_distribution<std::size_t>{ 0, a_count - 1 }(Rng());
-        }
 
         // The worst stage the player is carrying. Not a sum: a second illness
         // does not make anyone cough twice as much, it just makes them ill.
@@ -123,7 +103,7 @@ namespace RSL
         // this is a small probability many times over rather than one big roll,
         // and that is what keeps the spacing irregular instead of metronomic.
         const float chance = PER_HOUR[stage] * Settings::fCoughRateMult * a_gameHours;
-        if (RandomUnit() >= chance) {
+        if (RollUnit() >= chance) {
             return;
         }
 
@@ -132,7 +112,7 @@ namespace RSL
         if (voices.empty() || !audio) {
             return;
         }
-        auto* voice = voices[RandomIndex(voices.size())];
+        auto* voice = voices[RollIndex(voices.size())];
 
         // Building a fresh handle each time is deliberate: the handle carries
         // the sound that was picked, so reusing one would replay the same cough

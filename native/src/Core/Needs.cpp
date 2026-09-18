@@ -12,8 +12,9 @@
 #include "Core/ColdVisual.h"
 #include "Core/Hypothermia.h"
 #include "Core/Notify.h"
-#include "Core/StagedDisease.h"
+#include "Core/HitIllness.h"
 #include "Core/TakeDown.h"
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
@@ -90,11 +91,6 @@ namespace RSL
         // No cap on the span. v0.4.0 charges the whole delta and only clamps a
         // negative one; a ceiling here silently threw away everything past it,
         // so a long wait or a jailed-for-a-month script cost nothing.
-
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
 
         // One bar, two halves, spent FROM THE TOP DOWN.
         //
@@ -340,7 +336,7 @@ namespace RSL
             // times. Controller-side in v0.4.0 as well - there is no actor
             // value that says "this illness is eating your dinner". It scales
             // the WHOLE drain, so it goes on both halves.
-            const float gutworm = StagedDisease::GutwormHungerMult();
+            const float gutworm = GutwormHungerMult();
 
             // Combat is ADDED, not multiplied: a proper meal goes at the combat
             // rate, an apple at the combat rate plus its own.
@@ -723,7 +719,7 @@ namespace RSL
         // BrSleepMult, on the same line of the same function - it was the twin
         // of gutworm's hunger multiplier, and unlike that one it never made it
         // into the port.
-        const float rot = StagedDisease::BrownRotSleepMult();
+        const float rot = BrownRotSleepMult();
         const float room =
             toBase ? std::max(0.0f, 1.0f - _state.sleep) : std::max(0.0f, 1.0f - Sleep());
         const float restored = std::min(
@@ -853,7 +849,7 @@ namespace RSL
 
         // Gutworm eats first. A quarter, a half, then four fifths of the meal
         // never reaches the player.
-        const float kept = 1.0f - StagedDisease::GutwormFoodPenalty();
+        const float kept = 1.0f - GutwormFoodPenalty();
         meal.restore = std::clamp(weight * share * kept, 0.0f, 1.0f);
         return meal;
     }

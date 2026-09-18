@@ -3,69 +3,101 @@
 #include "Core/Disease.h"
 
 #include "Core/Forms.h"
+#include "Core/Illness.h"
+#include "Core/Hypothermia.h"
+#include "Core/Illnesses.h"
+#include "Core/Player.h"
+#include "Core/Random.h"
 #include "Settings.h"
 
 namespace RSL
 {
     namespace
     {
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
-
         [[nodiscard]] float GameDays()
         {
             auto* calendar = RE::Calendar::GetSingleton();
             return calendar ? calendar->GetCurrentGameTime() : 0.0f;
         }
 
-        // The stage spell an id and stage ought to put on the player, or null
-        // where this build cannot name one. Only the report needs this: every
-        // other path already holds the forms it is working with, and this is
-        // the one place that starts from a co-save key instead.
+        // The stage spell an id and stage ought to put on the player.
+        //
+        // Written out by hand once - a chain of comparisons against every
+        // family of records this build knows - and it was the wrong shape the
+        // day it was written: a second list of all the illnesses, kept beside
+        // the real one, to be edited whenever the set changed. It asks the
+        // registry now, and hypothermia answers for itself because it is not
+        // an illness and never was.
         [[nodiscard]] RE::SpellItem* StageSpellOf(std::string_view a_id,
             std::int32_t a_stage)
         {
-            if (a_stage < 1 || a_stage > 3) {
-                return nullptr;
+            if (auto* illness = Illnesses::GetSingleton().Find(a_id)) {
+                return illness->StageSpell(a_stage);
             }
-            const auto index = static_cast<std::size_t>(a_stage - 1);
-
-            if (a_id == "HY"sv) {
-                RE::SpellItem* const hypo[3] = { Forms::abHypo1, Forms::abHypo2,
-                    Forms::abHypo3 };
-                return hypo[index];
-            }
-            if (a_id == "CC"sv) {
-                RE::SpellItem* const cold[3] = { Forms::abCold1, Forms::abCold2,
-                    Forms::abCold3 };
-                return cold[index];
-            }
-            for (const auto& dz : Forms::hitDisease) {
-                if (dz.id == a_id) {
-                    return dz.stage[index];
-                }
-            }
-            if (Forms::elemLesion.id == a_id) {
-                return Forms::elemLesion.stage[index];
-            }
-            for (const auto& dz : Forms::rfabDisease) {
-                if (dz.id == a_id) {
-                    // Stage 1 is RFAB's own record and stays theirs; 2 and 3
-                    // are ours.
-                    return a_stage == 1 ? dz.base : dz.ours[index - 1];
-                }
+            if (a_id == Hypothermia::GetSingleton().Id()) {
+                return Hypothermia::GetSingleton().StageSpell(a_stage);
             }
             return nullptr;
         }
 
-        [[nodiscard]] float RandomPercent()
+        // WHAT THE ENGINE HAS, as against what the spell list says.
+        //
+        // They are not the same question and this mod has already been bitten
+        // by the difference once: e275a60 found hypothermia where AddSpell was
+        // accepted, HasSpell stayed true across a save reload, and no
+        // ActiveEffect was ever created - the spell sat in the list doing
+        // nothing and showing nothing. Hypothermia.cpp still carries the
+        // check that found it.
+        //
+        // An effect that IS instantiated can also be sitting there doing
+        // nothing: inactive, dispelled, or with its condition evaluated
+        // false. All four states look identical from the spell list and
+        // identical to the player - an illness with nothing to show for it.
+        // Only this tells them apart.
+        struct Running
         {
-            static std::mt19937                          gen{ std::random_device{}() };
-            static std::uniform_real_distribution<float> dist{ 0.0f, 100.0f };
-            return dist(gen);
+            int  count{ 0 };
+            bool inactive{ false };
+            bool dispelled{ false };
+            bool conditionFalse{ false };
+        };
+
+        [[nodiscard]] Running RunningEffects(RE::SpellItem* a_spell)
+        {
+            Running out;
+
+            auto* player = Player();
+            // Through MagicTarget by name: PlayerCharacter inherits it twice
+            // over and the call is ambiguous without saying which.
+            auto* target = player ? player->AsMagicTarget() : nullptr;
+            auto* list = target ? target->GetActiveEffectList() : nullptr;
+            if (!a_spell || !list) {
+                return out;
+            }
+
+            for (auto* active : *list) {
+                if (!active || active->spell != a_spell) {
+                    continue;
+                }
+                ++out.count;
+                if (active->flags.any(RE::ActiveEffect::Flag::kInactive)) {
+                    out.inactive = true;
+                }
+                if (active->flags.any(RE::ActiveEffect::Flag::kDispelled)) {
+                    out.dispelled = true;
+                }
+                if (active->conditionStatus.get() ==
+                    RE::ActiveEffect::ConditionStatus::kFalse) {
+                    out.conditionFalse = true;
+                }
+            }
+            return out;
         }
+
+        // An axis at or below this much of its bar keeps an illness going.
+        // Read straight off the bar the widget draws, so what the player sees
+        // and what the illness reacts to are the same number.
+        constexpr float AXIS_WORSEN_BELOW = 0.5f;
     }
 
     Disease& Disease::GetSingleton()
@@ -185,13 +217,34 @@ namespace RSL
         for (int i = 0; i < iterations; ++i) {
             state.prog = std::clamp(state.prog + a_drift * sub, -100.0f, 100.0f);
 
-            if (RandomPercent() < std::abs(state.prog) * sub) {
+            if (RollPercent() < std::abs(state.prog) * sub) {
                 net += state.prog > 0.0f ? 1 : -1;
                 state.prog = 0.0f;
             }
         }
 
         return std::clamp(net, -1, 1);
+    }
+
+    AxisBand AxisState(float a_sleep, float a_hunger, float a_cold, bool a_undead)
+    {
+        // Worsening wins: one axis in the ground is enough, however good the
+        // others are.
+        if (!a_undead && (a_sleep < AXIS_WORSEN_BELOW || a_hunger < AXIS_WORSEN_BELOW)) {
+            return AxisBand::kWorsen;
+        }
+        if (a_cold < AXIS_WORSEN_BELOW) {
+            return AxisBand::kWorsen;
+        }
+
+        // Healing needs everything to be genuinely fine, not merely not-awful.
+        const bool sleepOk = a_undead || a_sleep > Settings::fSleepSafe;
+        const bool hungerOk = a_undead || a_hunger > Settings::fHungerSafe;
+        if (sleepOk && hungerOk && a_cold > Settings::fColdSafe) {
+            return AxisBand::kHeal;
+        }
+
+        return AxisBand::kHold;
     }
 
     std::string_view AxisBandName(AxisBand a_band)
@@ -278,13 +331,19 @@ namespace RSL
 
     void Disease::ApplyCure()
     {
-        for (auto& [id, state] : _states) {
-            // Hypothermia runs on this engine but is not an illness: it is a
-            // state of the body, and no potion, altar or spell talks it out of
-            // being cold. Only warmth does.
-            if (id == "HY") {
+        // EVERY ILLNESS, and nothing that is not one. Hypothermia used to be
+        // skipped here by comparing its id to the letters "HY" in the middle of
+        // the loop - a state of the body, with no potion, altar or spell that
+        // talks it out of being cold, excluded from medicine by a string
+        // comparison. It is a different type now and simply is not in this
+        // list, which is the same fact stated where it can be seen.
+        for (const auto& illness : Illnesses::GetSingleton().All()) {
+            if (!illness->Ready() || !illness->CuresApply()) {
                 continue;
             }
+            const auto id = illness->Id();
+            auto&      state = Get(id);
+
             // MEDICINE SETTLES AN EARLY ILLNESS AND ONLY EASES A LATE ONE.
             //
             // At stage 1 a potion, a spell or an altar clears it outright -
@@ -316,7 +375,7 @@ namespace RSL
 
     void Disease::SyncMarker()
     {
-        auto* player = RE::PlayerCharacter::GetSingleton();
+        auto* player = Player();
         if (!player || !Forms::dzMarker) {
             return;
         }
@@ -328,10 +387,11 @@ namespace RSL
         bool advanced = Settings::bModEnabled && Settings::bDiseasesEnabled;
         if (advanced) {
             advanced = false;
-            for (const auto& [id, state] : _states) {
-                // Hypothermia is a state of the body, not an illness, and
-                // nobody should remark on it as one.
-                if (id != "HY" && state.stage >= 2) {
+            // Hypothermia is a state of the body, not an illness, and nobody
+            // should remark on it as one. It is absent from this list by being
+            // a different kind of thing rather than by name.
+            for (const auto& illness : Illnesses::GetSingleton().All()) {
+                if (illness->Stage() >= 2) {
                     advanced = true;
                     break;
                 }
@@ -367,11 +427,17 @@ namespace RSL
             auto*       spell = StageSpellOf(id, state.stage);
             const char* worn = state.stage == 0 ? "-"
                                : !spell          ? "NO RECORD"
-                               : (player && player->HasSpell(spell)) ? "on the player"
+                               : (player && player->HasSpell(spell)) ? "in the list"
                                                                     : "MISSING";
 
-            logger::info("  {} stage {} P {:+.1f} cures {} - stage spell {}",
-                id, state.stage, state.prog, state.cures, worn);
+            const auto running = RunningEffects(spell);
+
+            logger::info("  {} stage {} P {:+.1f} cures {} - stage spell {}, "
+                         "{} effect(s) running{}{}{}",
+                id, state.stage, state.prog, state.cures, worn, running.count,
+                running.inactive ? ", INACTIVE" : "",
+                running.dispelled ? ", DISPELLED" : "",
+                running.conditionFalse ? ", CONDITION FALSE" : "");
         }
 
         if (said == 0) {

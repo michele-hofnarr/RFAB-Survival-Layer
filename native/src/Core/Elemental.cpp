@@ -4,7 +4,8 @@
 
 #include "Core/Disease.h"
 #include "Core/Campfire.h"
-#include "Core/ElemLesion.h"
+#include "Core/Illnesses.h"
+#include "Core/LesionIllness.h"
 #include "Core/Forms.h"
 #include "Settings.h"
 
@@ -228,7 +229,8 @@ namespace RSL
         // Nothing to patch. The credit is dropped rather than banked: banking
         // it would let a player eat bandages while unhurt and walk into a
         // blizzard with a counter that cannot be driven down.
-        if (!ElemLesion::GetSingleton().Wounded()) {
+        auto* lesion = Illnesses::GetSingleton().Lesion();
+        if (!lesion || !lesion->Wounded()) {
             logger::info("bandage used, but there is no wound to patch");
             return;
         }

@@ -79,28 +79,26 @@ namespace RSL
         static inline RE::SpellItem* abBonusRest{ nullptr };
         static inline RE::SpellItem* abBonusFed{ nullptr };
 
-        // Hypothermia: three stage abilities and the notifications.
-        static inline RE::SpellItem* abHypo1{ nullptr };
-        static inline RE::SpellItem* abHypo2{ nullptr };
-        static inline RE::SpellItem* abHypo3{ nullptr };
-        static inline RE::BGSMessage* msgHypo1{ nullptr };
-        static inline RE::BGSMessage* msgHypo2{ nullptr };
-        static inline RE::BGSMessage* msgHypo3{ nullptr };
-        static inline RE::BGSMessage* msgHypoCured{ nullptr };
-        static inline RE::BGSMessage* msgHypoNoRest{ nullptr };
-        static inline RE::BGSMessage* msgHypoEase2{ nullptr };
-        static inline RE::BGSMessage* msgHypoEase1{ nullptr };
+        // Hypothermia. The same three-spells-and-six-messages shape as every
+        // illness, even though it is not one - so it keeps its records the same
+        // way, and the stage bookkeeping can be written once for both.
+        //
+        // Stage 1 here is an ABILITY, not a Disease-type spell: no cure may
+        // reach any of the three, because nothing but warmth talks a body out
+        // of being cold.
+        static inline DiseaseForms hypothermia{};
 
-        // Common cold: three stages and their notifications.
-        static inline RE::SpellItem*  abCold1{ nullptr };
-        static inline RE::SpellItem*  abCold2{ nullptr };
-        static inline RE::SpellItem*  abCold3{ nullptr };
-        static inline RE::BGSMessage* msgCold1{ nullptr };
-        static inline RE::BGSMessage* msgCold2{ nullptr };
-        static inline RE::BGSMessage* msgCold3{ nullptr };
-        static inline RE::BGSMessage* msgCold0{ nullptr };
-        static inline RE::BGSMessage* msgColdEase2{ nullptr };
-        static inline RE::BGSMessage* msgColdEase1{ nullptr };
+        // Why you cannot rest. Not part of the triad, and not currently shown
+        // anywhere - the rest block is enforced through the engine's flag and
+        // says nothing.
+        static inline RE::BGSMessage* msgHypoNoRest{ nullptr };
+
+        // Common cold. Nine loose fields until the illnesses were unified -
+        // the same three spells and six messages every other illness keeps in
+        // a DiseaseForms, spelled out by hand because it was written first.
+        // Each one meant a switch and a chain of ternaries that the shared
+        // pass now does by index.
+        static inline DiseaseForms commonCold{};
 
         // RFAB's own seven, in v0.4.0's order: AT RJ WB RA BF BRR DR. The
         // first six are base-game diseases the Peryite blessing freezes at

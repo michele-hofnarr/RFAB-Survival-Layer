@@ -6,19 +6,16 @@
 #include "Core/ColdScreen.h"
 #include "Core/ColdVisual.h"
 #include "Core/Cough.h"
-#include "Core/CommonCold.h"
+#include "Core/Illnesses.h"
 #include "Core/Disease.h"
 #include "Core/Hypothermia.h"
 #include "Core/Needs.h"
 #include "Core/Notify.h"
 #include "Core/Penalties.h"
-#include "Core/ElemLesion.h"
-#include "Core/RfabDisease.h"
 #include "Core/Bedroll.h"
 #include "Core/Campfire.h"
 #include "Core/WarmAnim.h"
 #include "Core/Trees.h"
-#include "Core/StagedDisease.h"
 #include "Core/TakeDown.h"
 #include "Core/Teardown.h"
 #include "Settings.h"
@@ -457,21 +454,17 @@ namespace RSL
         if (!Settings::bModEnabled) {
             if (!_toreDown) {
                 Penalties::GetSingleton().ClearAll();
-                Hypothermia::GetSingleton().ClearAll();
+                Hypothermia::GetSingleton().Clear();
                 ColdVisual::GetSingleton().ClearAll();
                 ColdScreen::GetSingleton().ClearAll();
-                CommonCold::GetSingleton().ClearAll();
 
-                // EVERY ILLNESS, not just the common cold. Each of these clears
-                // itself at the top of its own Update when the mod is off - but
-                // this branch returns before any of them is called, so their
-                // stage spells sat on the player with the mod switched off.
-                // Twelve of them, at worst.
-                for (const auto& dz : Forms::hitDisease) {
-                    StagedDisease::Clear(dz);
-                }
-                RfabDisease::GetSingleton().ClearAll();
-                ElemLesion::GetSingleton().ClearAll();
+                // EVERY ILLNESS. Each clears itself at the top of its own pass
+                // when the mod is off - but this branch returns before any of
+                // them is reached, so their stage spells sat on the player with
+                // the mod switched off. Thirteen of them, at worst, and they
+                // used to be listed here one family at a time; the registry
+                // knows them all, so adding one cannot forget this.
+                Illnesses::GetSingleton().ClearAll();
 
                 // The hidden disease marker is a spell on the player like any
                 // other, and switching the mod off has to take it with
@@ -569,13 +562,6 @@ namespace RSL
         Penalties::GetSingleton().Update(
             needs.Sleep(), needs.Hunger(), needs.ColdBase(), needs.Undead());
 
-        // Hypothermia is driven in real seconds as well as game hours: its
-        // stage-3 drain is a wall-clock bleed, not a per-hour one.
-        step("hypothermia");
-        Hypothermia::GetSingleton().Update(
-            needs.ColdBase(), needs.HoursThisTick(), SIM_STEP_SECONDS, needs.Undead(),
-            needs.LastClimate().ChillSlow());
-
         // EVERY ILLNESS READS THE EARNED HALVES, not the bars.
         //
         // Sleep and hunger are each one bar made of two, and the top half is
@@ -585,25 +571,26 @@ namespace RSL
         // running on naps and apples is not mending, and reading the sum let P
         // heal on exactly that. Cold is already the reserve alone, for the same
         // reason - a bought buffer does not thaw anything.
-        step("cold disease");
-        CommonCold::GetSingleton().Update(needs.SleepBase(), needs.HungerBase(),
-            needs.ColdBase(), needs.HoursThisTick(), needs.Undead());
+        //
+        // Built once and handed to both. Five arguments were written out four
+        // times over, and the day one of them was read from the wrong half in
+        // one copy and the right half in another is exactly what this prevents.
+        const Tick tick{ needs.SleepBase(), needs.HungerBase(), needs.ColdBase(),
+            needs.HoursThisTick(), needs.Undead() };
 
-        // The four caught by a hit or a bad meal. Catching them happens on the
-        // event; all this does is carry them forward once they are there.
-        step("hit diseases");
-        for (const auto& dz : Forms::hitDisease) {
-            StagedDisease::Advance(dz, needs.SleepBase(), needs.HungerBase(),
-                needs.ColdBase(), needs.HoursThisTick(), needs.Undead());
-        }
+        // Hypothermia is driven in real seconds as well as game hours: its
+        // stage-3 drain is a wall-clock bleed, not a per-hour one. It runs
+        // before the illnesses because the lesions ask after its stage.
+        step("hypothermia");
+        Hypothermia::GetSingleton().Update(tick, SIM_STEP_SECONDS,
+            needs.LastClimate().ChillSlow());
 
-        step("rfab diseases");
-        RfabDisease::GetSingleton().Update(needs.SleepBase(), needs.HungerBase(),
-            needs.ColdBase(), needs.HoursThisTick(), needs.Undead());
-
-        step("elemental lesions");
-        ElemLesion::GetSingleton().Update(needs.SleepBase(), needs.HungerBase(),
-            needs.ColdBase(), needs.HoursThisTick(), needs.Undead());
+        // ALL THIRTEEN, in one call. This was four blocks in a row - the cold,
+        // the four caught by a hit, RFAB's seven, the lesions - each spelling
+        // out the same arguments, and each a place to forget an illness. The
+        // order inside is the registry's, and is the order these blocks had.
+        step("illnesses");
+        Illnesses::GetSingleton().Update(tick);
 
         step("bedroll");
         Bedroll::GetSingleton().Update();

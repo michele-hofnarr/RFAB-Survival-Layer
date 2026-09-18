@@ -3,6 +3,7 @@
 #include "Core/Events.h"
 #include "Core/Disease.h"
 #include "Core/Forms.h"
+#include "Core/Illnesses.h"
 #include "Core/RfabPatch.h"
 #include "Core/Teleport.h"
 #include "Core/Trees.h"
@@ -39,6 +40,9 @@ namespace
             // lookups, the UI singleton, and the Scaleform manager are all
             // available now and were not at plugin load.
             RSL::Forms::Load();
+            // After the records and before anything ticks: every illness
+            // copies the forms it needs, so this has to follow a resolve.
+            RSL::Illnesses::GetSingleton().Build();
             RSL::RfabPatch::Apply();
             RSL::Disease::ScanCureEffects();
             RSL::Settings::ReadSettings();

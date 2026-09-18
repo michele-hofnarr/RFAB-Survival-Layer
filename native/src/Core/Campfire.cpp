@@ -8,6 +8,7 @@
 #include "Core/Placement.h"
 #include "Core/Shelter.h"
 #include "Core/TakeDown.h"
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
@@ -21,11 +22,6 @@ namespace RSL
         // and down to sit on the spit. Measured in v0.4.0, not derived.
         constexpr float POT_FORWARD = -47.0f;
         constexpr float POT_UP = -13.3f;
-
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
 
         // The yes/no box the player gets for putting their own fire out.
         //

@@ -7,6 +7,7 @@
 #include "Core/Placement.h"
 #include "Core/Shelter.h"
 #include "Core/TakeDown.h"
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
@@ -25,11 +26,6 @@ namespace RSL
 
         // How near a tent of ours has to be to count as the one overhead.
         constexpr float UNDER_TENT = 250.0f;
-
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
 
         [[nodiscard]] RE::TESObjectREFR* Deref(RE::FormID a_id)
         {

@@ -2,18 +2,11 @@
 
 #include "Core/Shelter.h"
 
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
 {
-    namespace
-    {
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
-    }
-
     Shelter& Shelter::GetSingleton()
     {
         static Shelter singleton;

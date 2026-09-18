@@ -38,6 +38,22 @@ namespace RSL
 
     [[nodiscard]] std::string_view AxisBandName(AxisBand a_band);
 
+    // Which band the character is in. Shared by every illness that runs on the
+    // stochastic model, and a rule of the ENGINE rather than of any one
+    // illness - it lived in CommonCold.cpp, so three other illnesses included
+    // the cold's header to reach it.
+    //
+    // A deliberate divergence from v0.4.0, which had no hold band and measured
+    // "bad" as half the distance from the safe mark to the bottom rather than
+    // half the bar. Under the old rule a sleep bar of 48% scored 0.28 and
+    // counted as clear, so a cold healed while the character was well below the
+    // notch the widget draws.
+    //
+    // The bands cannot overlap: every safe mark sits above half, so an axis
+    // above its mark is never also below half.
+    [[nodiscard]] AxisBand AxisState(float a_sleep, float a_hunger, float a_cold,
+        bool a_undead);
+
     class Disease
     {
     public:

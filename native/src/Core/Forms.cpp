@@ -148,27 +148,22 @@ namespace RSL
         abBonusRest = Lookup<RE::SpellItem>(AbBonusRest, "rest bonus ability");
         abBonusFed = Lookup<RE::SpellItem>(AbBonusFed, "fed bonus ability");
 
-        abHypo1 = Lookup<RE::SpellItem>(AbHypo1, "hypothermia stage 1");
-        abHypo2 = Lookup<RE::SpellItem>(AbHypo2, "hypothermia stage 2");
-        abHypo3 = Lookup<RE::SpellItem>(AbHypo3, "hypothermia stage 3");
-        msgHypo1 = Lookup<RE::BGSMessage>(MsgHypo1, "hypothermia message 1");
-        msgHypo2 = Lookup<RE::BGSMessage>(MsgHypo2, "hypothermia message 2");
-        msgHypo3 = Lookup<RE::BGSMessage>(MsgHypo3, "hypothermia message 3");
-        msgHypoCured = Lookup<RE::BGSMessage>(MsgHypoCured, "hypothermia cured message");
+        // Through the same loop as the illnesses. Hypothermia is not one, but
+        // its RECORDS are the same shape, and that is what LoadDisease reads.
+        LoadDisease(hypothermia, "HY"sv, "hypothermia",
+            { AbHypo1, AbHypo2, AbHypo3 },
+            { MsgHypo1, MsgHypo2, MsgHypo3 },
+            MsgHypoCured, { MsgHypoEase2, MsgHypoEase1 });
         msgHypoNoRest = Lookup<RE::BGSMessage>(MsgHypoNoRest, "hypothermia no-rest message");
-        msgHypoEase2 = Lookup<RE::BGSMessage>(MsgHypoEase2, "hypothermia eased-to-2 message");
-        msgHypoEase1 = Lookup<RE::BGSMessage>(MsgHypoEase1, "hypothermia eased-to-1 message");
 
         dzMarker = Lookup<RE::SpellItem>(DiseaseMarker, "disease marker");
-        abCold1 = Lookup<RE::SpellItem>(DiseaseColdCommon1, "common cold stage 1");
-        abCold2 = Lookup<RE::SpellItem>(DiseaseColdCommon2, "common cold stage 2");
-        abCold3 = Lookup<RE::SpellItem>(DiseaseColdCommon3, "common cold stage 3");
-        msgCold1 = Lookup<RE::BGSMessage>(MsgColdCommon1, "common cold message 1");
-        msgCold2 = Lookup<RE::BGSMessage>(MsgColdCommon2, "common cold message 2");
-        msgCold3 = Lookup<RE::BGSMessage>(MsgColdCommon3, "common cold message 3");
-        msgCold0 = Lookup<RE::BGSMessage>(MsgColdCommonCured, "common cold cured message");
-        msgColdEase2 = Lookup<RE::BGSMessage>(MsgColdCommonEase2, "common cold eased-to-2");
-        msgColdEase1 = Lookup<RE::BGSMessage>(MsgColdCommonEase1, "common cold eased-to-1");
+        // The common cold, through the same loop as every other illness. It
+        // used to be nine lookups into nine named fields - the one illness
+        // resolved by hand, because it was the first one written.
+        LoadDisease(commonCold, "CC"sv, "common cold",
+            { DiseaseColdCommon1, DiseaseColdCommon2, DiseaseColdCommon3 },
+            { MsgColdCommon1, MsgColdCommon2, MsgColdCommon3 },
+            MsgColdCommonCured, { MsgColdCommonEase2, MsgColdCommonEase1 });
 
         // The four caught by being hit or by eating badly. Ids are v0.4.0's,
         // and they have to stay exactly these two letters: the co-save keys its
@@ -333,7 +328,7 @@ namespace RSL
 
         _ready = abSleep && abHunger && abCold &&
                  abBonusWarm && abBonusRest && abBonusFed &&
-                 abHypo1 && abHypo2 && abHypo3;
+                 hypothermia.Valid();
         if (_ready) {
             logger::info("forms resolved");
         } else {

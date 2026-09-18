@@ -4,6 +4,7 @@
 
 #include "Core/Climate.h"
 #include "Core/Forms.h"
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
@@ -19,11 +20,6 @@ namespace RSL
         constexpr float STILL_TOLERANCE = 8.0f;
 
         constexpr float PI = 3.14159265358979323846f;
-
-        [[nodiscard]] RE::PlayerCharacter* Player()
-        {
-            return RE::PlayerCharacter::GetSingleton();
-        }
 
         // Actor.PlayIdle is not bound in CommonLibSSE, so it goes through
         // Papyrus - the same boundary EffectShader.Play and Game.SetInChargen
