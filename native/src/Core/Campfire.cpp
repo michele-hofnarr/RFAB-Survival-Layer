@@ -88,22 +88,44 @@ namespace RSL
             const RE::NiPoint3& a_at, float a_pitch, float a_roll, float a_heading)
         {
             auto* player = Player();
-            if (!player || !a_base) {
+            auto* handler = RE::TESDataHandler::GetSingleton();
+            if (!player || !a_base || !handler) {
                 return nullptr;
             }
 
-            auto ref = player->PlaceObjectAtMe(a_base, false);
+            // CREATED WHERE IT GOES, not created here and dragged there.
+            //
+            // PlaceObjectAtMe is this same call with the PLAYER's position and
+            // angle - TESObjectREFR::PlaceObjectAtMe is one line and that line
+            // is CreateReferenceAtLocation(base, GetPosition(), GetAngle(),
+            // ...). So it built the object at the player's feet, with its model
+            // and everything the model brings with it, and only then was it
+            // teleported a hundred units away.
+            //
+            // v0.4.0 kept clear of that by placing initially disabled and
+            // enabling once it was in place - PlaceAtMe(base, 1, false, true)
+            // ... Enable() - and Campfire does the same. CommonLibSSE has no
+            // such argument and no Enable at all, so the way out is not to
+            // place it in the wrong spot in the first place.
+            //
+            // Radians, and in the engine's own order - Placement hands them
+            // over that way for exactly this reason.
+            const auto handle = handler->CreateReferenceAtLocation(a_base, a_at,
+                RE::NiPoint3{ a_pitch, a_roll, a_heading }, player->GetParentCell(),
+                player->GetWorldspace(), nullptr, nullptr, RE::ObjectRefHandle(),
+                false, true);
+
+            auto ref = handle.get();
             if (!ref) {
                 return nullptr;
             }
 
-            // No SetAngle on a reference in CommonLibSSE - the rotation is a
-            // field, and Update3DPosition is what makes the model catch up
-            // with it. Everything here is radians already; Placement hands
-            // them over in the engine's own units for exactly this reason.
-            ref->data.angle = { a_pitch, a_roll, a_heading };
+            // The cell handed over is the PLAYER's, and the spot is a hundred
+            // units from the player - which is over the boundary whenever he
+            // stands near one. SetPosition is what re-homes a reference to the
+            // cell it is actually in; here it moves nothing, because it is
+            // already there.
             ref->SetPosition(a_at);
-            ref->Update3DPosition(true);
             // Yours, as in v0.4.0's SetActorOwner.
             ref->extraList.SetOwner(player->GetActorBase());
             return ref.get();

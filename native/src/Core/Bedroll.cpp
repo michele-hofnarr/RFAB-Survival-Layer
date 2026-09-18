@@ -40,17 +40,42 @@ namespace RSL
             const Placement::Spot& a_spot, const RE::NiPoint3& a_at)
         {
             auto* player = Player();
-            if (!player || !a_base) {
+            auto* handler = RE::TESDataHandler::GetSingleton();
+            if (!player || !a_base || !handler) {
                 return nullptr;
             }
-            auto ref = player->PlaceObjectAtMe(a_base, false);
+
+            // CREATED WHERE IT GOES, not created here and dragged there.
+            //
+            // PlaceObjectAtMe is this same call with the PLAYER's position and
+            // angle - TESObjectREFR::PlaceObjectAtMe is one line and that line
+            // is CreateReferenceAtLocation(base, GetPosition(), GetAngle(),
+            // ...). So it built the object at the player's feet, with its model
+            // and everything the model brings with it, and only then was it
+            // teleported a couple of hundred units away.
+            //
+            // v0.4.0 kept clear of that by placing initially disabled and
+            // enabling once it was in place - PlaceAtMe(base, 1, false, true)
+            // ... Enable() - and Campfire does the same. CommonLibSSE has no
+            // such argument and no Enable at all, so the way out is not to
+            // place it in the wrong spot in the first place.
+            //
+            // Radians, straight from Placement - see the note there.
+            const auto handle = handler->CreateReferenceAtLocation(a_base, a_at,
+                RE::NiPoint3{ a_spot.pitch, a_spot.roll, a_spot.heading },
+                player->GetParentCell(), player->GetWorldspace(), nullptr, nullptr,
+                RE::ObjectRefHandle(), false, true);
+
+            auto ref = handle.get();
             if (!ref) {
                 return nullptr;
             }
-            // Radians, straight from Placement - see the note there.
-            ref->data.angle = { a_spot.pitch, a_spot.roll, a_spot.heading };
+
+            // The cell handed over is the PLAYER's, and the spot is not where
+            // the player stands. SetPosition re-homes a reference to the cell
+            // it is actually in; here it moves nothing, because it is already
+            // there.
             ref->SetPosition(a_at);
-            ref->Update3DPosition(true);
             // Yours, as in v0.4.0's SetActorOwner: what you pitched is not
             // somebody else's bed to be caught sleeping in.
             ref->extraList.SetOwner(player->GetActorBase());

@@ -410,11 +410,22 @@ namespace RSL
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
 
-                    const char* edid = base->GetFormEditorID();
-                    logger::info("  heat? {:<38} [{:08X}] {} at {:.0f}",
+                    // The REFERENCE as well as the base. A base id alone names
+                    // a kind of thing, and the question this line gets asked is
+                    // always about one particular thing: which object is that,
+                    // where is it, and is it one of ours. A base in the dynamic
+                    // FF space says the object was made during play, and then
+                    // the base id is not even a stable name for it.
+                    const char*  edid = base->GetFormEditorID();
+                    const auto   at = a_ref.GetPosition();
+                    const char*  name = a_ref.GetName();
+                    logger::info("  heat? {:<34} [{:08X}] {} ref {:08X} "
+                                 "at {:.0f},{:.0f},{:.0f} d {:.0f}{}{}",
                         (edid && *edid) ? edid : "<no editor id>",
                         base->GetFormID(), RE::FormTypeToString(type),
-                        from.GetDistance(a_ref.GetPosition()));
+                        a_ref.GetFormID(), at.x, at.y, at.z,
+                        from.GetDistance(at),
+                        (name && *name) ? " " : "", (name && *name) ? name : "");
                     ++printed;
                     return RE::BSContainer::ForEachResult::kContinue;
                 });

@@ -19,6 +19,7 @@ namespace RSL
             // still owed has no such limit - see Watch().
             constexpr float WATCH_SECONDS = 900.0f;
 
+
             struct Pending
             {
                 RE::FormID   id{ 0 };
@@ -29,6 +30,7 @@ namespace RSL
                 bool marked{ false };     // the delete mark has gone out
                 bool restored{ false };   // came back from the co-save
                 bool waited{ false };     // "out of reach" has been said once
+                bool queued{ false };     // was out of reach at least once
 
                 std::chrono::steady_clock::time_point when{};
             };
@@ -113,6 +115,7 @@ namespace RSL
                     // Disable nor Delete processes on a reference the engine
                     // does not currently have. So it waits. Said once - this
                     // runs every frame and the wait can be an hour of play.
+                    a_entry.queued = true;
                     if (!a_entry.waited) {
                         a_entry.waited = true;
                         logger::info("takedown: {} {:08X} is out of reach, queued",
@@ -133,6 +136,21 @@ namespace RSL
                     }
 
                     a_entry.at = ref->GetPosition();
+
+                    // WHAT THE 3D WAS DOING BEFORE THE DISABLE, which is the one
+                    // thing the old line could not say: it printed the state
+                    // afterwards, when the answer is always "gone".
+                    //
+                    // The suspicion this is here to settle: a take-down that
+                    // went through the queue acts in the first frames after the
+                    // reference came back within reach, which may be while the
+                    // engine is still putting its model into the scene. Take
+                    // the reference away at that moment and the model can be
+                    // left behind with nothing pointing at it - which is
+                    // exactly a glow that cannot be selected, disabled or
+                    // found by anything that walks references.
+                    const bool had3D = ref->Is3DLoaded();
+
                     if (!ref->IsDisabled()) {
                         ref->Disable();
                     }
@@ -143,9 +161,11 @@ namespace RSL
                     a_entry.waited = false;
 
                     logger::info("takedown: {} {:08X} at {:.0f},{:.0f},{:.0f} going "
-                                 "down - disabled {}, 3D {}",
+                                 "down - had 3D {}, {}, disabled {}, 3D now {}",
                         a_entry.what, a_entry.id, a_entry.at.x, a_entry.at.y,
-                        a_entry.at.z, ref->IsDisabled(), ref->Is3DLoaded());
+                        a_entry.at.z, had3D,
+                        a_entry.queued ? "came through the queue" : "in hand all along",
+                        ref->IsDisabled(), ref->Is3DLoaded());
                     return true;
                 }
 
