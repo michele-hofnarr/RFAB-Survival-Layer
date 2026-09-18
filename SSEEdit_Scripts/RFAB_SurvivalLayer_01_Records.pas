@@ -805,7 +805,7 @@ end;
 // again takes a second library entry, which needs a name.
 procedure ForceValueModifier(rec: IwbMainRecord);
 var
-  arch: string;
+  arch, av: string;
 begin
   if not Assigned(rec) then Exit;
 
@@ -820,7 +820,28 @@ begin
   end;
   if SameText(arch, 'Value Modifier') or SameText(arch, 'Script') then Exit;
 
+  // THE ACTOR VALUE IS TAKEN FIRST AND PUT BACK AFTER, because writing the
+  // archetype clears it.
+  //
+  // This file already warns about it twice - "an Actor Value clobbered to
+  // Aggression", and the note on Casting Type / Delivery being safe because
+  // they "CANNOT clobber an enum (unlike blindly echoing Actor Value)" - and
+  // the first version of this procedure walked straight into it anyway. It
+  // converted 48 records and left every one of them modifying actor value
+  // None, which is a value modifier that modifies nothing: the same illness
+  // applying nothing as before, by a different route, and check_effects.py
+  // passed it.
+  av := GetElementEditValues(rec, 'Magic Effect Data\DATA\Actor Value');
+
   PutEdit(rec, 'Magic Effect Data\DATA\Archtype', 'Value Modifier');
+
+  if av <> '' then begin
+    PutEdit(rec, 'Magic Effect Data\DATA\Actor Value', av);
+    if not SameText(GetElementEditValues(rec, 'Magic Effect Data\DATA\Actor Value'), av) then
+      Problem('ForceValueModifier: ' + EditorID(rec) + ' lost its actor value ('
+        + av + ')');
+  end else
+    Problem('ForceValueModifier: ' + EditorID(rec) + ' had no actor value to keep');
 
   // The dual pair means nothing to a plain modifier, and a stale second actor
   // value left behind reads like an intent nothing acts on. Only touched if the

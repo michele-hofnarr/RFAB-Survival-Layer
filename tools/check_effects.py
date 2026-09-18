@@ -21,6 +21,12 @@ is visible in game as a fault - the illness simply does nothing:
               no business answering to it. The generator meant to strip them
               and silently did not, for twenty records.
 
+  ACTOR VALUE. A value modifier with no actor value modifies nothing. This
+              check was added after the archetype fix shipped WITHOUT it and
+              broke 48 records a second way: writing the archetype clears the
+              actor value beside it, so every converted effect came out
+              pointing at None, and this script said ALL CLEAR.
+
 It also lists the actor values two of our own records still share, which is not
 a fault by itself - plain value modifiers stack - but is worth seeing.
 
@@ -127,6 +133,9 @@ def main():
 
     bad_arch = [r for r in ours if r["arch"] not in ALLOWED]
     bad_cond = [r for r in ours if r["conditions"]]
+    # A script archetype has no actor value by nature; a value modifier without
+    # one modifies nothing at all.
+    bad_av = [r for r in ours if r["arch"] == 0 and r["av"] < 0]
 
     print("-- archetype ------------------------------------------------------")
     if bad_arch:
@@ -146,6 +155,15 @@ def main():
     else:
         print("  PASS: no effect of ours is gated by a condition.")
 
+    print()
+    print("-- actor value ----------------------------------------------------")
+    if bad_av:
+        print("  FAIL: %d value modifier(s) modify nothing at all." % len(bad_av))
+        for r in sorted(bad_av, key=lambda r: r["edid"]):
+            print("      %-34s actor value None" % r["edid"])
+    else:
+        print("  PASS: every value modifier names an actor value.")
+
     # Not a fault - plain modifiers stack - but two of our own on one actor
     # value is worth knowing about when a number looks doubled.
     print()
@@ -161,7 +179,7 @@ def main():
     else:
         print("  none")
 
-    failed = len(bad_arch) + len(bad_cond)
+    failed = len(bad_arch) + len(bad_cond) + len(bad_av)
     print()
     print("=" * 70)
     print(" %s" % ("ALL CLEAR" if not failed else "%d PROBLEM(S)" % failed))
