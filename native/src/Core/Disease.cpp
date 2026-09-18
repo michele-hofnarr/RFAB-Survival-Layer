@@ -20,6 +20,46 @@ namespace RSL
             return calendar ? calendar->GetCurrentGameTime() : 0.0f;
         }
 
+        // The stage spell an id and stage ought to put on the player, or null
+        // where this build cannot name one. Only the report needs this: every
+        // other path already holds the forms it is working with, and this is
+        // the one place that starts from a co-save key instead.
+        [[nodiscard]] RE::SpellItem* StageSpellOf(std::string_view a_id,
+            std::int32_t a_stage)
+        {
+            if (a_stage < 1 || a_stage > 3) {
+                return nullptr;
+            }
+            const auto index = static_cast<std::size_t>(a_stage - 1);
+
+            if (a_id == "HY"sv) {
+                RE::SpellItem* const hypo[3] = { Forms::abHypo1, Forms::abHypo2,
+                    Forms::abHypo3 };
+                return hypo[index];
+            }
+            if (a_id == "CC"sv) {
+                RE::SpellItem* const cold[3] = { Forms::abCold1, Forms::abCold2,
+                    Forms::abCold3 };
+                return cold[index];
+            }
+            for (const auto& dz : Forms::hitDisease) {
+                if (dz.id == a_id) {
+                    return dz.stage[index];
+                }
+            }
+            if (Forms::elemLesion.id == a_id) {
+                return Forms::elemLesion.stage[index];
+            }
+            for (const auto& dz : Forms::rfabDisease) {
+                if (dz.id == a_id) {
+                    // Stage 1 is RFAB's own record and stays theirs; 2 and 3
+                    // are ours.
+                    return a_stage == 1 ? dz.base : dz.ours[index - 1];
+                }
+            }
+            return nullptr;
+        }
+
         [[nodiscard]] float RandomPercent()
         {
             static std::mt19937                          gen{ std::random_device{}() };
@@ -305,6 +345,38 @@ namespace RSL
         } else if (!advanced && worn) {
             player->RemoveSpell(Forms::dzMarker);
             logger::info("disease marker off");
+        }
+    }
+
+    void Disease::Report(std::string_view a_why)
+    {
+        auto* player = Player();
+
+        std::size_t said = 0;
+        for (const auto& [id, state] : _states) {
+            // An id with nothing on it is carried because something asked
+            // after it once, not because it is an illness anybody has.
+            if (state.stage == 0 && state.prog == 0.0f && state.cures == 0) {
+                continue;
+            }
+            if (said == 0) {
+                logger::info("illnesses ({}):", a_why);
+            }
+            ++said;
+
+            auto*       spell = StageSpellOf(id, state.stage);
+            const char* worn = state.stage == 0 ? "-"
+                               : !spell          ? "NO RECORD"
+                               : (player && player->HasSpell(spell)) ? "on the player"
+                                                                    : "MISSING";
+
+            logger::info("  {} stage {} P {:+.1f} cures {} - stage spell {}",
+                id, state.stage, state.prog, state.cures, worn);
+        }
+
+        if (said == 0) {
+            logger::info("illnesses ({}): none - {} ids carried, all clear",
+                a_why, _states.size());
         }
     }
 

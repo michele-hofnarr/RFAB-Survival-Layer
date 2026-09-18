@@ -151,16 +151,25 @@ namespace RSL
                         stage);
                 }
             } else {
-                auto cures = diseases.TakeCures(ID);
-                if (cures == 0 && spellMissing) {
+                // WHERE THE CURE CAME FROM, because the two are not the same
+                // claim and the line could not tell them apart. One is a
+                // potion this mod heard land; the other is an inference from
+                // a spell that is no longer on the player, drawn after the
+                // evidence for it has gone. They read identically to the
+                // player - the illness announces that it has passed - and
+                // when that announcement is the thing being questioned, this
+                // is the only line that can answer it.
+                auto       cures = diseases.TakeCures(ID);
+                const bool guessed = cures == 0 && spellMissing;
+                if (guessed) {
                     cures = 1;
                 }
 
                 if (cures > 0) {
                     StagedDisease::SetStage(forms, 0, stage);
                     diseases.HalveP(ID);
-                    logger::info("elemental lesions: {} cure(s), stage 1 -> 0",
-                        cures);
+                    logger::info("elemental lesions: {} cure(s), stage 1 -> 0 ({})",
+                        cures, guessed ? "the stage spell was gone, so a cure went unheard" : "a cure was counted");
                     return;
                 }
             }

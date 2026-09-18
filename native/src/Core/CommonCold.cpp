@@ -168,8 +168,11 @@ namespace RSL
                     logger::info("cold disease: stage {} ability put back", stage);
                 }
             } else {
-                auto cures = diseases.TakeCures(ID);
-                if (cures == 0 && spellMissing) {
+                // Counted or inferred - see the note in ElemLesion for why
+                // the line has to say which.
+                auto       cures = diseases.TakeCures(ID);
+                const bool guessed = cures == 0 && spellMissing;
+                if (guessed) {
                     cures = 1;
                 }
 
@@ -177,8 +180,9 @@ namespace RSL
                     const auto target = std::max(0, stage - cures);
                     SetStage(target, stage);
                     diseases.HalveP(ID);
-                    logger::info("cold disease: {} cure(s), stage {} -> {}",
-                        cures, stage, target);
+                    logger::info("cold disease: {} cure(s), stage {} -> {} ({})",
+                        cures, stage, target,
+                        guessed ? "the stage spell was gone, so a cure went unheard" : "a cure was counted");
                     return;
                 }
             }

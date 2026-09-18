@@ -532,6 +532,25 @@ namespace RSL
             return;
         }
 
+        // WHAT THE MOD THINKS YOU ARE ILL WITH, the moment the log is on.
+        //
+        // Every illness here logs transitions and only transitions, so one
+        // that is merely running says nothing at all - and a player who
+        // turns the switch on to look into something finds a log with no
+        // illness in it and a character visibly carrying two. The switch
+        // itself asks now, so the first thing in the log is the answer.
+        //
+        // It fires on the first pass of a session that starts with the
+        // switch already up as well, which is the same question asked at
+        // the only other moment it comes up.
+        {
+            static bool wasLogging = false;
+            if (Settings::bDebugLog && !wasLogging) {
+                Disease::GetSingleton().Report("the debug log was turned on");
+            }
+            wasLogging = Settings::bDebugLog;
+        }
+
         // Step markers, off unless a crash needs locating. They found the fast
         // travel fault in one run, and then buried the log: this pass runs
         // every frame, so seven lines a pass is nineteen thousand lines in two

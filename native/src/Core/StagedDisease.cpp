@@ -179,16 +179,20 @@ namespace RSL::StagedDisease
                 logger::info("disease {}: stage {} ability put back", a_forms.id, stage);
             }
         } else {
-            auto cures = diseases.TakeCures(a_forms.id);
-            if (cures == 0 && spellMissing) {
+            // Counted or inferred - see the note in ElemLesion for why the
+            // line has to say which.
+            auto       cures = diseases.TakeCures(a_forms.id);
+            const bool guessed = cures == 0 && spellMissing;
+            if (guessed) {
                 cures = 1;
             }
             if (cures > 0) {
                 const auto target = std::max(0, stage - cures);
                 SetStage(a_forms, target, stage);
                 diseases.HalveP(a_forms.id);
-                logger::info("disease {}: {} cure(s), stage {} -> {}",
-                    a_forms.id, cures, stage, target);
+                logger::info("disease {}: {} cure(s), stage {} -> {} ({})",
+                    a_forms.id, cures, stage, target,
+                    guessed ? "the stage spell was gone, so a cure went unheard" : "a cure was counted");
                 return target;
             }
         }

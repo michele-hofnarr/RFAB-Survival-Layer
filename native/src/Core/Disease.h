@@ -116,6 +116,25 @@ namespace RSL
         // Deterministic threshold crossing.
         std::int32_t StepLinear(std::string_view a_id, float a_drift, float a_hours);
 
+        // One line per illness that has anything to say: stage, P, cures
+        // pending, and whether the stage spell is actually on the player.
+        //
+        // EVERY MODULE HERE LOGS TRANSITIONS AND ONLY TRANSITIONS, which is
+        // right for a log that runs all session and useless the moment
+        // somebody turns the switch on to look into something: an illness
+        // that is merely sitting there has already said its piece, hours
+        // ago, at a log level that threw it away. This is the standing
+        // state, asked for rather than waited for.
+        //
+        // The spell column is the one that matters. Our stage and the
+        // player's spell list are two records of the same fact, and every
+        // illness here treats them disagreeing as evidence - a cure nobody
+        // heard, at stage 1; a console removespell, past it. When one of
+        // those inferences fires there is no way to check it afterwards,
+        // because the thing it read is gone. This prints it while it is
+        // still there.
+        void Report(std::string_view a_why);
+
         void Clear();
 
         [[nodiscard]] auto& All() { return _states; }

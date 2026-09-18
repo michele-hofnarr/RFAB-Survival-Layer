@@ -1129,6 +1129,7 @@ namespace RSL
                         Disease::GetSingleton().Get(id) = entry;
                     }
                     logger::info("{} disease states restored", count);
+                    Disease::GetSingleton().Report("restored from the save");
                     continue;
                 }
 
