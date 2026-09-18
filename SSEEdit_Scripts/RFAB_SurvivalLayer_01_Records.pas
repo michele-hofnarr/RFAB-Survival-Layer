@@ -731,6 +731,115 @@ begin
   end;
 end;
 
+// EVERY CONDITION, not the first one, and through the container.
+//
+// DropElement(rec, 'CTDA') was meant to do this and never removed a thing:
+// xEdit keeps a magic effect's conditions inside a "Conditions" array, so
+// ElementBySignature at record level finds nothing and the Say never fires.
+// Twenty of our records shipped carrying a condition because of it - four
+// library effects copied from RFAB's Peryite records, the campfire effect, and
+// every face cloned off one of those.
+//
+// What the condition is does not matter here. It is RFAB's, it gates RFAB's own
+// disease debuffs against RFAB's own boon, and a penalty this mod applies has no
+// business answering to it.
+// BOTH WAYS ROUND, and it says when neither worked.
+//
+// Whether a record's conditions answer to ElementByName('Conditions') or only
+// to ElementBySignature depends on the definition, and guessing wrong is how
+// the old line failed: it found nothing, removed nothing, and printed nothing.
+// A drop that cannot be seen to have happened is the bug, not the mechanism.
+procedure DropConditions(rec: IwbMainRecord);
+var
+  cond, el: IInterface;
+  n       : Integer;
+begin
+  if not Assigned(rec) then Exit;
+
+  n := 0;
+
+  // Signature first, which is where DumpMgefGate below found them.
+  el := ElementBySignature(rec, 'CTDA');
+  while Assigned(el) and (n < 64) do begin
+    Remove(el);
+    Inc(n);
+    el := ElementBySignature(rec, 'CTDA');
+  end;
+
+  // ...and the container, for whatever that did not account for.
+  cond := ElementByName(rec, 'Conditions');
+  if Assigned(cond) then
+    while (ElementCount(cond) > 0) and (n < 64) do begin
+      RemoveByIndex(cond, 0, True);
+      Inc(n);
+    end;
+
+  if n >= 64 then
+    Problem('DropConditions: ' + EditorID(rec) + ' would not let go - stopped at 64')
+  else if n > 0 then
+    Say('    dropped ' + IntToStr(n) + ' condition(s) from ' + EditorID(rec));
+end;
+
+// A PLAIN VALUE MODIFIER, ALWAYS.
+//
+// Peak and Dual value modifiers DO NOT STACK: the engine keeps one per actor
+// value, and a second is never instantiated at all - no effect, no penalty, and
+// nothing in the active-effects list to show the illness is there. Proven in
+// play and by the records: a tissue stress at stage 1 had two of its three
+// effects missing, one displaced by RFAB's permanent attack-speed bonus and the
+// other by our own green spore, while three plain ValueModifiers on the same two
+// actor values ran side by side - two of them the same record twice over.
+//
+// Nothing chose those archetypes. They are whatever the vanilla or RFAB effect
+// each library entry was copied from happened to be, and the twenty entries that
+// came out non-stacking collided with RFAB on six actor values and with EACH
+// OTHER on six more. Half the illnesses were applying nothing.
+//
+// The Script archetype is left alone: the campfire effect and the monitor are
+// not value modifiers and have no actor value to hold.
+//
+// COST, stated rather than buried: _RSL_MgefWeapSpeed was the one Dual entry,
+// and dual is how one effect reaches both hands - actor value 85 and 132. As a
+// plain modifier it reaches the right hand only, so a dual-wielding character's
+// off hand is no longer slowed by tissue stress or hypothermia. Covering it
+// again takes a second library entry, which needs a name.
+procedure ForceValueModifier(rec: IwbMainRecord);
+var
+  arch: string;
+begin
+  if not Assigned(rec) then Exit;
+
+  arch := GetElementEditValues(rec, 'Magic Effect Data\DATA\Archtype');
+  if arch = '' then begin
+    // The DATA tree is not open. Every caller writes Casting Type and Delivery
+    // first precisely so that it is, so this means the record is not shaped the
+    // way this file assumes - and saying nothing is how the last one of these
+    // went unnoticed for twenty records.
+    Problem('ForceValueModifier: no Archtype on ' + EditorID(rec));
+    Exit;
+  end;
+  if SameText(arch, 'Value Modifier') or SameText(arch, 'Script') then Exit;
+
+  PutEdit(rec, 'Magic Effect Data\DATA\Archtype', 'Value Modifier');
+
+  // The dual pair means nothing to a plain modifier, and a stale second actor
+  // value left behind reads like an intent nothing acts on. Only touched if the
+  // definition actually names those fields - writing a path that does not exist
+  // is how a generator quietly does nothing, which is the fault being fixed
+  // here, so it is reported instead.
+  if SameText(arch, 'Dual Value Modifier') then begin
+    if Assigned(ElementByPath(rec, 'Magic Effect Data\DATA\Second Actor Value')) then
+      PutEdit(rec, 'Magic Effect Data\DATA\Second Actor Value', 'None')
+    else
+      Problem('ForceValueModifier: no Second Actor Value path on ' + EditorID(rec));
+
+    if Assigned(ElementByPath(rec, 'Magic Effect Data\DATA\Second AV Weight')) then
+      PutNative(rec, 'Magic Effect Data\DATA\Second AV Weight', 0.0);
+  end;
+
+  Say('    ' + EditorID(rec) + ': ' + arch + ' -> Value Modifier');
+end;
+
 procedure ScrubTemplate(rec: IwbMainRecord);
 begin
   if not Assigned(rec) then Exit;
@@ -1069,7 +1178,7 @@ begin
     Result := old;
 
   ScrubTemplate(Result);           // VMAD/DNAM/KSIZ/KWDA/MDOB
-  DropElement(Result, 'CTDA');     // some RFAB sources carry Peryite conditions
+  DropConditions(Result);          // RFAB sources carry Peryite conditions
   DropElement(Result, 'SNDD');     // no per-effect sounds on a static debuff
   PutEdit(Result, 'EDID', newEdid);
   PutEdit(Result, 'FULL', L('lib.' + stem + '.full'));
@@ -1098,6 +1207,7 @@ begin
   // Must come after the Casting Type / Delivery writes above: they are what
   // force the DATA tree open on a freshly-copied record.
   MakeNonHostile(Result);
+  ForceValueModifier(Result);
 
   // Library MGEFs are pure mechanics - hidden in the active-effects UI. Each
   // stage SPEL shows a single visible "face" MGEF (BuildFace) cloned off the
@@ -1771,6 +1881,13 @@ begin
     ForceEnumFrom(Result, lib, 'Magic Effect Data\DATA\Archtype');
     ForceEnumFrom(Result, lib, 'Magic Effect Data\DATA\Actor Value');
   end;
+
+  // The face is a copy of a library entry, so it inherits whatever that one
+  // carried - including the archetype and, until DropConditions existed, the
+  // condition. Both are settled here as well: a reused face is not re-copied,
+  // so CopyFlagsFrom above can only put back what the source has now.
+  DropConditions(Result);
+  ForceValueModifier(Result);
 
   ShowInUI(Result);   // the library MGEF is hidden; the face must show
   Remember(faceEdid, Result);
@@ -2822,6 +2939,9 @@ begin
   mgef := RecordByEDID(tgt, 'MGEF', PFX + 'MgefLightCampfire');
   if Assigned(mgef) then begin
     ScrubTemplate(mgef);
+    // The template it was copied from brought a condition with it, like every
+    // other record copied in this file.
+    DropConditions(mgef);
     Inc(reused);
   end else begin
     mgef := wbCopyElementToFile(mgefTpl, tgt, True, True);
