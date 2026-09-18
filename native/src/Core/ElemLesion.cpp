@@ -103,6 +103,41 @@ namespace RSL
             }
         }
 
+        // A COUNTED CURE IS A CURE SPENT, and at stage one that is the whole
+        // of it. Disease::ApplyCure is the one door every illness comes
+        // through: at stage 1 it counts a cure to be spent here, past that it
+        // eases P by fCurePotency instead and counts nothing, and hypothermia
+        // is excused altogether because it is a state of the body rather than
+        // an illness. So a lesion at stage 2 or 3 has already had what a
+        // potion is worth to it by the time this runs.
+        //
+        // Which is why the fallback below stops at stage one. Past it the
+        // spell is an ability no cure can take off, and a missing one is
+        // evidence of a console removespell, not of medicine.
+        //
+        // What was wrong: nobody spent it at all. ElemLesion read P and drift
+        // and never asked. Measured - "cure counted for EL" at 15:04:28, and
+        // the stage did not move until 15:11:54, when P crossed the threshold
+        // on its own. The potion did take the stage-1 effect off; our own
+        // stage stayed where it was and went on dripping.
+        if (stage == 1) {
+            auto*      player = RE::PlayerCharacter::GetSingleton();
+            auto*      current = forms.stage[0];
+            const bool spellMissing = !current || !player || !player->HasSpell(current);
+
+            auto cures = diseases.TakeCures(ID);
+            if (cures == 0 && spellMissing) {
+                cures = 1;
+            }
+
+            if (cures > 0) {
+                StagedDisease::SetStage(forms, 0, stage);
+                diseases.HalveP(ID);
+                logger::info("elemental lesions: {} cure(s), stage 1 -> 0", cures);
+                return;
+            }
+        }
+
         if (stage == 0) {
             // Not ill yet: P only ever sits at or below zero, and reaching the
             // threshold is what catches it.
