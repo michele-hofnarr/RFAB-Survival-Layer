@@ -197,7 +197,7 @@ namespace RSL
         //
         // Degrees off the temperature, after everything else including
         // the fire: a fire on the bank is not reaching you.
-        static inline float fSwimTemp{ -20.0f };
+        static inline float fSwimTemp{ -10.0f };
 
         // And a multiplier on how fast the bar falls, on the losing side
         // only - the same one-sidedness the tent and the combat brake
