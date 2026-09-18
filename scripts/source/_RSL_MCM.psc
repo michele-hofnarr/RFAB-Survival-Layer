@@ -114,3 +114,16 @@ Function ResetDefaults()
   ; Redraw, or the page keeps showing what it showed before the reset.
   RefreshMenu()
 EndFunction
+
+; Take every illness off the player - the same thing switching the mod
+; off does to them, and nothing else. For an illness that has got stuck.
+;
+; Papyrus only forwards it. The work is native, because the stage, the
+; accumulator and the spells are all held there and a script has no way
+; to reach them.
+Function ResetIllnesses()
+  ResetIllnessesNative()
+EndFunction
+
+; Bound by the plugin at load - see native/src/Papyrus.cpp.
+Function ResetIllnessesNative() global native

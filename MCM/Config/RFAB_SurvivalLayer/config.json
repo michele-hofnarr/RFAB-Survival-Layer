@@ -1446,6 +1446,17 @@
           "valueOptions": {
             "sourceType": "ModSettingBool"
           }
+        },
+        {
+          "text": "$_RSL_BtnResetDiseases",
+          "help": "$_RSL_BtnResetDiseases_help",
+          "type": "text",
+          "action": {
+            "type": "CallFunction",
+            "form": "RFAB_SurvivalLayer.esp|913",
+            "scriptName": "_RSL_MCM",
+            "function": "ResetIllnesses"
+          }
         }
       ]
     }

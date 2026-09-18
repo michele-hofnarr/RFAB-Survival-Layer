@@ -44,6 +44,7 @@ add_subdirectory("$ENV{CommonLibSSEPath}" "${CMAKE_CURRENT_BINARY_DIR}/commonlib
 add_library(${PROJECT_NAME} SHARED
     src/main.cpp
     src/Settings.cpp
+    src/Papyrus.cpp
     src/Menu/RSLMenu.cpp
     src/Menu/BarWidget.cpp
     src/Core/Needs.cpp

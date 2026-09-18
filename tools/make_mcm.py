@@ -182,7 +182,7 @@ HIDDEN = {
 PAGES = [
     ("_RSL_PageGeneral", [
         ("set", "bModEnabled"),
-        ("btn", "_RSL_BtnReset"),
+        ("btn", "_RSL_BtnReset", "ResetDefaults"),
         ("hdr", "_RSL_HdrColdVisual"),
         ("set", "bColdShaderEnabled"), ("set", "fColdShaderAt"),
         ("set", "bColdScreenEnabled"), ("set", "bColdBlocksTeleport"),
@@ -288,6 +288,7 @@ PAGES = [
     ("_RSL_PageDebug", [
         ("hdr", "_RSL_HdrDebug"),
         ("set", "bDebugLog"), ("set", "bTracePass"),
+        ("btn", "_RSL_BtnResetDiseases", "ResetIllnesses"),
     ]),
 ]
 
@@ -361,7 +362,9 @@ def main():
     where = sections()
 
     # --- the layout has to cover the plugin, exactly ----------------------
-    placed = [name for _, rows in PAGES for kind, name in rows if kind == "set"]
+    # row[0] is the kind and row[1] the name; a button carries a third
+    # field and nothing else does.
+    placed = [row[1] for _, rows in PAGES for row in rows if row[0] == "set"]
     errors = []
     for name in sorted(set(where) - set(placed) - HIDDEN):
         errors.append(f"{name} is read by the plugin but is on no MCM page")
@@ -390,7 +393,11 @@ def main():
     for title, rows in PAGES:
         content = []
         wanted.add(f"${title}")
-        for kind, name in rows:
+        for row in rows:
+            kind, name = row[0], row[1]
+            # Only a button carries a third field: the Papyrus function it
+            # calls. Everything else is a pair.
+            fn = row[2] if len(row) > 2 else None
             if kind == "hdr":
                 content.append({"text": f"${name}", "type": "header"})
                 wanted.add(f"${name}")
@@ -402,9 +409,12 @@ def main():
                     content.append({"text": f"${key}", "type": "text"})
                     wanted.add(f"${key}")
                 continue
-            # A button. MCM Helper has no bulk "reset to defaults" of its own -
-            # the R key resets ONE option, from settings.ini - so the loop over
-            # every setting is ours, in Papyrus, and this calls it.
+            # A button, and the function it calls lives in _RSL_MCM.psc.
+            #
+            # MCM Helper has no bulk "reset to defaults" of its own - the R
+            # key resets ONE option, from settings.ini - so the loop over every
+            # setting is ours, in Papyrus. The illness reset is the other kind:
+            # Papyrus only forwards it, and the work is native.
             if kind == "btn":
                 content.append({
                     "text": f"${name}",
@@ -414,7 +424,7 @@ def main():
                         "type": "CallFunction",
                         "form": MCM_QUEST,
                         "scriptName": "_RSL_MCM",
-                        "function": "ResetDefaults",
+                        "function": fn,
                     },
                 })
                 wanted.add(f"${name}")
@@ -538,6 +548,19 @@ def main():
         "  ; Redraw, or the page keeps showing what it showed before the reset.",
         "  RefreshMenu()",
         "EndFunction",
+        "",
+        "; Take every illness off the player - the same thing switching the mod",
+        "; off does to them, and nothing else. For an illness that has got stuck.",
+        ";",
+        "; Papyrus only forwards it. The work is native, because the stage, the",
+        "; accumulator and the spells are all held there and a script has no way",
+        "; to reach them.",
+        "Function ResetIllnesses()",
+        "  ResetIllnessesNative()",
+        "EndFunction",
+        "",
+        "; Bound by the plugin at load - see native/src/Papyrus.cpp.",
+        "Function ResetIllnessesNative() global native",
         "",
     ]
     PAPYRUS.write_text(chr(10).join(psc), encoding="utf-8")

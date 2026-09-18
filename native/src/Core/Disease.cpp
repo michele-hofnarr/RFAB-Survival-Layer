@@ -10,6 +10,8 @@
 #include "Core/Random.h"
 #include "Settings.h"
 
+#include <spdlog/fmt/fmt.h>
+
 namespace RSL
 {
     namespace
@@ -61,6 +63,60 @@ namespace RSL
             bool dispelled{ false };
             bool conditionFalse{ false };
         };
+
+        // WHICH of the spell's effects are missing, by name.
+        //
+        // The count alone said a stage-1 lesion had one effect running where a
+        // green spore had two - true, and useless, because the two spells do
+        // not carry the same number of effects. Three carried and one running
+        // is a different fact from two carried and two running, and only this
+        // says which of the three never arrived.
+        // The list is taken non-const because BSSimpleList has no const
+        // iterator: iterator_base cannot be built from a const node, and the
+        // error it gives says nothing about that.
+        [[nodiscard]] std::string MissingEffects(RE::SpellItem* a_spell,
+            RE::BSSimpleList<RE::ActiveEffect*>* a_list)
+        {
+            if (!a_spell || !a_list) {
+                return {};
+            }
+
+            std::string missing;
+            std::size_t carried = 0;
+            std::size_t absent = 0;
+
+            for (const auto* effect : a_spell->effects) {
+                if (!effect) {
+                    continue;
+                }
+                ++carried;
+
+                bool running = false;
+                for (auto* active : *a_list) {
+                    if (active && active->effect == effect) {
+                        running = true;
+                        break;
+                    }
+                }
+                if (running) {
+                    continue;
+                }
+
+                ++absent;
+                const auto* base = effect->baseEffect;
+                const char* edid = base ? base->GetFormEditorID() : nullptr;
+                if (!missing.empty()) {
+                    missing += ", ";
+                }
+                missing += (edid && *edid) ? edid : "<no editor id>";
+            }
+
+            if (absent == 0) {
+                return {};
+            }
+            return fmt::format("{} of {} effect(s) NOT RUNNING: {}", absent, carried,
+                missing);
+        }
 
         [[nodiscard]] Running RunningEffects(RE::SpellItem* a_spell)
         {
@@ -438,6 +494,15 @@ namespace RSL
                 running.inactive ? ", INACTIVE" : "",
                 running.dispelled ? ", DISPELLED" : "",
                 running.conditionFalse ? ", CONDITION FALSE" : "");
+
+            if (spell && player) {
+                auto* target = player->AsMagicTarget();
+                if (auto missing = MissingEffects(spell,
+                        target ? target->GetActiveEffectList() : nullptr);
+                    !missing.empty()) {
+                    logger::warn("    {} {}", id, missing);
+                }
+            }
         }
 
         if (said == 0) {

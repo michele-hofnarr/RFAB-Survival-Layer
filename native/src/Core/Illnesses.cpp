@@ -5,6 +5,7 @@
 #include "Core/ColdIllness.h"
 #include "Core/Forms.h"
 #include "Core/HitIllness.h"
+#include "Core/Hypothermia.h"
 #include "Core/LesionIllness.h"
 #include "Core/RfabIllness.h"
 
@@ -76,6 +77,26 @@ namespace RSL
                 illness->Clear();
             }
         }
+    }
+
+    void ResetAllIllnesses()
+    {
+        auto& diseases = Disease::GetSingleton();
+
+        // Both sides printed, because the whole point of the button is that
+        // something is stuck and the log is how anyone finds out what it was.
+        diseases.Report("before the reset");
+
+        Illnesses::GetSingleton().ClearAll();
+
+        auto& hypothermia = Hypothermia::GetSingleton();
+        hypothermia.Clear();
+        hypothermia.Forget();
+
+        diseases.SyncMarker();
+
+        diseases.Report("after the reset");
+        logger::info("illnesses reset by hand from the menu");
     }
 
     Illness* Illnesses::Find(std::string_view a_id)

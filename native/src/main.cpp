@@ -10,6 +10,7 @@
 #include "Core/ClimateMap.h"
 #include "Core/Needs.h"
 #include "Menu/RSLMenu.h"
+#include "Papyrus.h"
 #include "Settings.h"
 
 namespace
@@ -104,6 +105,10 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_s
 
     RSL::ClimateMap::Load();
     RSL::Needs::InstallSerialization();
+
+    // At plugin load, not at kDataLoaded: the interface queues the bind and
+    // runs it when the VM comes up, which is earlier than that message.
+    RSL::Papyrus::Install();
 
     auto* messaging = SKSE::GetMessagingInterface();
     if (!messaging || !messaging->RegisterListener("SKSE", MessageHandler)) {

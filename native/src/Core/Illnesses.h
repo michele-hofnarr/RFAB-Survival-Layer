@@ -63,4 +63,22 @@ namespace RSL
         // which is the lifetime of the build.
         LesionIllness* _lesion{ nullptr };
     };
+
+    // TAKE EVERY STAGE OFF THE PLAYER BY HAND. What switching the mod off does
+    // to the illnesses, and nothing else - the penalties, the camp and the
+    // widget are left alone.
+    //
+    // Hypothermia goes with them. It is not an illness, but it is the other
+    // thing that holds a stage, and it is the one that can leave the player
+    // locked down or unable to rest - so a reset that left it out would not be
+    // a reset. It comes straight back if the character is still that cold, at
+    // stage 1 rather than where it was.
+    //
+    // RFAB's own seven are handed back rather than cured: stage 1 is their
+    // record and this layer does not get to take it off.
+    //
+    // A free function and not a method of the registry, because it touches the
+    // condition too and a registry that quietly reached outside its own list
+    // would be lying about what it owns.
+    void ResetAllIllnesses();
 }
