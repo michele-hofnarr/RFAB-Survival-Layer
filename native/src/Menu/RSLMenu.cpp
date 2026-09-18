@@ -658,23 +658,24 @@ namespace RSL
 
         // The projection shares its arithmetic with the eating path, so the
         // number cannot drift - with one deliberate exception, spelled out on
-        // Needs::HungerPreview. A negative one means the highlighted thing is
+        // Needs::HungerAfter. A negative total means the highlighted thing is
         // not food: a drink, a sword, nothing at all.
-        auto*       selected = open ? SelectedFood() : nullptr;
-        const float projected =
-            (open && !needs.Undead()) ? needs.HungerPreview(selected) : -1.0f;
+        auto* selected = open ? SelectedFood() : nullptr;
+        const auto after = (open && !needs.Undead()) ? needs.HungerAfter(selected)
+                                                     : Needs::Fullness{};
+        const float projected = after.total;
 
         // The cold bar answers a different question about the same item: how
-        // much time its frost resistance buys. A draught is not food and a meal
-        // is not warmth, so the two bars appear and vanish independently - and a
-        // RFAB dish that does both shows both.
+        // much time its frost resistance buys. Frost resistance is not food and
+        // a meal is not warmth, so the two bars appear and vanish independently
+        // - and a RFAB dish that does both shows both, which is also why
+        // neither of them may be called a drink.
         //
         // The undead gate is on the food bar alone. A vampire neither sleeps
         // nor eats and those two bars are hidden for them, but cold still
-        // applies - so a draught still buys them time, and still says so.
-        const float gift = open ? Needs::ColdGift(selected) : 0.0f;
-        const float coldProjected =
-            gift > 0.0f ? std::min(1.0f, needs.Cold() + gift) : -1.0f;
+        // applies - so it still buys them time, and still says so.
+        const auto  warm = open ? needs.ColdAfter(selected) : Needs::Fullness{};
+        const float coldProjected = warm.total;
 
         // ...and that is also what decides whether each bar is there. They
         // appear when the highlighted item would move them and go away again
@@ -692,7 +693,7 @@ namespace RSL
         // and it comes from the same Assess the eating path uses.
         if (projected >= 0.0f) {
             _bars.SetInvValue(BarWidget::INV_FOOD, needs.Hunger(), Settings::fHungerSafe,
-                projected, needs.HungerFast(), !Needs::Assess(selected).special);
+                projected, needs.HungerFast(), after.fast);
         }
 
         // Bought time is ALWAYS hatched: unlike food, there is no kind of it
@@ -700,7 +701,7 @@ namespace RSL
         // which is why the hatch covers both.
         if (coldProjected >= 0.0f) {
             _bars.SetInvValue(BarWidget::INV_COLD, needs.Cold(), Settings::fColdSafe,
-                coldProjected, needs.ColdTemp(), true);
+                coldProjected, needs.ColdTemp(), warm.fast);
         }
     }
 

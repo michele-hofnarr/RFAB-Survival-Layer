@@ -246,7 +246,7 @@ namespace RSL
             // THE RED READS THE RESERVE, NOT THE BAR. On the cold axis the
             // hatched part is bought time, and nothing downstream counts it:
             // penalties, hypothermia and the rest all read the reserve
-            // underneath. A bar held up by a draught would otherwise sit calm
+            // underneath. A bar held up by bought time would otherwise sit calm
             // and blue while the player was taking the full cold penalty.
             //
             // value - fast IS that reserve: the bar is base + bought and the
@@ -427,7 +427,7 @@ namespace RSL
     }
 
     void BarWidget::SetInvValue(int a_slot, float a_value, float a_safe, float a_projected,
-        float a_fast, bool a_projectedFast)
+        float a_fast, float a_projectedFast)
     {
         if (a_slot < 0 || a_slot >= INV_SLOTS) {
             return;
@@ -436,7 +436,7 @@ namespace RSL
         axis.value = std::clamp(a_value, 0.0f, 1.0f);
         axis.safe = std::clamp(a_safe, 0.0f, 1.0f);
         axis.fast = std::clamp(a_fast, 0.0f, 1.0f);
-        _invProjectedFast[a_slot] = a_projectedFast;
+        _invProjectedFast[a_slot] = std::clamp(a_projectedFast, 0.0f, 1.0f);
 
         // No loss marker on a preview: the marker means "this much just went",
         // and nothing has gone. Keeping it level with the value is what stops
@@ -476,7 +476,7 @@ namespace RSL
                 std::abs(axis.fast - row.drawnFast) > 1e-4f ||
                 std::abs(axis.safe - row.drawnSafe) > 1e-4f ||
                 std::abs(_invProjected[i] - _drawnInvProjected[i]) > 1e-4f ||
-                _drawnInvProjectedFast[i] != static_cast<int>(_invProjectedFast[i]);
+                std::abs(_invProjectedFast[i] - _drawnInvProjectedFast[i]) > 1e-4f;
             if (!moved) {
                 continue;
             }
@@ -487,7 +487,7 @@ namespace RSL
             row.drawnFast = axis.fast;
             row.drawnSafe = axis.safe;
             _drawnInvProjected[i] = _invProjected[i];
-            _drawnInvProjectedFast[i] = static_cast<int>(_invProjectedFast[i]);
+            _drawnInvProjectedFast[i] = _invProjectedFast[i];
 
             if (!_invShown[i]) {
                 continue;
@@ -516,14 +516,24 @@ namespace RSL
             Draw::Rect(row.fill, here, INNER, there - here, g.innerH(),
                 { SLOT_COLOUR[i], 50.0f });
 
-            // Hatch the promise too when what it offers is not the lasting kind
-            // - fast food on the one bar, bought time on the other - so the bar
-            // says which KIND of fullness it is offering and not only how much.
-            // The mask takes in the projected part on top of whatever share of
-            // the current fill is already hatched.
-            if (_invProjectedFast[i] && there > here) {
-                Draw::Rect(row.hatchMask, here, INNER, there - here, g.innerH(),
-                    { MARKER_WHITE });
+            // THE HATCH IS DRAWN FROM WHAT THE BAR WILL BE, not from what it
+            // is. DrawFill has just masked the fast share the player has now,
+            // sitting at the right of the CURRENT fill; that is the wrong
+            // picture here, because a meal displaces what was snacked. Eating
+            // one can make the hatched part shrink, or take it away entirely,
+            // while the bar as a whole grows - and being able to see that
+            // trade before making it is the whole point of the preview.
+            //
+            // So the mask is thrown away and drawn once, at the right of the
+            // PROJECTED fill, as wide as the fast share that would be left.
+            // Fast food widens it, a meal narrows it, and a meal that fills
+            // the bar leaves none of it at all.
+            Draw::Clear(row.hatchMask);
+            const float keptFast =
+                g.innerW() * std::min(_invProjectedFast[i], _invProjected[i]);
+            if (keptFast > 0.0f) {
+                Draw::Rect(row.hatchMask, there - keptFast, INNER, keptFast,
+                    g.innerH(), { MARKER_WHITE });
             }
         }
     }

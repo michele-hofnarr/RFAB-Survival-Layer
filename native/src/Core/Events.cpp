@@ -146,7 +146,7 @@ namespace RSL
                 // A SpecialFood that also resists frost passes through here and
                 // then goes on to feed, which is correct - it does both.
                 if (const float gift = Needs::ColdGift(alchemy); gift > 0.0f) {
-                    Needs::GetSingleton().OnDrankWarm(gift);
+                    Needs::GetSingleton().OnBoughtWarmth(gift);
                 }
 
                 // What this does to the bar is worked out in one place, so

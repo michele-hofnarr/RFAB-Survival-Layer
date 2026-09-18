@@ -74,8 +74,8 @@ namespace RSL
         // the one piece of the widget visible only while a menu owns the
         // screen, so their visibility is not part of SetVisible.
         //
-        // Two of them because a draught of frost resistance moves the cold bar
-        // and a meal moves the food bar, and RFAB has dishes that do both. The
+        // Two of them because frost resistance moves the cold bar and a meal
+        // moves the food bar, and RFAB has dishes that do both. The
         // food bar keeps the anchor it always had; cold sits one row pitch
         // ABOVE it, so nothing the player already placed by hand moves.
         enum InvSlot
@@ -86,8 +86,11 @@ namespace RSL
         };
 
         void SetInvShown(int a_slot, bool a_shown);
+        // a_fast is the fast share the bar has now; a_projectedFast the one it
+        // would have after. The second is not a kind but a size, because a
+        // meal can take the fast share away as well as add to it.
         void SetInvValue(int a_slot, float a_value, float a_safe, float a_projected,
-            float a_fast, bool a_projectedFast);
+            float a_fast, float a_projectedFast);
         void SetInvPlacement(float a_x, float a_y, float a_scale);
 
     private:
@@ -147,10 +150,10 @@ namespace RSL
         Row          _inv[INV_SLOTS];
         Axis         _invAxis[INV_SLOTS];
         float        _invProjected[INV_SLOTS]{ -1.0f, -1.0f };
-        bool         _invProjectedFast[INV_SLOTS]{ false, false };
+        float        _invProjectedFast[INV_SLOTS]{ 0.0f, 0.0f };
         bool         _invShown[INV_SLOTS]{ false, false };
         float        _drawnInvProjected[INV_SLOTS]{ -2.0f, -2.0f };
-        int          _drawnInvProjectedFast[INV_SLOTS]{ -1, -1 };
+        float        _drawnInvProjectedFast[INV_SLOTS]{ -2.0f, -2.0f };
         int          _drawnInvShown[INV_SLOTS]{ -1, -1 };
 
         bool         _built{ false };

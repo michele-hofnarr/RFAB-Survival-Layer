@@ -484,7 +484,7 @@ namespace RSL
 
         if (delta < 0.0f) {
             // FALLING: while the buffer covers it the reserve does not move at
-            // all. That is the whole of what a draught buys - not a cure, a
+            // all. That is the whole of what bought time is - not a cure, a
             // delay - and it is why hypothermia neither worsens nor eases while
             // one is running.
             _state.cold = std::clamp(_state.cold + std::min(0.0f, delta + paid),
@@ -864,11 +864,14 @@ namespace RSL
             return 0.0f;
         }
 
-        // Every frost-resistance effect on the item, summed - a draught with
-        // two of them is worth both. The magnitude is the one on the ITEM
-        // (EFIT), not the base effect's: that is where a potion's strength
-        // actually lives, and two potions sharing one base effect differ only
-        // there.
+        // Every frost-resistance effect on the item, summed - an item with
+        // two of them is worth both. ANY consumable: this reads the effects
+        // and nothing else, so a dish that carries frost resistance buys the
+        // same time a potion does.
+        //
+        // The magnitude is the one on the ITEM (EFIT), not the base effect's:
+        // that is where an item's strength actually lives, and two items
+        // sharing one base effect differ only there.
         float points = 0.0f;
         for (const auto* effect : a_item->effects) {
             if (!effect || !effect->baseEffect) {
@@ -887,33 +890,72 @@ namespace RSL
         return points * Settings::fColdPerResistPoint;
     }
 
-    void Needs::OnDrankWarm(float a_gift)
+    void Needs::OnBoughtWarmth(float a_gift)
     {
         if (a_gift <= 0.0f) {
             return;
         }
 
-        // The ceiling is on the SUM. A player at 0.9 with a 0.25 draught gets
-        // 0.1 of buffer and no more - the bar cannot hold more than a bar, and
-        // a buffer that could would be a second, hidden reserve.
+        // The ceiling is on the SUM. A player at 0.9 offered 0.25 gets 0.1 of
+        // buffer and no more - the bar cannot hold more than a bar, and a
+        // buffer that could would be a second, hidden reserve.
         const float before = _state.coldTemp;
         _state.coldTemp = std::clamp(_state.coldTemp + a_gift, 0.0f,
             std::max(0.0f, 1.0f - _state.cold));
-        logger::info("warm draught: +{:.3f} bought (offered {:.3f}, "
+        logger::info("bought warmth: +{:.3f} (offered {:.3f}, "
                      "buffer {:.3f} -> {:.3f}, base {:.3f})",
             _state.coldTemp - before, a_gift, before, _state.coldTemp, _state.cold);
     }
 
-    float Needs::HungerPreview(RE::AlchemyItem* a_item) const
+    Needs::Fullness Needs::ColdAfter(RE::AlchemyItem* a_item) const
+    {
+        const float gift = ColdGift(a_item);
+        if (gift <= 0.0f) {
+            return Fullness{};
+        }
+
+        // OnBoughtWarmth's arithmetic, on a copy of the buffer. The ceiling
+        // is on the SUM, not on the offer, so what one is worth depends on
+        // what the earned half has already taken - and on a full bar it is
+        // worth nothing at all. A preview that added the whole of it
+        // regardless promised a buffer that would never arrive.
+        const float temp = std::clamp(_state.coldTemp + gift, 0.0f,
+            std::max(0.0f, 1.0f - _state.cold));
+
+        return Fullness{ std::clamp(_state.cold + temp, 0.0f, 1.0f), temp };
+    }
+
+    Needs::Fullness Needs::HungerAfter(RE::AlchemyItem* a_item) const
     {
         const auto meal = Assess(a_item);
         if (!meal.feeds) {
-            return -1.0f;
+            return Fullness{};
         }
 
+        // OnAte's arithmetic, on a copy of the two halves. Written out again
+        // rather than shared because the eating path has side effects all
+        // through it, and copied line for line because the moment these two
+        // disagree the preview starts lying about the trade.
+        //
         // meal.rawWeak is not consulted. See the note on the declaration: the
         // preview promises the meal, the stomach has the last word.
-        return std::clamp(Hunger() + meal.restore, 0.0f, 1.0f);
+        float special = _state.hungerSpecial;
+        float fast = _state.hungerFast;
+
+        const float room = meal.special
+                               ? std::max(0.0f, 1.0f - special)
+                               : std::max(0.0f, 1.0f - (special + fast));
+        const float ate = std::min(meal.restore, room);
+
+        if (meal.special) {
+            special += ate;
+            fast = std::min(fast, std::max(0.0f, 1.0f - special));
+        } else {
+            fast += ate;
+        }
+
+        return Fullness{ std::clamp(special + fast, 0.0f, 1.0f),
+            std::clamp(fast, 0.0f, 1.0f) };
     }
 
     void Needs::OnAte(float a_restore, bool a_special)

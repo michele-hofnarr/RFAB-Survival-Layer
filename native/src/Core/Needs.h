@@ -86,19 +86,38 @@ namespace RSL
         // drinking, so the promise on screen cannot drift from the result.
         [[nodiscard]] static float ColdGift(RE::AlchemyItem* a_item);
 
-        // A draught of frost resistance was drunk. What it buys goes on top of
-        // the reserve, and cannot push the bar past full.
-        void OnDrankWarm(float a_gift);
+        // Frost resistance was taken from a consumable - which need not be a
+        // drink, and in this pack often is not: ColdGift reads the effects on
+        // the item, and RFAB has dishes that carry them. What it buys goes on
+        // top of the reserve, and cannot push the bar past full.
+        void OnBoughtWarmth(float a_gift);
 
-        // What the inventory preview should promise, or a negative number if
-        // the item would not move the bar at all.
+        // What the bar would look like after eating this: the total, and how
+        // much of that total would be the fast share.
+        //
+        // BOTH, because the total alone cannot say what the bar will look
+        // like. A meal displaces what was snacked, so eating one can make the
+        // hatched part SHRINK - or go altogether - while the bar as a whole
+        // grows. A preview that promises only a total draws the same picture
+        // either way, and the player cannot see the trade he is making.
         //
         // Deliberately NOT the same as what eating it does. Raw meat on a weak
         // stomach is worth exactly what the preview says and empties the bar
         // anyway, and the preview says so cheerfully - you find out by eating
         // it. The arithmetic is still shared with the eating path; only this
         // one line differs, on purpose.
-        [[nodiscard]] float HungerPreview(RE::AlchemyItem* a_item) const;
+        struct Fullness
+        {
+            float total{ -1.0f };   // negative: this item would not feed at all
+            float fast{ 0.0f };     // how much of that total is the fast share
+        };
+        [[nodiscard]] Fullness HungerAfter(RE::AlchemyItem* a_item) const;
+
+        // The same for the cold bar and the frost resistance on a consumable.
+        // Its whole total is bought time, so Fullness::fast is the buffer -
+        // and the buffer is what the ceiling bites: it is worth only the room
+        // the earned half leaves, and at a full bar it is worth nothing.
+        [[nodiscard]] Fullness ColdAfter(RE::AlchemyItem* a_item) const;
 
         // Food was eaten; a_restore is a fraction of a full bar. a_special
         // decides which half of the bar it goes into - and the bar cannot pass
@@ -210,7 +229,7 @@ namespace RSL
             // something on a long walk and nothing at all in a blizzard you
             // are already losing.
             //
-            // So a draught buys TIME instead. coldTemp sits on top of cold and
+            // So it buys TIME instead. coldTemp sits on top of cold and
             // is spent first, which holds cold still while it lasts - and
             // holding cold still is the whole of it: penalties, hypothermia,
             // the common cold, lesions, RFAB's own illnesses, the ice crust,
