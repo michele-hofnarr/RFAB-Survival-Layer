@@ -64,24 +64,73 @@ namespace RSL
             bool conditionFalse{ false };
         };
 
-        // WHICH of the spell's effects are missing, by name.
+        [[nodiscard]] std::string ArchetypeName(RE::EffectArchetype a_arch)
+        {
+            switch (a_arch) {
+            case RE::EffectArchetype::kValueModifier:       return "ValueMod";
+            case RE::EffectArchetype::kDualValueModifier:   return "DualValueMod";
+            case RE::EffectArchetype::kPeakValueModifier:   return "PeakValueMod";
+            case RE::EffectArchetype::kAccumulateMagnitude: return "AccumMagnitude";
+            default: return fmt::format("archetype {}", static_cast<int>(a_arch));
+            }
+        }
+
+        // Everything else running on the player that moves this actor value.
         //
-        // The count alone said a stage-1 lesion had one effect running where a
-        // green spore had two - true, and useless, because the two spells do
-        // not carry the same number of effects. Three carried and one running
-        // is a different fact from two carried and two running, and only this
-        // says which of the three never arrived.
+        // THIS IS THE COLUMN THAT MATTERS. A peak-value modifier does not stack
+        // with another on the same actor value - only the largest applies - so
+        // an effect that never arrives while something else already holds its
+        // actor value has not failed to instantiate at all. It has been
+        // outranked, and from every other angle the two look identical.
+        [[nodiscard]] std::string RivalsFor(RE::ActorValue a_av, const RE::Effect* a_skip,
+            RE::BSSimpleList<RE::ActiveEffect*>* a_list)
+        {
+            std::string rivals;
+            if (!a_list || a_av == RE::ActorValue::kNone) {
+                return rivals;
+            }
+
+            for (auto* active : *a_list) {
+                if (!active || active->effect == a_skip) {
+                    continue;
+                }
+                const auto* base = active->GetBaseObject();
+                if (!base || base->data.primaryAV != a_av) {
+                    continue;
+                }
+                const char* name = base->GetName();
+                if (!rivals.empty()) {
+                    rivals += ", ";
+                }
+                rivals += fmt::format("[{:08X}] {} {} mag {:.1f}", base->GetFormID(),
+                    (name && *name) ? name : "<unnamed>",
+                    ArchetypeName(base->data.archetype), active->magnitude);
+            }
+            return rivals;
+        }
+
+        // EVERYTHING ABOUT AN EFFECT THAT DID NOT ARRIVE, in one place.
+        //
+        // Written this way after two runs that each answered a third of the
+        // question and cost a restart of the game apiece. The first named the
+        // culprits "<no editor id>", because Skyrim SE keeps no editor ids for
+        // magic effects at runtime; the second would have named them without
+        // saying what they are or what might be standing in their way.
+        //
+        // So: which effect, what kind it is, which actor value it moves, and
+        // what else already holds that actor value.
+        //
         // The list is taken non-const because BSSimpleList has no const
         // iterator: iterator_base cannot be built from a const node, and the
         // error it gives says nothing about that.
-        [[nodiscard]] std::string MissingEffects(RE::SpellItem* a_spell,
+        [[nodiscard]] std::vector<std::string> MissingEffects(RE::SpellItem* a_spell,
             RE::BSSimpleList<RE::ActiveEffect*>* a_list)
         {
+            std::vector<std::string> lines;
             if (!a_spell || !a_list) {
-                return {};
+                return lines;
             }
 
-            std::string missing;
             std::size_t carried = 0;
             std::size_t absent = 0;
 
@@ -101,21 +150,32 @@ namespace RSL
                 if (running) {
                     continue;
                 }
-
                 ++absent;
+
                 const auto* base = effect->baseEffect;
-                const char* edid = base ? base->GetFormEditorID() : nullptr;
-                if (!missing.empty()) {
-                    missing += ", ";
+                if (!base) {
+                    lines.push_back("      an effect with no base object at all");
+                    continue;
                 }
-                missing += (edid && *edid) ? edid : "<no editor id>";
+
+                const char* name = base->GetName();
+                const auto  rivals = RivalsFor(base->data.primaryAV, effect, a_list);
+
+                lines.push_back(fmt::format(
+                    "      [{:08X}] {} - {} on av {}, magnitude {:.1f}{}{}",
+                    base->GetFormID(), (name && *name) ? name : "<unnamed>",
+                    ArchetypeName(base->data.archetype),
+                    static_cast<int>(base->data.primaryAV), effect->effectItem.magnitude,
+                    rivals.empty() ? ", and nothing else holds that av" : ", held by: ",
+                    rivals));
             }
 
             if (absent == 0) {
                 return {};
             }
-            return fmt::format("{} of {} effect(s) NOT RUNNING: {}", absent, carried,
-                missing);
+            lines.insert(lines.begin(),
+                fmt::format("    {} of {} effect(s) NOT RUNNING:", absent, carried));
+            return lines;
         }
 
         [[nodiscard]] Running RunningEffects(RE::SpellItem* a_spell)
@@ -497,10 +557,9 @@ namespace RSL
 
             if (spell && player) {
                 auto* target = player->AsMagicTarget();
-                if (auto missing = MissingEffects(spell,
-                        target ? target->GetActiveEffectList() : nullptr);
-                    !missing.empty()) {
-                    logger::warn("    {} {}", id, missing);
+                for (const auto& line : MissingEffects(spell,
+                         target ? target->GetActiveEffectList() : nullptr)) {
+                    logger::warn("{}", line);
                 }
             }
         }
