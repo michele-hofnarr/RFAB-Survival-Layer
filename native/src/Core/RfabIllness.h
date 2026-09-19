@@ -31,12 +31,23 @@
 //     whether it removed anything is the only way to tell a real stray instance
 //     from our copy showing RFAB's effect names.
 //
-// The Peryite blessing stops P for the six base-game ones at stage 1, AND THAT
-// IS THE WHOLE OF IT. Stage 1 is RFAB's own record and carries their Peryite
-// boon, so this layer must not drive it anywhere - but it does not hold the
-// player ill either. Medicine reaches it like any other disease, a cure takes
-// it off, and stages 2 and 3 run normally, so a disease already in progress
-// settles back to 1 and stops there.
+// THE PERYITE BLESSING, and what it is for.
+//
+// A player who has it is playing through it on purpose: for them those six
+// diseases are a boon, not an affliction. So while it is on, this layer stops
+// having an opinion about RFAB's OWN records - it may neither aggravate them
+// nor cure them by its own arithmetic. In the game they come off by Cure
+// Disease and by nothing else, and that is the custom being kept.
+//
+// In code that is one sentence: at stage 1, P does not move. Nothing else
+// changes. Medicine still reaches the illness, a cure still takes it off, and
+// with P still the only other way a stage can move, a cure is the only way out
+// - which is the point.
+//
+// Stages 2 and 3 are not covered, because they are not RFAB's. They are this
+// layer's own addition and carry no Peryite bonus, so P runs there as it does
+// for any illness: something already in progress works its way back down to
+// stage 1 and stops.
 //
 // It used to do more, and none of the rest was ever asked for. The same branch
 // re-added RFAB's disease spell whenever it found it gone - "re-assert if a
