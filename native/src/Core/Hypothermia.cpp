@@ -43,6 +43,43 @@ namespace RSL
             }
         }
 
+        // A MENU ALREADY ON SCREEN WHEN THE BODY GIVES OUT.
+        //
+        // Taking a control away stops a menu being OPENED and does nothing
+        // whatever about one that is already up: the player goes on browsing
+        // their pack while lying paralysed on the floor. So the menus the
+        // lockdown denies are shut as well as blocked, and the two lists are
+        // deliberately the same list - the four behind kMainFour, the tween
+        // menu that leads to them, the favourites wheel, and the item menus
+        // reached by activating something, which kActivate denies.
+        //
+        // kForceHide rather than kHide: that is what SKSE's own UI.CloseMenu
+        // sends, and a plain hide can leave the engine in menu mode with
+        // nothing on screen.
+        //
+        // Escape and the journal are absent here for the same reason they are
+        // absent from the flags - see ToggleControls.
+        void CloseBlockedMenus()
+        {
+            auto* ui = RE::UI::GetSingleton();
+            auto* queue = RE::UIMessageQueue::GetSingleton();
+            if (!ui || !queue) {
+                return;
+            }
+
+            for (const auto name : { RE::InventoryMenu::MENU_NAME,
+                     RE::MagicMenu::MENU_NAME, RE::StatsMenu::MENU_NAME,
+                     RE::MapMenu::MENU_NAME, RE::TweenMenu::MENU_NAME,
+                     RE::FavoritesMenu::MENU_NAME, RE::ContainerMenu::MENU_NAME,
+                     RE::BarterMenu::MENU_NAME, RE::GiftMenu::MENU_NAME }) {
+                if (ui->IsMenuOpen(name)) {
+                    queue->AddMessage(name, RE::UI_MESSAGE_TYPE::kForceHide,
+                        nullptr);
+                    logger::info("lockdown: closed {}", name);
+                }
+            }
+        }
+
         // WHICH FLAG GOVERNS WHICH KEY, read off the game's own control map.
         //
         // The grouping lives in controlmap.txt inside a BSA and no header
@@ -278,6 +315,7 @@ namespace RSL
                 said = true;
                 SayControlFlags();
             }
+            CloseBlockedMenus();
             if (auto* process = player->GetActorRuntimeData().currentProcess) {
                 process->KnockExplosion(player, player->GetPosition(), 3.0f);
             }
