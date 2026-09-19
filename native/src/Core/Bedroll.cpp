@@ -188,7 +188,24 @@ namespace RSL
 
         auto* furn = Put(Forms::bedrollFurn, spot, spot.position);
         if (!furn) {
-            logger::error("bedroll: would not place");
+            // The item was hidden a few lines up so the raycast would not land
+            // on it, and returning here left it exactly there: disabled, never
+            // deleted, with nothing in the player's pack to show for it. The
+            // bedroll was simply gone.
+            //
+            // The same two steps the no-room path above takes, for the same
+            // reason: one back in the pack, the reference taken down.
+            std::int32_t back = 0;
+            if (a_dropped) {
+                back = std::max(1, a_dropped->extraList.GetCount());
+                if (auto* base = a_dropped->GetBaseObject()) {
+                    player->AddObjectToContainer(base, nullptr, back, nullptr);
+                }
+                // Counted BEFORE this: the reference is marked for deletion
+                // here and is not ours to read afterwards.
+                TakeDown::Now(a_dropped, "dropped bedroll");
+            }
+            logger::error("bedroll: would not place - {} back in the pack", back);
             return;
         }
 

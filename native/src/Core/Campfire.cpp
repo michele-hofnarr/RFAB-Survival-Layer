@@ -262,7 +262,25 @@ namespace RSL
 
         auto* fire = Put(base, spot.position, spot.pitch, spot.roll, spot.heading);
         if (!fire) {
-            logger::error("campfire: the fire would not place");
+            // WHAT THIS PATH USED TO LEAVE BEHIND. The firewood was already
+            // spent and the old set already hidden, and returning here kept
+            // both: the player paid for a fire they did not get, and their
+            // previous one stayed in _state as a reference that was disabled
+            // and would never be marked - a camp standing in the world that
+            // nothing could reach and nothing would take down.
+            //
+            // So the wood goes back and the old set is retired properly. There
+            // is no putting the old fire up again: Disable has no counterpart
+            // in CommonLibSSE, which is why Hide only ever disables.
+            player->AddObjectToContainer(Forms::firewood, nullptr, need, nullptr);
+
+            // Through Extinguish rather than Retire, so the player is told in
+            // the one way that is already true and already translated: their
+            // fire IS out. With no previous fire it says nothing, which is
+            // also right - nothing went out.
+            Extinguish();
+            logger::error("campfire: the fire would not place - {} firewood back",
+                need);
             return;
         }
 
