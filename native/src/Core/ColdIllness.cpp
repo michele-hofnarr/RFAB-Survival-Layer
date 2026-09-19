@@ -44,7 +44,19 @@ namespace RSL
         }
 
         const float chance = ContractChance(a_tick.cold);
-        return chance > 0.0f && RollPercent() < chance;
+        if (chance <= 0.0f || RollPercent() >= chance) {
+            return false;
+        }
+
+        // THE ONLY ILLNESS THAT CAUGHT ITSELF IN SILENCE. Every other one says
+        // why: the lesions print the threshold they crossed, the RFAB wrappers
+        // that they adopted a record, and a hit or a bad meal goes through
+        // Illness::Contract, which logs. The cold came through this hook, and
+        // this hook printed nothing - so a caught cold appeared in the log as
+        // a bare "disease CC: stage -> 1" with no reading behind it.
+        logger::info("dz {}: contracted from the cold ({:.2f} left, {:.0f}%/h)", Id(),
+            a_tick.cold, chance);
+        return true;
     }
 
     std::string ColdIllness::TraceExtra(const Tick& a_tick) const

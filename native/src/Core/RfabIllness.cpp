@@ -167,8 +167,7 @@ namespace RSL
         // THE WHOLE OF WHAT THE BLESSING DOES: P does not move. Not reset, not
         // held at a value of our choosing - simply not driven by us, so that
         // losing the blessing resumes from wherever the illness actually was.
-        _frozen = Frozen();
-        if (_frozen) {
+        if (Frozen()) {
             return 0;
         }
         return Illness::Progress(a_tick);
@@ -196,6 +195,7 @@ namespace RSL
     std::string RfabIllness::TraceExtra(const Tick&) const
     {
         return fmt::format("afflicted={} ourCopy={} seenClean={}{}", _afflicted,
-            _ourCopyOn, _seenClean, _frozen ? " FROZEN by the Peryite blessing" : "");
+            _ourCopyOn, _seenClean,
+            Frozen() ? " FROZEN by the Peryite blessing" : "");
     }
 }

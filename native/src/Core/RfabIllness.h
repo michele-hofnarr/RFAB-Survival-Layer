@@ -113,14 +113,17 @@ namespace RSL
         [[nodiscard]] static DiseaseForms AsCommon(const RfabDiseaseForms& a_src);
 
         // Is the Peryite blessing holding this one still right now?
+        //
+        // ASKED EVERY TIME, by both the progression and the trace. It used to
+        // be answered once inside Progress and kept in a member for the trace
+        // to read - and Progress only runs at stage 1 or worse, so once the
+        // illness was cured the member stayed true and the trace went on
+        // saying "FROZEN by the Peryite blessing" about an illness the player
+        // no longer had. A hundred and sixty lines of it in one session.
         [[nodiscard]] bool Frozen() const;
 
         const RfabDiseaseForms& _src;
         bool                    _blessingFreezes{ false };
-
-        // For the trace, so a frozen illness says so rather than looking like
-        // one that simply is not moving.
-        bool _frozen{ false };
 
         // Read once at the top of each pass: is RFAB's own illness on the
         // player at all, and is one of our copies wearing its effect names?
