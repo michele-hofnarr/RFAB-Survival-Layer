@@ -417,7 +417,7 @@ namespace RSL
         // either. Ten is what a clean linen cloth gives a lesion, so a dose
         // means the same thing wherever it lands. Zero makes medicine useless
         // past stage 1, which is a fair setting to want.
-        static inline float fCurePotency{ 10.0f };
+        static inline float fCurePotency{ 25.0f };
         static inline float fDiseaseProgressHours{ 24.0f };
         static inline float fDiseaseDecayHours{ 24.0f };
 

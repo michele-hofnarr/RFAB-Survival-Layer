@@ -216,8 +216,18 @@ namespace RSL
         // Worth exactly what a dose of medicine is worth to an illness. It had
         // a setting of its own that happened to carry the same number, which is
         // two knobs for one idea and a silent disagreement waiting to happen.
-        const float held = std::clamp(_lesionP.load() + Settings::fCurePotency,
-            -LESION_LIMIT, LESION_LIMIT);
+        //
+        // CAPPED AT ONE DOSE, NOT AT THE DAMAGE GUARD. LESION_LIMIT bounds how
+        // much DAMAGE one tick may fold in; the cloth shares that accumulator
+        // only because the accumulator is signed. Clamping the cloth against it
+        // as well made the guard decide what medicine is worth - at a potency
+        // of 25 against a guard of 20 it quietly paid 20, and the setting's own
+        // help text promises that one dose means one thing across the mod.
+        //
+        // The floor needs no clamp: what is already in the queue is at worst
+        // -LESION_LIMIT and this only ever adds.
+        const float held = std::min(_lesionP.load() + Settings::fCurePotency,
+            Settings::fCurePotency);
         _lesionP.store(held);
         logger::info("bandage used -> lesion P {:+.1f}", held);
     }

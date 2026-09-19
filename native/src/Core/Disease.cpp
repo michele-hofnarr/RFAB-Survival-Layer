@@ -474,9 +474,10 @@ namespace RSL
             // of the illness turning rather than deepening. The body still has
             // to do the rest, through sleep, food and warmth.
             //
-            // fCurePotency defaults to the same 10 a clean linen cloth is worth
-            // to a lesion, so "one dose of medicine" means one thing across the
-            // mod.
+            // fCurePotency is what a clean linen cloth is worth to a lesion as
+            // well, so "one dose of medicine" means one thing across the mod.
+            // It was 10 and read as nothing in play; 25 is a quarter of the way
+            // to a stage.
             //
             // Both halves live HERE and not at the point of use: there is one
             // door into the cure count, so there is one place that decides what

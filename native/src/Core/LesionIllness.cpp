@@ -143,10 +143,17 @@ namespace RSL
         state.prog = std::clamp(state.prog + _drift * a_tick.gameHours,
             -100.0f, 100.0f);
 
+        // BOTH ENDS TAKE BOTH VALUES. The healing side has the same shape as
+        // the worsening one and for the same reason: a clean linen cloth is a
+        // saturating input too, and AddP stops it at +100 exactly. Bandage a
+        // deep lesion and step into deep cold on the same tick, and the drift
+        // pulls P off +100 before the post-drift test ever sees it. Rarer than
+        // the barrage - which saturated every tick under fire - but the same
+        // fault, so it is closed the same way.
         std::int32_t step = 0;
         if (afterHits <= -limit || state.prog <= -limit) {
             step = 1;    // worse
-        } else if (state.prog >= limit) {
+        } else if (afterHits >= limit || state.prog >= limit) {
             step = -1;   // better
         }
 
