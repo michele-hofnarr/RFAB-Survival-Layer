@@ -27,7 +27,9 @@ namespace RSL
         //             that is the ragdoll and not the control map.
         //
         // What is taken is what a body that has stopped obeying cannot do:
-        // walk, fight, sneak, reach for things.
+        // walk, fight, sneak, reach for things - and rummage through a pack,
+        // which is kMainFour: the game's own name for the four menus behind
+        // Inventory, Magic, Skills and Map.
         void ToggleControls(bool a_enable)
         {
             auto* controls = RE::ControlMap::GetSingleton();
@@ -36,8 +38,53 @@ namespace RSL
             }
             using UEFlag = RE::ControlMap::UEFlag;
             for (const auto flag : { UEFlag::kMovement, UEFlag::kFighting,
-                     UEFlag::kSneaking, UEFlag::kActivate }) {
+                     UEFlag::kSneaking, UEFlag::kActivate, UEFlag::kMainFour }) {
                 controls->ToggleControls(flag, a_enable);
+            }
+        }
+
+        // WHICH FLAG GOVERNS WHICH KEY, read off the game's own control map.
+        //
+        // The grouping lives in controlmap.txt inside a BSA and no header
+        // states it, so the set above was picked by name and by inference -
+        // "main four" for the four menus, kMenu for Escape and the quick keys.
+        // Inference is what this replaces. Printed once, the first time a
+        // lockdown goes on, because a key that still works when it should not
+        // otherwise costs a run of the game to place.
+        void SayControlFlags()
+        {
+            auto* controls = RE::ControlMap::GetSingleton();
+            auto* events = RE::UserEvents::GetSingleton();
+            if (!controls || !events) {
+                return;
+            }
+
+            const RE::BSFixedString wanted[] = {
+                events->inventory, events->stats, events->map, events->favorites,
+                events->tweenMenu, events->journal, events->pause,
+                events->quicksave, events->quickload,
+                events->quickInventory, events->quickMagic, events->quickStats,
+                events->quickMap, events->activate, events->jump,
+            };
+
+            auto* context =
+                controls->controlMap[RE::UserEvents::INPUT_CONTEXT_ID::kGameplay];
+            if (!context) {
+                return;
+            }
+
+            logger::info("lockdown: control flags (enabled mask {:#x})",
+                controls->enabledControls.underlying());
+            for (const auto& mapping :
+                context->deviceMappings[RE::INPUT_DEVICE::kKeyboard]) {
+                for (const auto& name : wanted) {
+                    if (mapping.eventID == name) {
+                        logger::info("    {:<16} flag {:#06x}  key {}",
+                            mapping.eventID.c_str(),
+                            mapping.userEventGroupFlag.underlying(),
+                            mapping.inputKey);
+                    }
+                }
             }
         }
 
@@ -226,6 +273,11 @@ namespace RSL
         // v0.4.0 delivers it. There is no binding for that, but the same work
         // is done by the process-level knock the explosion path uses.
         if (a_on) {
+            static bool said = false;
+            if (!said) {
+                said = true;
+                SayControlFlags();
+            }
             if (auto* process = player->GetActorRuntimeData().currentProcess) {
                 process->KnockExplosion(player, player->GetPosition(), 3.0f);
             }
