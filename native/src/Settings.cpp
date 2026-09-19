@@ -164,7 +164,6 @@ namespace RSL
         ReadFloat(ini, "Cold", "fInteriorTemp", fInteriorTemp);
         ReadFloat(ini, "Cold", "fColdInteriorTemp", fColdInteriorTemp);
         ReadFloat(ini, "Cold", "fFireRadius", fFireRadius);
-        ReadFloat(ini, "Cold", "fFireShare", fFireShare);
         ReadFloat(ini, "Cold", "fFireMaxDeg", fFireMaxDeg);
         ReadFloat(ini, "Cold", "fTorchOfFire", fTorchOfFire);
         ReadFloat(ini, "Cold", "fElemDamageShare", fElemDamageShare);

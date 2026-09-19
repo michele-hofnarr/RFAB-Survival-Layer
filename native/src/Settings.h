@@ -271,38 +271,26 @@ namespace RSL
         // temperature instead, which is the same relief expressed in the units
         // this model actually uses.
         //
-        // A SHARE of what the cold is short by, not a flat number of degrees.
-        // The reason is in the target table: all eight interior rows sit at the
-        // same temperature, so they pin what a fire is WORTH (0.15 of the bar)
-        // while saying nothing about its shape - and the one outdoor fire row,
-        // four slots and 50% resist in the mountains, asks for more than the
-        // flat number can give (0.47 against a required 0.50+). A share
-        // satisfies both. It also removes the oddity that a flat fire threw
-        // away whatever part of itself pushed past comfort.
+        // A FLAT NUMBER OF DEGREES, unconditionally, and the same number
+        // everywhere. Not a share of what the cold is short by.
         //
-        // fFireShare is solved rather than chosen: 0.15 of a bar, six degrees
-        // short of comfort, is 0.4583 of the shortfall. The cap is the one
-        // number here the target table does not fix, and it carries the whole
-        // of how much of a rescue a fire is.
+        // The share was solved off the target table - 0.15 of a bar at six
+        // degrees short of comfort is 0.4583 of the shortfall - and it made a
+        // fire worth almost nothing in a mild wood and a great deal on a
+        // mountain. That is defensible on paper and reads as a fire that does
+        // not work, because the player cannot see the shortfall it is a share
+        // of. Ten degrees is ten degrees wherever it is lit.
         //
-        // EVERY FIRE IS THE SAME FIRE. A flat +10 used to sit on top of one the
-        // player lit themselves, and it put the model outside its own
-        // specification: row 18 asks for 0.50+ in the mountains at a fire, the
-        // share alone returns 0.599, and the bonus took that row to 1.000. A
-        // fire carried up a mountain is worth having because it could be
-        // carried there, not because it burns hotter than anyone else's.
-        //
-        // The cap reaches no interior row: at +6 the shortfall is six degrees
-        // and the share gives 2.75, nowhere near any cap under eleven. It only
-        // ever decides the cold outdoors, which is what makes it safe to turn.
-        // At 7 a fire in ordinary snow settles on the penalty line and the
-        // mountains become survivable rather than solved.
-        static inline float fFireShare{ 0.4583f };
-        static inline float fFireMaxDeg{ 7.0f };
+        // EVERY FIRE IS STILL THE SAME FIRE. One the player lit themselves is
+        // worth exactly what anyone else's is worth; what the perks buy is
+        // being able to light one at all, and to have it last the night.
+        static inline float fFireMaxDeg{ 10.0f };
 
-        // A torch is this much of a fire, cap and all. In a warm interior that
-        // comes out at the 1.2 degrees it was before.
-        static inline float fTorchOfFire{ 0.44f };
+        // And a torch in the hand, on the same terms: degrees, not a fraction
+        // of a fire. It used to be 0.44 OF one, which in a warm interior came
+        // out at about 1.2 degrees and outdoors at rather more - the same
+        // invisible arithmetic, one step removed.
+        static inline float fTorchOfFire{ 5.0f };
 
         // Half of v0.4.0's 400 for the radius. That number was reached through
         // a different model - severity was multiplied by 0.2 anywhere inside it
@@ -564,7 +552,7 @@ namespace RSL
         // How long the white loss marker trails the bar. 1 is the shipped
         // speed; 2 makes it last twice as long. It is the only readout of how
         // FAST an axis is falling, and at 1 it was gone before the eye found it.
-        static inline float fMarkerLinger{ 2.0f };
+        static inline float fMarkerLinger{ 3.0f };
 
         // THE AIR ABOVE THE GROUND, for the baked climate map.
         //

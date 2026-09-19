@@ -158,22 +158,6 @@ namespace RSL
                                    RE::TESWeather::WeatherDataFlag::kRainy);
         }
 
-        // What a fire is worth here.
-        //
-        // A share of the shortfall rather than a flat number of degrees, capped
-        // so the coldest places do not turn a stranger's campfire into a
-        // solution. Settings.h has the reasoning and the numbers.
-        //
-        // The cap applies before the torch scale, so a torch stays a fraction
-        // of whatever a real fire would have been worth in the same spot.
-        [[nodiscard]] float FireGain(float a_tempBeforeFire, float a_scale)
-        {
-            const float missing =
-                std::max(0.0f, Settings::fComfortTemp - a_tempBeforeFire);
-            return std::min(Settings::fFireMaxDeg, Settings::fFireShare * missing) *
-                   a_scale;
-        }
-
         // The day, as a curve rather than a switch.
         //
         //     offset = -amp * (1 - cos(2pi (h - peak) / 24)) / 2
@@ -475,10 +459,10 @@ namespace RSL
                 const float beforeFire = out.baseTemp;
                 if (NearFire(player, Settings::fFireRadius)) {
                     out.nearFire = true;
-                    out.fireOffset = FireGain(beforeFire, 1.0f);
+                    out.fireOffset = Settings::fFireMaxDeg;
                 } else if (HoldingTorch(player)) {
                     out.nearFire = true;
-                    out.fireOffset = FireGain(beforeFire, Settings::fTorchOfFire);
+                    out.fireOffset = Settings::fTorchOfFire;
                 }
                 out.temperature = beforeFire + out.fireOffset;
             }
@@ -591,10 +575,10 @@ namespace RSL
 
         if (NearFire(player, Settings::fFireRadius)) {
             out.nearFire = true;
-            out.fireOffset = FireGain(beforeFire, 1.0f);
+            out.fireOffset = Settings::fFireMaxDeg;
         } else if (HoldingTorch(player)) {
             out.nearFire = true;
-            out.fireOffset = FireGain(beforeFire, Settings::fTorchOfFire);
+            out.fireOffset = Settings::fTorchOfFire;
         }
 
         out.temperature = beforeFire + out.fireOffset;

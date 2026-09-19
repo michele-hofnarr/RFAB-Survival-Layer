@@ -620,18 +620,15 @@ namespace RSL
                     if (auto* fire = Climate::NearestFire(Settings::fFireRadius)) {
                         auto*       base = fire->GetBaseObject();
                         const char* edid = base ? base->GetFormEditorID() : nullptr;
-                        logger::info("  fire: {} [{:08X}] at {:.0f}, worth {:+.1f} deg"
-                                     " (share {:.2f}, cap {:.1f})",
+                        logger::info("  fire: {} [{:08X}] at {:.0f}, worth {:+.1f} deg",
                             (edid && *edid) ? edid : "<no editor id>",
                             base ? base->GetFormID() : 0,
                             fire->GetPosition().GetDistance(
                                 RE::PlayerCharacter::GetSingleton()->GetPosition()),
-                            climate.fireOffset, Settings::fFireShare,
-                            Settings::fFireMaxDeg);
+                            climate.fireOffset);
                     } else {
-                        logger::info("  fire: a torch in hand, worth {:+.1f} deg"
-                                     " ({:.2f} of a fire)",
-                            climate.fireOffset, Settings::fTorchOfFire);
+                        logger::info("  fire: a torch in hand, worth {:+.1f} deg",
+                            climate.fireOffset);
                     }
                 }
                 if (climate.sheltered || climate.soaking || climate.ownFire) {
