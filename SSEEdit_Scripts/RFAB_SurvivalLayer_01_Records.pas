@@ -3153,7 +3153,7 @@ end;
 // scripts are our own. See _RSL_BedrollItem.psc for the pattern note.
 procedure BuildBedroll;
 var
-  miscTpl, furnTpl, cobjTpl, mi, fu, co, kwd, leather: IwbMainRecord;
+  miscTpl, furnTpl, cobjTpl, mi, fu, co, kwd, leather, perk: IwbMainRecord;
   items, ci, cond: IInterface;
 begin
   Say('');
@@ -3212,11 +3212,19 @@ begin
     PutEdit(co, 'EDID', PFX + 'RecipeBedroll');
     Inc(madeNew);
   end;
-  // wipe the template's conditions (RecipeLeather01 needs an AnimalHide) - keep
-  // the container, remove entries, so our recipe is always available
+  // Wipe the template's own conditions (RecipeLeather01 needs an AnimalHide),
+  // then put ours back: the bedroll is gated on the same perk the campfire is.
+  // The container is kept rather than dropped - AddCond wants one.
   cond := ElementByName(co, 'Conditions');
   if Assigned(cond) then
     while ElementCount(cond) > 0 do RemoveByIndex(cond, 0, True);
+
+  perk := RecordByEDID(FileByName('RFAB.esp'), 'PERK',
+    'RFAB_Perk_Survival_BaseSurvival');
+  if not Assigned(perk) then begin
+    Problem('RFAB_Perk_Survival_BaseSurvival не найден - рецепт спальника без перка');
+  end else
+    AddCond(co, CTDA_FUNC_HASPERK, CTDA_OP_EQ, 1.0, perk);
 
   PutNative(co, 'CNAM', GetLoadOrderFormID(mi));   // created object -> our item
   PutNative(co, 'NAM1', 1);
