@@ -47,16 +47,19 @@ namespace RSL
 
     void ColdVisual::ClearAll()
     {
-        if (_on) {
-            _on = false;
-            _fx.Stop(Forms::fxColdShader);
-        }
+        // UNCONDITIONALLY, unlike everything else here. This is the master
+        // switch, and the one thing it may not do is leave a crust behind on
+        // the strength of a flag - a load drops that flag while the effect it
+        // describes goes on running. Stop goes by shader and target now, so
+        // asking it when there is nothing to end costs one walk of the temp
+        // effects and says so in the log.
+        _on = false;
+        _fx.Stop(Forms::fxColdShader);
     }
 
     void ColdVisual::Forget()
     {
-        // The flag only. Dropping the instance as well is what put a second
-        // crust on the player after every load - see PlayerShader.
         _on = false;
+        _fx.Forget();
     }
 }

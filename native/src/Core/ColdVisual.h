@@ -29,12 +29,11 @@ namespace RSL
 
         void ClearAll();
 
-        // A load. Only "do I believe the crust is on" is dropped, so the next
-        // pass decides again from the cold bar - and PlayerShader answers it by
-        // looking at the engine rather than by re-applying blind. What is NOT
-        // dropped is which effect is ours: it survives the load, and so must
-        // the pointer to it - see "A LOAD DOES NOT TAKE THE EFFECT WITH IT"
-        // in Core/PlayerShader.h, which is where that was got wrong.
+        // A load. Both our answers go: whether the crust is on, and which
+        // instance is ours. The second one cannot outlive a load however it is
+        // held - the effect is rebuilt as a different object - which is why
+        // taking it off again goes by shader and target instead. See the note
+        // on PlayerShader::Stop.
         void Forget();
 
     private:

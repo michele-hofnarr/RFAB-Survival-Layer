@@ -102,33 +102,56 @@ namespace RSL
             return _instance != nullptr;
         }
 
+        // EVERY INSTANCE OF THIS SHADER ON THE PLAYER, not only the one we
+        // are holding a pointer to.
+        //
+        // NO POINTER CAN SURVIVE A LOAD, and that is the whole reason this
+        // reads the way it does. ShaderReferenceEffect overrides SaveGame,
+        // LoadGame and FinishLoadGame: the effect is written into the save and
+        // REBUILT on load as a different object at a different address. So
+        // after a load the pointer names nothing, Find returns null, and a
+        // Stop that goes by identity ends nothing at all - while the crust is
+        // still on screen, because the rebuilt effect is running.
+        //
+        // Measured twice over. Quicksave with the crust on, quickload: the
+        // crust is there, and the log shows two "frost shader on" either side
+        // of the load with no "off" between them. Keeping the pointer across
+        // the load was tried first and changed nothing, which is what sent the
+        // question to the vtable.
+        //
+        // It also stacks: GetStackable() returns true for this class, so each
+        // load adds another crust rather than replacing the last.
+        //
+        // So this is shader plus target, which is what Papyrus
+        // EffectShader.Stop(akRef) means and what v0.4.0 used before the port
+        // put identity tracking in front of it. The cost is stated plainly:
+        // 000DC20D is frost magic's own shader, so a spell's visual running on
+        // the player at the moment the cold bar rises past the line is ended
+        // with ours. That is one cut-short visual against an ice crust that
+        // never comes off.
         void Stop(RE::TESEffectShader* a_shader)
         {
-            if (auto* effect = Find(a_shader)) {
-                effect->finished = true;
-            }
+            int ended = 0;
+            ForEachOn(a_shader, [&ended](RE::ShaderReferenceEffect& a_effect) {
+                a_effect.finished = true;
+                ++ended;
+            });
             _instance = nullptr;
+
+            if (ended != 1) {
+                // One is the ordinary case. Anything else is worth seeing:
+                // zero means it had already gone, more than one means loads
+                // had stacked them up.
+                logger::info("shader {:08X}: ended {} instance(s)",
+                    a_shader->GetFormID(), ended);
+            }
         }
 
-        // A LOAD DOES NOT TAKE THE EFFECT WITH IT, which is the opposite of
-        // what this class assumed until it was measured.
-        //
-        // What stood here dropped the pointer on every load, "because the
-        // engine's temp effects went with the last game". They do not:
-        // quicksave with the crust on, quickload, and it is still there -
-        // reproduced with F5 and F9. So dropping the pointer did not forget an
-        // effect that was gone, it disowned one that was still running. The
-        // next pass then applied a SECOND crust, and the log shows it plainly:
-        // two "frost shader on" in a row with no "off" between them, either
-        // side of a load. Stop() ends only the instance we point at, so the
-        // first one stayed on the player for the rest of the session.
-        //
-        // There is nothing left for this to do. The pointer is never
-        // dereferenced on its own - Find() returns it only after seeing it
-        // alive in the engine's list - so keeping one across a load costs
-        // nothing and is what lets the survivor be adopted instead of
-        // duplicated. The caller still drops its own "is it on" flag, which is
-        // what makes the next pass ask again.
+        // A load. The effect is not gone - it is rebuilt as a different
+        // object, see Stop - so what this drops is a pointer that now names
+        // nothing rather than an effect that has ended. Holding it would only
+        // mean Find() searching for an address the engine no longer has.
+        void Forget() { _instance = nullptr; }
 
     private:
         // Our instance, but only if the engine still has it. Never returns a
