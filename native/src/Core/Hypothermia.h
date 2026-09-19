@@ -63,6 +63,11 @@ namespace RSL
         {}
 
         void SetLock(bool a_on, bool a_nudge);
+
+        // Put the lockdown where the stage says it should be. Same shape and
+        // same reason as SyncRestBlock below, and it runs on every pass for
+        // the same reason: stage 0 can be arrived at without a transition.
+        void SyncLock();
         void SyncRestBlock();
 
         // This pass's reading of how much the character's clothing is slowing
@@ -79,5 +84,16 @@ namespace RSL
         // because the stale cache already said "blocked".
         bool _restKnown{ false };
         bool _locked{ false };
+
+        // ...and the same question for the lockdown, which used to be assumed
+        // rather than known.
+        //
+        // Paralysis is an actor value and disabled controls are part of the
+        // save, so both come back with a game saved at stage three - while
+        // Forget() had just dropped our own answer to false. Nothing then
+        // owned the lock: Clear(), which is what the master switch and the
+        // menu's reset button call, lifts it only `if (_locked)`, so the
+        // player was left on the floor with no way to be got up.
+        bool _lockKnown{ false };
     };
 }
