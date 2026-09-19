@@ -485,6 +485,17 @@ namespace RSL
                 Campfire::GetSingleton().Extinguish();
                 Campfire::GetSingleton().Update();
 
+                // AND THE TREES, which are not on the player either and are
+                // not even in the world: the produce, the harvest sound and
+                // the name are written into the base TREE records of the
+                // masters at run time. Nothing else takes them back off, and
+                // Trees::Update - the one place that does - sits below this
+                // return with the rest of the tick. So switching the mod off
+                // left a hundred and twenty forest trees still offering
+                // firewood, still named for it, for the rest of the session.
+                // Update withdraws them itself once bModEnabled is down.
+                Trees::GetSingleton().Update();
+
                 // LAST, and by origin rather than by name. Everything
                 // above works from a list of records this build knows; this
                 // takes off anything of ours the list could not name - a
