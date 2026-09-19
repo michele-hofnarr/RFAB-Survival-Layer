@@ -50,3 +50,7 @@ docs/img/*
 !docs/img/baked_tamriel.png
 docs/control_points.txt
 docs/control_points(copy).xlsx
+
+# Working notes from a code review, not part of the release. The owner asked
+# for these to stay out of git.
+docs/BUGS.md
