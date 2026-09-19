@@ -14,6 +14,20 @@ namespace RSL
     {
         // Controls are toggled one flag at a time: UEFlag is a plain enum
         // class here, so the bitwise-or that reads naturally does not compile.
+        //
+        // WHAT IS DELIBERATELY LEFT ALONE, and why each one:
+        //
+        //   kMenu     Escape, and the quick save and load keys with it - the
+        //             vanilla control map files all three under this one flag.
+        //             Taking it away made stage three feel like a hang rather
+        //             than a death, and it also shut the door on the one way
+        //             out of a stuck lockdown: the mod's own switch lives in
+        //             a menu.
+        //   kLooking  the camera. Never in this list; if it will not turn,
+        //             that is the ragdoll and not the control map.
+        //
+        // What is taken is what a body that has stopped obeying cannot do:
+        // walk, fight, sneak, reach for things.
         void ToggleControls(bool a_enable)
         {
             auto* controls = RE::ControlMap::GetSingleton();
@@ -22,7 +36,7 @@ namespace RSL
             }
             using UEFlag = RE::ControlMap::UEFlag;
             for (const auto flag : { UEFlag::kMovement, UEFlag::kFighting,
-                     UEFlag::kSneaking, UEFlag::kMenu, UEFlag::kActivate }) {
+                     UEFlag::kSneaking, UEFlag::kActivate }) {
                 controls->ToggleControls(flag, a_enable);
             }
         }
