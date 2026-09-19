@@ -128,7 +128,12 @@ namespace RSL
         }
 
         if (step != 0) {
-            logger::info("dz {}: P {:+.0f} crossed -+{:.0f}", Id(), before, limit);
+            // BOTH ENDS OF THE STEP. This printed `before` alone, which is the
+            // one number that by definition has NOT crossed anything - so the
+            // line said "P -66 crossed -+70" and read as a threshold test that
+            // had fired early.
+            logger::info("dz {}: P {:+.0f} -> {:+.0f} crossed -+{:.0f}", Id(), before,
+                state.prog, limit);
             Diseases().ResetP(Id());
         }
         return step;
