@@ -74,6 +74,23 @@ namespace RSL
             return std::min(static_cast<float>(n) * step, ceiling);
         }
 
+        // Which ability the line is about.
+        //
+        // TESTED FOR EMPTY, not just for null. Skyrim SE keeps no editor ids at
+        // runtime unless something has cached them, and what comes back then is
+        // an empty STRING rather than a null pointer - so `p ? p : "?"` prints
+        // the empty one and the line reads `penalty : H=5 M=0 ...`, naming
+        // nothing. Every other log line in the mod already guards it this way;
+        // these two were written before that was known and never revisited.
+        [[nodiscard]] const char* NameOf(const RE::TESForm* a_form)
+        {
+            const char* edid = a_form ? a_form->GetFormEditorID() : nullptr;
+            if (edid && *edid) {
+                return edid;
+            }
+            return "<no editor id>";
+        }
+
         [[nodiscard]] float BaseValue(RE::ActorValue a_av)
         {
             auto* player = Player();
@@ -161,9 +178,8 @@ namespace RSL
         }
 
         if (Settings::bDebugLog) {
-            logger::info("bonus {}: {}",
-                a_ability->GetFormEditorID() ? a_ability->GetFormEditorID() : "?",
-                a_on ? "on" : "off");
+            logger::info("bonus {} [{:08X}]: {}", NameOf(a_ability),
+                a_ability->GetFormID(), a_on ? "on" : "off");
         }
     }
 
@@ -191,9 +207,8 @@ namespace RSL
         a_state.signature = signature;
 
         if (Settings::bDebugLog) {
-            logger::info("penalty {}: H={} M={} S={} Spd={}",
-                a_ability->GetFormEditorID() ? a_ability->GetFormEditorID() : "?",
-                qH, qM, qS, qSpd);
+            logger::info("penalty {} [{:08X}]: H={} M={} S={} Spd={}",
+                NameOf(a_ability), a_ability->GetFormID(), qH, qM, qS, qSpd);
         }
 
         a_ability->effects[0]->effectItem.magnitude = qH;
