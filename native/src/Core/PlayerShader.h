@@ -74,8 +74,14 @@ namespace RSL
             if (!player || !a_shader || !player->Is3DLoaded()) {
                 return false;
             }
+            // OURS AND STILL RUNNING. A second apply would stack a crust
+            // nobody owns - and this is also the path a loaded game takes,
+            // which is the whole of the note further down headed "A LOAD DOES
+            // NOT TAKE THE EFFECT WITH IT".
             if (Find(a_shader)) {
-                return true;   // ours and still running; a second apply stacks
+                logger::info("shader {:08X}: already running, kept",
+                    a_shader->GetFormID());
+                return true;
             }
 
             std::vector<const void*> before;
@@ -104,8 +110,25 @@ namespace RSL
             _instance = nullptr;
         }
 
-        // A load: the engine's temp effects went with the last game.
-        void Forget() { _instance = nullptr; }
+        // A LOAD DOES NOT TAKE THE EFFECT WITH IT, which is the opposite of
+        // what this class assumed until it was measured.
+        //
+        // What stood here dropped the pointer on every load, "because the
+        // engine's temp effects went with the last game". They do not:
+        // quicksave with the crust on, quickload, and it is still there -
+        // reproduced with F5 and F9. So dropping the pointer did not forget an
+        // effect that was gone, it disowned one that was still running. The
+        // next pass then applied a SECOND crust, and the log shows it plainly:
+        // two "frost shader on" in a row with no "off" between them, either
+        // side of a load. Stop() ends only the instance we point at, so the
+        // first one stayed on the player for the rest of the session.
+        //
+        // There is nothing left for this to do. The pointer is never
+        // dereferenced on its own - Find() returns it only after seeing it
+        // alive in the engine's list - so keeping one across a load costs
+        // nothing and is what lets the survivor be adopted instead of
+        // duplicated. The caller still drops its own "is it on" flag, which is
+        // what makes the next pass ask again.
 
     private:
         // Our instance, but only if the engine still has it. Never returns a

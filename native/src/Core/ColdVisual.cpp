@@ -55,7 +55,8 @@ namespace RSL
 
     void ColdVisual::Forget()
     {
+        // The flag only. Dropping the instance as well is what put a second
+        // crust on the player after every load - see PlayerShader.
         _on = false;
-        _fx.Forget();
     }
 }

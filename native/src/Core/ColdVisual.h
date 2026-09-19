@@ -29,8 +29,12 @@ namespace RSL
 
         void ClearAll();
 
-        // A load: the engine's temp effects went with the last game, so
-        // whatever we believed was on the player belongs to it too.
+        // A load. Only "do I believe the crust is on" is dropped, so the next
+        // pass decides again from the cold bar - and PlayerShader answers it by
+        // looking at the engine rather than by re-applying blind. What is NOT
+        // dropped is which effect is ours: it survives the load, and so must
+        // the pointer to it - see "A LOAD DOES NOT TAKE THE EFFECT WITH IT"
+        // in Core/PlayerShader.h, which is where that was got wrong.
         void Forget();
 
     private:
