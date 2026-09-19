@@ -692,19 +692,38 @@ begin
 end;
 
 // One condition on anything that has a Conditions container.
+//
+// CREATING THE CONTAINER ALREADY MAKES AN ENTRY, and that entry is blank:
+// function 0, comparison 0, no parameter. Appending a second one after it
+// leaves the blank in the record, and it is written out with everything else -
+// the bedroll recipe went out with "GetWantBlocking == 0" standing in front of
+// its perk check because of exactly this. Nothing noticed, because every other
+// caller works on a record whose template brought a container along.
+//
+// So the entry the container came with is the one that gets filled in. Read
+// back off the saved plugin rather than reasoned about: RecipeWater has its
+// two conditions and nothing else, RecipeBedroll had three where two were
+// asked for.
 procedure AddCond(rec: IInterface; funcIdx, op: Integer; cmp: Variant; param: IwbMainRecord);
 var
   conds, c: IInterface;
+  fresh: Boolean;
 begin
+  fresh := False;
   conds := ElementByName(rec, 'Conditions');
-  if not Assigned(conds) then
+  if not Assigned(conds) then begin
     conds := Add(rec, 'Conditions', True);
+    fresh := True;
+  end;
   if not Assigned(conds) then begin
     Problem('нет контейнера Conditions в ' + Name(rec));
     Exit;
   end;
 
-  c := ElementAssign(conds, HighInteger, nil, False);
+  if fresh and (ElementCount(conds) = 1) then
+    c := ElementByIndex(conds, 0)
+  else
+    c := ElementAssign(conds, HighInteger, nil, False);
   if not Assigned(c) then begin
     Problem('условие не создалось в ' + Name(rec));
     Exit;
