@@ -84,17 +84,23 @@ namespace RSL
 
         // Not ill yet: P only ever sits at or below zero, and reaching the
         // threshold is what catches it.
-        auto& state = Diseases().Get(Id());
+        //
+        // BOTH SIDES OF THE DRIFT ARE TESTED, and that is not belt and braces -
+        // see the note on Progress. The value the hits left can be at the
+        // floor while the drift is lifting it off again, and the floor IS the
+        // threshold now.
+        auto&       state = Diseases().Get(Id());
+        const float afterHits = state.prog;
         state.prog = std::clamp(state.prog + _drift * a_tick.gameHours, -100.0f, 0.0f);
 
-        if (state.prog <= -limit) {
+        if (afterHits <= -limit || state.prog <= -limit) {
             // TAKEN BEFORE THE CALLER RESETS IT. state is a reference into the
             // table and the contract path zeroes that same object, so reading
             // it afterwards printed "contracted (P 0)" for every contraction
             // there had ever been - a line that cannot tell a threshold that
             // was reached from one that was not.
-            logger::info("dz {}: contracted (P {:.0f} of -{:.0f})", Id(), state.prog,
-                limit);
+            logger::info("dz {}: contracted (P {:.0f} of -{:.0f})", Id(),
+                std::min(afterHits, state.prog), limit);
             return true;
         }
 
@@ -112,16 +118,33 @@ namespace RSL
     std::int32_t LesionIllness::Progress(const Tick& a_tick)
     {
         // Deterministic, and crossing the same threshold either way moves a
-        // stage. No roll, and no clamp pinning P at the bottom - v0.4.0 is
-        // explicit that this one is meant to be predictable.
+        // stage. No roll: v0.4.0 is explicit that this one is meant to be
+        // predictable.
+        //
+        // THE WORSENING IS TESTED ON THE VALUE THE HITS LEFT, before the drift
+        // is added, and v0.4.0 says why in as many words: "test the post-hit
+        // value BEFORE drift, so a maxed-out barrage (P slammed to the -100
+        // clamp) still trips it instead of drift nudging it back". The port
+        // dropped that ordering and got away with it only because the
+        // threshold was 70 and the floor -100, so the barrage overshot the
+        // test by thirty points.
+        //
+        // At a threshold of 100 the floor IS the test. A healing drift - every
+        // axis clear - lifts P off -100 by a fraction of a point each tick, the
+        // comparison misses by that fraction, and a character standing in fire
+        // never advances a stage at all. Which is the bug that number was
+        // hiding.
         const float limit = Limit();
 
         auto&       state = Diseases().Get(Id());
-        const float before = state.prog;
-        state.prog += _drift * a_tick.gameHours;
+        // The value the hits left: what the worsening is tested on, and what
+        // the log prints as the value that crossed.
+        const float afterHits = state.prog;
+        state.prog = std::clamp(state.prog + _drift * a_tick.gameHours,
+            -100.0f, 100.0f);
 
         std::int32_t step = 0;
-        if (state.prog <= -limit) {
+        if (afterHits <= -limit || state.prog <= -limit) {
             step = 1;    // worse
         } else if (state.prog >= limit) {
             step = -1;   // better
@@ -132,8 +155,8 @@ namespace RSL
             // one number that by definition has NOT crossed anything - so the
             // line said "P -66 crossed -+70" and read as a threshold test that
             // had fired early.
-            logger::info("dz {}: P {:+.0f} -> {:+.0f} crossed -+{:.0f}", Id(), before,
-                state.prog, limit);
+            logger::info("dz {}: P {:+.0f} -> {:+.0f} crossed -+{:.0f}", Id(),
+                afterHits, state.prog, limit);
             Diseases().ResetP(Id());
         }
         return step;
