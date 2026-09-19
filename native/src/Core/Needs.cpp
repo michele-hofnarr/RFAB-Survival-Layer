@@ -9,8 +9,10 @@
 #include "Core/Bedroll.h"
 #include "Core/Campfire.h"
 #include "Core/Forms.h"
+#include "Core/ColdScreen.h"
 #include "Core/ColdVisual.h"
 #include "Core/Hypothermia.h"
+#include "Core/Penalties.h"
 #include "Core/Notify.h"
 #include "Core/HitIllness.h"
 #include "Core/TakeDown.h"
@@ -1305,9 +1307,19 @@ namespace RSL
             Disease::GetSingleton().Clear();
             Hypothermia::GetSingleton().Forget();
             ColdVisual::GetSingleton().Forget();
+            ColdScreen::GetSingleton().Forget();
+            Penalties::GetSingleton().Forget();
             Campfire::GetSingleton().Reset();
             Bedroll::GetSingleton().Reset();
             TakeDown::Forget();
+
+            // The cut-tree table is co-save state like the camp, and the load
+            // below only clears it when the co-save actually carries a TREE
+            // record. A save with no co-save at all - the mod newly installed,
+            // or a record that failed its version check - left the last game's
+            // cooldowns standing, on references the new game has its own
+            // answers about. Reset() existed for this and nothing called it.
+            Trees::GetSingleton().Reset();
         }
     };
 

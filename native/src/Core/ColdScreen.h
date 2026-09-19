@@ -41,6 +41,17 @@ namespace RSL
         // the mod switched off.
         void ClearAll();
 
+        // A load: the engine's image space modifier instances went with the
+        // last game, and the bucket we remember describes THEM.
+        //
+        // Without this the screen stayed clear at a cold bar that should have
+        // dimmed it, for as long as the loaded game happened to sit in the
+        // same 5% bucket the last one ended on - Update compares against the
+        // bucket and nothing else, so an unchanged number means no work to do.
+        // Every other cache of engine state here has one of these; this was
+        // the one that did not.
+        void Forget();
+
         // The window this runs in, in bar fractions: nothing at BEGIN_AT,
         // full strength at FULL_AT, which is the floor - so the last third
         // of the bar is spent watching the picture go.

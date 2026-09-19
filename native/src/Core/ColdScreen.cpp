@@ -82,6 +82,15 @@ namespace RSL
         }
     }
 
+    void ColdScreen::Forget()
+    {
+        // The buckets only. Nothing is stopped: the instances this would be
+        // stopping belong to the game that has just gone.
+        for (int i = 0; i < COUNT; ++i) {
+            _bucket[i] = 0;
+        }
+    }
+
     void ColdScreen::ClearAll()
     {
         for (int i = 0; i < COUNT; ++i) {

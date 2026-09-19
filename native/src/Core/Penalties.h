@@ -43,6 +43,19 @@ namespace RSL
         // Removes everything. For the mod being switched off.
         void ClearAll();
 
+        // A load: what we last applied was applied to the game that has gone.
+        //
+        // Both refreshes are deduped on a signature of the quantised values,
+        // and the values come from the needs - so a save loaded at much the
+        // same reserves produces the same signature and the refresh is skipped
+        // entirely, on a player who has none of these abilities. The bonus is
+        // the visible half: a character loaded into a full cold bar kept no
+        // regeneration at all until the axis dipped and came back.
+        //
+        // Nothing is taken off the player here. The next pass applies whatever
+        // it decides, which is the one answer that is certainly right.
+        void Forget();
+
     private:
         struct AxisState
         {

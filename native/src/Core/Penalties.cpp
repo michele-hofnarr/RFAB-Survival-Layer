@@ -221,6 +221,14 @@ namespace RSL
         a_state.hadSpeed = qSpd > 0.0f;
     }
 
+    void Penalties::Forget()
+    {
+        _sleep = AxisState{};
+        _hunger = AxisState{};
+        _cold = AxisState{};
+        _bonusWarm = _bonusRest = _bonusFed = -1;
+    }
+
     void Penalties::ClearAll()
     {
         auto* player = Player();
