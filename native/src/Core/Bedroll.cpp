@@ -27,6 +27,11 @@ namespace RSL
         // How near a tent of ours has to be to count as the one overhead.
         constexpr float UNDER_TENT = 250.0f;
 
+        // How long a drop stays claimed. Generous against the burst it exists
+        // to stop - two events in the same millisecond - and short against the
+        // thing it must not outlive, which is the id itself.
+        constexpr auto CLAIM_LIFETIME = std::chrono::seconds(10);
+
         [[nodiscard]] RE::TESObjectREFR* Deref(RE::FormID a_id)
         {
             return a_id ? RE::TESForm::LookupByID<RE::TESObjectREFR>(a_id) : nullptr;
@@ -109,7 +114,13 @@ namespace RSL
     bool Bedroll::ClaimDrop(RE::FormID a_id)
     {
         std::scoped_lock lock(_claimLock);
-        return _claimed.insert(a_id).second;
+
+        const auto now = std::chrono::steady_clock::now();
+        std::erase_if(_claimed, [now](const auto& a_entry) {
+            return now - a_entry.second > CLAIM_LIFETIME;
+        });
+
+        return _claimed.emplace(a_id, now).second;
     }
 
     void Bedroll::Place(RE::TESObjectREFR* a_dropped)

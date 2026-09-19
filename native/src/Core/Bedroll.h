@@ -91,10 +91,22 @@ namespace RSL
 
         std::unordered_map<RE::FormID, RE::FormID> _camps;
 
-        // Dropped references already turned into a camp. Small and short-lived:
-        // an id goes in when the drop is claimed and the reference is deleted
-        // immediately afterwards.
-        std::unordered_set<RE::FormID> _claimed;
-        std::mutex                     _claimLock;
+        // Dropped references already turned into a camp, and WHEN.
+        //
+        // IT IS THE TIME THAT MATTERS. This was a set of bare ids that nothing
+        // ever emptied, on the stated grounds that the reference is deleted
+        // straight afterwards - which is exactly what makes the id come back:
+        // Skyrim hands deleted dynamic ids out again. Pitch a bedroll, pack
+        // it, drop it a second time, and the new reference can be given the
+        // number the old one had; the claim it never let go of then refused
+        // it, and the bedroll lay on the ground as an item with nothing
+        // whatever in the log.
+        //
+        // A claim only has to outlive the burst of TESInitScriptEvents for one
+        // reference - the same millisecond, measured - so it is kept for
+        // seconds and dropped. See CLAIM_LIFETIME in the cpp.
+        std::unordered_map<RE::FormID, std::chrono::steady_clock::time_point>
+                   _claimed;
+        std::mutex _claimLock;
     };
 }
