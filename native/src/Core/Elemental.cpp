@@ -7,6 +7,7 @@
 #include "Core/Illnesses.h"
 #include "Core/LesionIllness.h"
 #include "Core/Forms.h"
+#include "Core/Player.h"
 #include "Settings.h"
 
 namespace RSL
@@ -76,29 +77,6 @@ namespace RSL
             case Element::kShock: return "shock"sv;
             default:              return "nothing"sv;
             }
-        }
-
-        [[nodiscard]] RE::ActorValue ResistOf(Element a_kind)
-        {
-            switch (a_kind) {
-            case Element::kFrost: return RE::ActorValue::kResistFrost;
-            case Element::kFire:  return RE::ActorValue::kResistFire;
-            default:              return RE::ActorValue::kResistShock;
-            }
-        }
-
-        // Resistance scales the hit down, and past 100% it stops scaling: a
-        // negative factor would turn a resisted hit into its opposite. Used by
-        // the LESION counter only - the cold bar is charged what the engine
-        // actually took, which has been through resistance already.
-        [[nodiscard]] float ResistFactor(RE::ActorValue a_av)
-        {
-            auto* player = RE::PlayerCharacter::GetSingleton();
-            auto* owner = player ? player->AsActorValueOwner() : nullptr;
-            if (!owner) {
-                return 1.0f;
-            }
-            return std::clamp(1.0f - owner->GetActorValue(a_av) * 0.01f, 0.0f, 2.0f);
         }
 
         // The pool the hit is measured against: the player's maximum health as
@@ -278,6 +256,43 @@ namespace RSL
         }
     }
 
+    // THE SAME DAMAGE, ON P'S SCALE AND AGAINST P'S RESISTANCE.
+    //
+    // Elemental resistance is deliberately absent: the number handed to the
+    // hook has already been through it, and applying it twice was what the old
+    // per-hit version did. What a lesion answers to instead is resistance to
+    // DISEASE, in the shape every other illness uses - clamped below zero only,
+    // so that 100% and over moves nothing at all while a curse still makes it
+    // worse.
+    //
+    // The 100 is not a balance number. P runs to 100 and the threshold is 100,
+    // so it is the share of the health bar the hit took, read onto P: a whole
+    // health bar's worth of elemental damage is one stage. There is nothing to
+    // tune, which is why it is here and not in the settings.
+    void Elemental::QueueLesion(float a_damage)
+    {
+        const float maxHealth = MaxHealth();
+        if (a_damage <= 0.0f || maxHealth <= 0.0f) {
+            return;
+        }
+
+        const float resist = std::max(0.0f, 1.0f - DiseaseResist() * 0.01f);
+        const float hurt = -100.0f * (a_damage / maxHealth) * resist;
+        if (hurt == 0.0f) {
+            return;   // fully resistant, or a hit that took nothing
+        }
+
+        const float held =
+            std::clamp(_lesionP.load() + hurt, -LESION_LIMIT, LESION_LIMIT);
+        _lesionP.store(held);
+
+        if (Settings::bDebugLog) {
+            logger::info("lesion: {:.1f} damage of {:.0f} max health -> {:+.1f} "
+                         "(disease resist {:.0f}%), holding {:+.1f}",
+                a_damage, maxHealth, hurt, DiseaseResist(), held);
+        }
+    }
+
     void Elemental::NoteDamage(const RE::ValueModifierEffect* a_effect,
         const RE::Actor* a_actor, float a_value, RE::ActorValue a_actorValue,
         const char* a_from)
@@ -291,10 +306,14 @@ namespace RSL
             return;
         }
 
-        const float sign = SignOf(KindOf(a_effect->GetBaseObject()));
-        if (sign == 0.0f) {
+        // THE ELEMENT FIRST, THE SIGN SECOND. Shock has no sign - it never
+        // touches the cold bar - but it damages tissue like the other two, so
+        // bailing on the sign here is what would drop it.
+        const Element kind = KindOf(a_effect->GetBaseObject());
+        if (kind == Element::kNone) {
             return;
         }
+        const float sign = SignOf(kind);
 
         // kNone IS NOT "no actor value". It means "the one this effect
         // carries", and the caller passes it nearly every time - which is why
@@ -338,52 +357,10 @@ namespace RSL
             return;
         }
 
-        Queue(sign, -a_value);
-    }
-
-    void Elemental::Note(const RE::EffectSetting* a_effect)
-    {
-        if (!Settings::bModEnabled) {
-            return;
-        }
-
-        const Element kind = KindOf(a_effect);
-        if (kind == Element::kNone) {
-            return;
-        }
-
-        // THE LESION COUNTER COUNTS HITS, not damage, so it needs the debounce
-        // the cold bar has no use for: one application is one wound here, and a
-        // cloak effect would otherwise open thirty a second.
-        const auto now = std::chrono::steady_clock::now();
-        if (_seenAny &&
-            std::chrono::duration<float>(now - _last).count() < EVENT_GAP) {
-            return;
-        }
-        _last = now;
-        _seenAny = true;
-
+        const float damage = -a_value;
+        Queue(sign, damage);
         if (Settings::bElemLesionEnabled) {
-            const float resist = ResistFactor(ResistOf(kind));
-            const float damage = Settings::fElemLesionHitP * resist;
-            const float held =
-                std::clamp(_lesionP.load() + damage, -LESION_LIMIT, LESION_LIMIT);
-            _lesionP.store(held);
-
-            // THIS PATH SAID NOTHING AT ALL. Not a word for a counted
-            // hit, not a word for what it was worth, while the cold bar
-            // beside it printed two lines for every tick of the same
-            // damage. The only line the lesions ever wrote was the one at
-            // the moment of contracting, so a log could show an illness
-            // arriving with nothing whatever leading up to it - which is
-            // exactly how it read when one was reported.
-            if (Settings::bDebugLog) {
-                const char* edid = a_effect->GetFormEditorID();
-                logger::info("lesion: {} hit {} [{:08X}] worth {:+.1f} "
-                             "(resist x{:.2f}), holding {:+.1f}",
-                    NameOf(kind), (edid && *edid) ? edid : "<no editor id>",
-                    a_effect->GetFormID(), damage, resist, held);
-            }
+            QueueLesion(damage);
         }
     }
 
@@ -409,10 +386,12 @@ namespace RSL
                 return RE::BSEventNotifyControl::kContinue;
             }
 
+            // The campfire only. Elemental damage is read off
+            // ModifyActorValue, not off this event - see the note at the top
+            // of the header for the two measurements that moved it there.
             auto* form = RE::TESForm::LookupByID(a_event->magicEffect);
             if (auto* effect = form ? form->As<RE::EffectSetting>() : nullptr) {
                 Elemental::GetSingleton().NoteCampfire(effect);
-                Elemental::GetSingleton().Note(effect);
             }
             return RE::BSEventNotifyControl::kContinue;
         }

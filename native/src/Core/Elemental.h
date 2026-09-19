@@ -42,9 +42,14 @@
 //
 // The other half is elemental lesions: frost, fire AND shock all damage a
 // separate progression counter, which is why shock is noticed at all even
-// though it never touches the cold bar. That one counts HITS rather than
-// damage, so it still rides the apply event and still needs its debounce - a
-// cloak effect would otherwise open thirty wounds a second.
+// though it never touches the cold bar.
+//
+// IT IS CHARGED THE SAME WAY, and used not to be. It counted HITS - a candle
+// flame and a dragon's breath were worth the same four points - so it rode the
+// apply event and needed a half-second debounce to stop a cloak effect opening
+// thirty wounds a second. Both are gone: it reads the same number off the same
+// hook as the cold bar, and a hit that takes nothing off the player is worth
+// nothing. What differs is only what the number is scaled by, below.
 
 namespace RSL
 {
@@ -74,30 +79,28 @@ namespace RSL
         void NoteDamage(const RE::ValueModifierEffect* a_effect, const RE::Actor* a_actor,
             float a_value, RE::ActorValue a_actorValue, const char* a_from);
 
-        // An elemental effect landed on the player. The lesion counter only.
-        void Note(const RE::EffectSetting* a_effect);
-
-        // So did the campfire power's effect, which this sink sees anyway.
+        // The campfire power's effect, which the apply sink sees anyway.
         void NoteCampfire(const RE::EffectSetting* a_effect);
 
     private:
         // Turns damage into bar and queues it.
         void Queue(float a_sign, float a_damage);
 
-        // At most one LESION hit is counted per this many real seconds.
-        static constexpr float EVENT_GAP = 0.5f;
+        // ...and the same damage into P, which is a different scale and a
+        // different resistance. See the definition.
+        void QueueLesion(float a_damage);
 
         // The queue cannot grow past a fifth of the bar between ticks, however
         // much fire is flying about.
         static constexpr float QUEUE_LIMIT = 0.20f;
 
-        // v0.4.0 caps the folded lesion damage at 40 between ticks, the same
-        // way it caps the cold nudge at 20.
-        static constexpr float LESION_LIMIT = 40.0f;
+        // A fifth of P between ticks, which is the same share of its scale the
+        // cold nudge is allowed of its own. v0.4.0's number was 40 against a
+        // threshold of 70; the threshold is 100 now and the two caps say the
+        // same thing again.
+        static constexpr float LESION_LIMIT = 20.0f;
 
-        std::atomic<float>                    _queued{ 0.0f };
-        std::atomic<float>                    _lesionP{ 0.0f };
-        std::chrono::steady_clock::time_point _last{};
-        bool                                  _seenAny{ false };
+        std::atomic<float> _queued{ 0.0f };
+        std::atomic<float> _lesionP{ 0.0f };
     };
 }

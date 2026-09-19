@@ -466,8 +466,11 @@ namespace RSL
         static inline bool  bElemLesionEnabled{ true };
         static inline float fElemLesionColdAt{ 0.10f };      // reserve, = v0.4.0's 90
         static inline float fElemLesionHypoChance{ 50.0f };  // %/hour at hypothermia 2+
-        static inline float fElemLesionHitP{ -4.0f };        // P per hit, pre-resist
-        static inline float fElemLesionContractP{ 70.0f };
+        // 100, and not in the menu. P runs to 100 and every other threshold
+        // in the engine is 100; 70 was a hand-set number carried over from
+        // v0.4.0's _RSL_Balance.psc with no reasoning recorded anywhere, and it
+        // made the lesions the one mechanic with a different ceiling.
+        static inline float fElemLesionContractP{ 100.0f };
 
         // --- hypothermia ---
         // v0.4.0's numbers, as reserves - the same end of the axis every other

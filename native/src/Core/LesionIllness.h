@@ -52,10 +52,11 @@ namespace RSL
 
     private:
         // The ceiling P can actually reach, and the threshold in both
-        // directions. Capped at 100: set higher - which only a hand-edited ini
-        // can do, the slider stops there - the counter would sit at its floor
-        // for ever and the lesion could never be caught, with nothing anywhere
-        // saying why.
+        // directions. It IS 100 now - the same number every other threshold in
+        // the engine uses - and the setting is gone from the menu, so the cap
+        // guards nothing but a hand-edited ini. Set higher there, the counter
+        // would sit at its floor for ever and the lesion could never be
+        // caught, with nothing anywhere saying why.
         [[nodiscard]] static float Limit();
 
         // How P moves this pass, per game hour. Worked out once at the top of

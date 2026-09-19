@@ -130,8 +130,6 @@ RANGES = {
     "fColdCatchChanceMax": (0, 100, 1),
     "fElemLesionColdAt": (0.0, 1.0, 0.05),
     "fElemLesionHypoChance": (0, 100, 1),
-    "fElemLesionHitP": (-20, 0, 1),
-    "fElemLesionContractP": (10, 100, 1),
 
     "fHypoThreshold": (0.0, 1.0, 0.05),
     "fHypoRecoverThreshold": (0.0, 1.0, 0.05),
@@ -174,6 +172,7 @@ HIDDEN = {
     "fRawFoodStaggerForce",
     "fCookGearZ",            # measured off the mesh in game, not a preference
     "fCampfireCooldown",     # a guard against double-casting, not a choice
+    "fElemLesionContractP",  # P runs to 100 and so does this: a scale, not a knob
 }
 
 # The settings pages. Every setting the plugin reads appears exactly once, here
@@ -266,8 +265,7 @@ PAGES = [
         ("set", "fCoughVolume"),
         ("hdr", "_RSL_HdrElemLesion"),
         ("set", "bElemLesionEnabled"), ("set", "fElemLesionColdAt"),
-        ("set", "fElemLesionHypoChance"), ("set", "fElemLesionHitP"),
-        ("set", "fElemLesionContractP"),
+        ("set", "fElemLesionHypoChance"),
         ("hdr", "_RSL_HdrHypo"),
         ("set", "bHypothermiaEnabled"), ("set", "bHypoBlocksRest"),
         ("set", "fHypoThreshold"),

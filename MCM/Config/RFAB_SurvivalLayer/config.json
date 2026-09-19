@@ -1150,32 +1150,6 @@
           }
         },
         {
-          "id": "fElemLesionHitP:Disease",
-          "text": "$_RSL_fElemLesionHitP",
-          "help": "$_RSL_fElemLesionHitP_help",
-          "type": "slider",
-          "valueOptions": {
-            "min": -20,
-            "max": 0,
-            "step": 1,
-            "formatString": "{0}",
-            "sourceType": "ModSettingFloat"
-          }
-        },
-        {
-          "id": "fElemLesionContractP:Disease",
-          "text": "$_RSL_fElemLesionContractP",
-          "help": "$_RSL_fElemLesionContractP_help",
-          "type": "slider",
-          "valueOptions": {
-            "min": 10,
-            "max": 100,
-            "step": 1,
-            "formatString": "{0}",
-            "sourceType": "ModSettingFloat"
-          }
-        },
-        {
           "text": "$_RSL_HdrHypo",
           "type": "header"
         },

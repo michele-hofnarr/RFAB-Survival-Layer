@@ -136,7 +136,6 @@ namespace RSL
         ReadBool(ini, "Disease", "bElemLesionEnabled", bElemLesionEnabled);
         ReadFloat(ini, "Disease", "fElemLesionColdAt", fElemLesionColdAt);
         ReadFloat(ini, "Disease", "fElemLesionHypoChance", fElemLesionHypoChance);
-        ReadFloat(ini, "Disease", "fElemLesionHitP", fElemLesionHitP);
         ReadFloat(ini, "Disease", "fElemLesionContractP", fElemLesionContractP);
 
         ReadBool(ini, "Hypothermia", "bHypothermiaEnabled", bHypothermiaEnabled);
