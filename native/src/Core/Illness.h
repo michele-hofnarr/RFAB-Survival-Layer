@@ -99,10 +99,6 @@ namespace RSL
         // and the player's spell list still agree.
         [[nodiscard]] virtual RE::SpellItem* StageSpell(std::int32_t a_stage) const;
 
-        // Does medicine reach this at all? Only the RFAB wrappers say no, and
-        // only while the Peryite blessing is on.
-        [[nodiscard]] virtual bool CuresApply() const { return true; }
-
         [[nodiscard]] const DiseaseForms& Forms() const { return _forms; }
 
     protected:
@@ -150,13 +146,6 @@ namespace RSL
         // own record, their scripts watch it, and pulling it out from under
         // them to fix our problem is not ours to do.
         [[nodiscard]] virtual bool MayRestart(std::int32_t) const { return true; }
-
-        // Is the illness pinned where it is this pass? Only the Peryite
-        // blessing does this, freezing RFAB's six at stage 1 because that is
-        // RFAB's own balance and this layer does not get to touch it.
-        //
-        // Allowed to put its own house in order before saying yes.
-        [[nodiscard]] virtual bool Held(std::int32_t) { return false; }
 
         // Anything this illness wants to do at the top of a pass, before the
         // stage is read for anything. The lesions fold in the damage that

@@ -151,10 +151,6 @@ namespace RSL
             return;
         }
 
-        if (Held(stage)) {
-            return;
-        }
-
         // OUR RECORD AND THE PLAYER'S SPELL LIST ARE TWO ACCOUNTS OF ONE FACT,
         // and what their disagreeing means depends on the stage.
         //
@@ -177,7 +173,7 @@ namespace RSL
                     logger::info("dz {}: stage {} ability put back", Id(), stage);
                 }
             }
-        } else if (CuresApply()) {
+        } else {
             auto       cures = diseases.TakeCures(Id());
             const bool stripped = cures == 0 && StageSpellGone(stage);
             if (stripped) {

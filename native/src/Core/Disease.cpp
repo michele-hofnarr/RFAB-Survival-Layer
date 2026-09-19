@@ -453,8 +453,13 @@ namespace RSL
         // talks it out of being cold, excluded from medicine by a string
         // comparison. It is a different type now and simply is not in this
         // list, which is the same fact stated where it can be seen.
+        //
+        // Nothing else is excluded. A cure effect takes every illness the
+        // player has, the RFAB wrappers included and the Peryite blessing
+        // notwithstanding: the blessing stops this layer driving P, it does not
+        // make a disease incurable.
         for (const auto& illness : Illnesses::GetSingleton().All()) {
-            if (!illness->Ready() || !illness->CuresApply()) {
+            if (!illness->Ready()) {
                 continue;
             }
             const auto id = illness->Id();

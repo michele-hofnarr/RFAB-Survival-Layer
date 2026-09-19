@@ -31,12 +31,24 @@
 //     whether it removed anything is the only way to tell a real stray instance
 //     from our copy showing RFAB's effect names.
 //
-// The Peryite blessing freezes the six base-game ones at stage 1: that is
-// RFAB's own balance and this layer does not get to touch it. Stages 2 and 3
-// still run, so a disease already in progress can settle back down to 1 and
-// lock there - which is the intended way out for a Peryite follower. Dragonborn
-// 's Droops is not covered by the blessing, which is why the flag is passed in
-// per illness rather than tested as an index against five, as it used to be.
+// The Peryite blessing stops P for the six base-game ones at stage 1, AND THAT
+// IS THE WHOLE OF IT. Stage 1 is RFAB's own record and carries their Peryite
+// boon, so this layer must not drive it anywhere - but it does not hold the
+// player ill either. Medicine reaches it like any other disease, a cure takes
+// it off, and stages 2 and 3 run normally, so a disease already in progress
+// settles back to 1 and stops there.
+//
+// It used to do more, and none of the rest was ever asked for. The same branch
+// re-added RFAB's disease spell whenever it found it gone - "re-assert if a
+// stray cure stripped it" - which cannot tell a player who drank a cure from
+// some hypothetical third party, so under the blessing these six could not be
+// cured at all: the potion stripped the spell and the next pass put it back.
+// It also discarded the counted cure and returned before the cure block ran,
+// so nothing downstream ever saw the attempt. All of it went in with the
+// freeze in 5f2bda0 and none of it was in the version before.
+//
+// Dragonborn's Droops is not covered by the blessing, which is why the flag is
+// passed in per illness rather than tested as an index against five.
 
 namespace RSL
 {
@@ -67,7 +79,10 @@ namespace RSL
 
         [[nodiscard]] bool Contracts(const Tick& a_tick) override;
         [[nodiscard]] bool StageSpellGone(std::int32_t a_stage) const override;
-        [[nodiscard]] bool Held(std::int32_t a_stage) override;
+
+        // P does not move while the blessing holds this at stage 1. Everything
+        // else about the pass is left alone.
+        [[nodiscard]] std::int32_t Progress(const Tick& a_tick) override;
 
         // Stage 1 is RFAB's own disease record. Their scripts watch it,
         // and taking it off the player to restart OUR effects is not ours
@@ -86,8 +101,15 @@ namespace RSL
         // absent because their record announces itself.
         [[nodiscard]] static DiseaseForms AsCommon(const RfabDiseaseForms& a_src);
 
+        // Is the Peryite blessing holding this one still right now?
+        [[nodiscard]] bool Frozen() const;
+
         const RfabDiseaseForms& _src;
         bool                    _blessingFreezes{ false };
+
+        // For the trace, so a frozen illness says so rather than looking like
+        // one that simply is not moving.
+        bool _frozen{ false };
 
         // Read once at the top of each pass: is RFAB's own illness on the
         // player at all, and is one of our copies wearing its effect names?

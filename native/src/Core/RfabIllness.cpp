@@ -155,20 +155,23 @@ namespace RSL
         return a_stage >= 2;
     }
 
-    bool RfabIllness::Held(std::int32_t a_stage)
+    bool RfabIllness::Frozen() const
     {
         auto* player = Player();
-        if (!_blessingFreezes || a_stage != 1 || !Forms::peryiteBlessing || !player ||
-            !player->HasSpell(Forms::peryiteBlessing)) {
-            return false;
-        }
+        return _blessingFreezes && Stage() == 1 && Forms::peryiteBlessing && player &&
+               player->HasSpell(Forms::peryiteBlessing);
+    }
 
-        if (!_afflicted) {
-            player->AddSpell(_src.base);   // a stray cure stripped it
+    std::int32_t RfabIllness::Progress(const Tick& a_tick)
+    {
+        // THE WHOLE OF WHAT THE BLESSING DOES: P does not move. Not reset, not
+        // held at a value of our choosing - simply not driven by us, so that
+        // losing the blessing resumes from wherever the illness actually was.
+        _frozen = Frozen();
+        if (_frozen) {
+            return 0;
         }
-        Diseases().ResetP(Id());
-        Diseases().TakeCures(Id());        // discarded: frozen means frozen
-        return true;
+        return Illness::Progress(a_tick);
     }
 
     void RfabIllness::Announce(std::int32_t a_stage, std::int32_t a_old)
@@ -192,7 +195,7 @@ namespace RSL
 
     std::string RfabIllness::TraceExtra(const Tick&) const
     {
-        return fmt::format("afflicted={} ourCopy={} seenClean={}", _afflicted, _ourCopyOn,
-            _seenClean);
+        return fmt::format("afflicted={} ourCopy={} seenClean={}{}", _afflicted,
+            _ourCopyOn, _seenClean, _frozen ? " FROZEN by the Peryite blessing" : "");
     }
 }
