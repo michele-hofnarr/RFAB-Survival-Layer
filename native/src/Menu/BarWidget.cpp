@@ -166,6 +166,7 @@ namespace RSL
         _temp = RE::GFxValue{};
         _movie = nullptr;
         _drawnFeel = -1;
+        _opacity = -1.0f;
         _built = false;
     }
 
@@ -617,5 +618,25 @@ namespace RSL
         if (_built) {
             Draw::SetPosition(_container, a_x, a_y, a_scale);
         }
+    }
+
+    void BarWidget::SetOpacity(float a_opacity)
+    {
+        if (!_built) {
+            return;
+        }
+
+        // Position and alpha are separate flags on one DisplayInfo, so setting
+        // either alone leaves the other where it was - which is why this can be
+        // its own call beside SetPlacement rather than an argument to it.
+        const float alpha = std::clamp(a_opacity, 0.0f, 1.0f) * 100.0f;
+        if (alpha == _opacity) {
+            return;
+        }
+        _opacity = alpha;
+
+        Draw::SetAlpha(_container, alpha);
+        Draw::SetAlpha(_temp, alpha);
+        Draw::SetAlpha(_invRoot, alpha);
     }
 }

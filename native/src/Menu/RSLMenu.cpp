@@ -381,6 +381,7 @@ namespace RSL
         _bars.SetPlacement(Settings::fHudX, Settings::fHudY, Settings::fHudScale);
         _bars.SetTempPlacement(
             Settings::fTempIconX, Settings::fTempIconY, Settings::fTempIconScale);
+        _bars.SetOpacity(Settings::fHudOpacity);
 
         // Display only. These read what the last gameplay pass left behind.
         auto& needs = Needs::GetSingleton();

@@ -52,6 +52,18 @@ namespace RSL
 
         void SetPlacement(float a_x, float a_y, float a_scale);
 
+        // How solid the whole thing is, 0..1. The bars, the temperature
+        // indicator and the inventory preview together - fHudOpacity says
+        // "the widget", and those three are the widget.
+        //
+        // It is set on the three ROOTS, so everything inside keeps the alpha
+        // it was drawn with: a parent's alpha multiplies its children's, so
+        // the hatch stays a hatch and a hidden row stays hidden.
+        //
+        // The slider, its help text and its ini default have all existed
+        // since the widget did. Nothing read the value.
+        void SetOpacity(float a_opacity);
+
         // The whole widget, bars and indicator alike. Used to take it off
         // screen while a menu owns the screen.
         void SetVisible(bool a_visible);
@@ -137,6 +149,10 @@ namespace RSL
 
         Layout::Geometry _geo{};
         bool             _visible{ true };
+
+        // Last applied, as alpha 0..100. Negative means "not yet", so the
+        // first pass after a build always writes it.
+        float _opacity{ -1.0f };
 
         int _feel{ 2 };
         int _drawnFeel{ -1 };
