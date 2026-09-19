@@ -99,6 +99,17 @@ namespace RSL
                     _instance = &a_effect;
                 }
             });
+
+            // HOW MANY WERE ALREADY THERE, which is the one number that says
+            // whether an orphan from before a load is reachable through this
+            // list at all. One already on the player means it is - and then
+            // Stop, which goes by shader and target, will end it with ours.
+            // Zero after a load that came back with the crust visible would
+            // mean the rebuilt effect is somewhere this walk cannot see, and
+            // nothing here can take it off.
+            logger::info("shader {:08X}: {} already on the player, applied -> {}",
+                a_shader->GetFormID(), before.size(),
+                _instance ? "tracked" : "NOT FOUND");
             return _instance != nullptr;
         }
 
@@ -131,20 +142,40 @@ namespace RSL
         // never comes off.
         void Stop(RE::TESEffectShader* a_shader)
         {
-            int ended = 0;
-            ForEachOn(a_shader, [&ended](RE::ShaderReferenceEffect& a_effect) {
-                a_effect.finished = true;
-                ++ended;
-            });
             _instance = nullptr;
 
-            if (ended != 1) {
-                // One is the ordinary case. Anything else is worth seeing:
-                // zero means it had already gone, more than one means loads
-                // had stacked them up.
-                logger::info("shader {:08X}: ended {} instance(s)",
-                    a_shader->GetFormID(), ended);
+            auto* lists = RE::ProcessLists::GetSingleton();
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (!lists || !player || !a_shader) {
+                return;
             }
+
+            // COUNTED IN TWO HALVES, and both printed every time.
+            //
+            // `elsewhere` is the diagnostic that matters: an instance of this
+            // shader that is running but does NOT answer to the player's
+            // handle. If a crust outlives this call, that number says whether
+            // it was out of reach of the target test or out of reach of the
+            // walk itself - and those need different answers. Without it the
+            // next report would cost another run to tell them apart.
+            const auto handle = player->GetHandle();
+            int        ended = 0;
+            int        elsewhere = 0;
+
+            lists->ForEachShaderEffect([&](RE::ShaderReferenceEffect& a_effect) {
+                if (a_effect.effectData == a_shader) {
+                    if (a_effect.target == handle) {
+                        a_effect.finished = true;
+                        ++ended;
+                    } else {
+                        ++elsewhere;
+                    }
+                }
+                return RE::BSContainer::ForEachResult::kContinue;
+            });
+
+            logger::info("shader {:08X}: ended {} on the player, {} elsewhere",
+                a_shader->GetFormID(), ended, elsewhere);
         }
 
         // A load. The effect is not gone - it is rebuilt as a different
