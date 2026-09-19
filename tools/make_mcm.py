@@ -97,7 +97,7 @@ RANGES = {
     "fDayPeakHour": (0, 23, 1),
     "fSoakMinutes": (1, 60, 1),
     "fDryMinutes": (1, 60, 1),
-    "fColdChillRate": (0.05, 5.0, 0.05),
+    "fColdChillRate": (0.0, 5.0, 0.01),
     "fColdWarmRate": (0.5, 30.0, 0.5),
     "fColdChillEase": (0.0, 0.5, 0.01),
     "fWarmthSlowsChill": (0.0, 0.05, 0.001),
