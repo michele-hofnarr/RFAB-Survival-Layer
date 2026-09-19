@@ -468,8 +468,13 @@ namespace RSL
         // above false where it matters most: a night in a tent halves the
         // reserve's fall and used to leave bought time burning at full rate,
         // and a fight slowed the reserve fivefold while the buffer ran on.
-        const float burn = std::abs(climate.ColdLoad()) * Settings::fColdChillRate /
-                           climate.ChillSlow() * a_coldRateMult * swim /
+        // THE SAME SPEED THE RESERVE FALLS AT, asked of the same function.
+        //
+        // It was written out by hand here, and the copy drifted: the reserve
+        // gained the gap easing and this did not, so the two halves of one bar
+        // came to be spent at different rates. Whatever the chill is worth, it
+        // is worth the same to both.
+        const float burn = climate.ChillSpeed(before) * a_coldRateMult * swim /
                            combat * a_hours;
 
         // ONE DRAIN, NOT TWO. What the buffer burns is also what it pays
@@ -597,10 +602,10 @@ namespace RSL
                 // while the second drains, and a sum hides exactly that.
                 if (_state.coldTemp > 0.0f) {
                     logger::info("    base {:.3f} + bought {:.3f}"
-                                 "  (burning {:.3f} bar/h, target not involved)",
+                                 "  (burning {:.3f} bar/h, the same speed the "
+                                 "base falls at)",
                         _state.cold, _state.coldTemp,
-                        std::abs(climate.ColdLoad()) * Settings::fColdChillRate /
-                            climate.ChillSlow());
+                        climate.ChillSpeed(before));
                 }
 
                 // Why that speed and not the plain rate. Only printed while

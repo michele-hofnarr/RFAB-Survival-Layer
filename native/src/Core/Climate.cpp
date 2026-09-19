@@ -629,11 +629,19 @@ namespace RSL
 
     float Climate::DryWarmth() const
     {
-        // Wet clothes stop insulating. This is why being soaked is so much
-        // worse than the direct load alone suggests: it costs warmth you were
-        // already counting on, so the two terms compound - and now a third
-        // time, because the chilling speed divides by this as well.
-        return warmth * (1.0f - wetness * Settings::fWetWarmthLoss);
+        // Wet CLOTHES stop insulating, and only the clothes.
+        //
+        // This multiplied the whole of `warmth`, which is the slots PLUS frost
+        // resistance - so rain cut the enchantment and the potion with them. A
+        // soaked player lost most of a resist effect that has nothing to do
+        // with being wet, in the equilibrium and in the chilling speed both,
+        // and nothing anywhere said so.
+        //
+        // Being soaked still costs the larger half: four slots are worth 58.7
+        // and sixty per cent of that is what goes.
+        return static_cast<float>(slots) * Settings::fWarmthPerSlot *
+                   (1.0f - wetness * Settings::fWetWarmthLoss) +
+               resist * Settings::fFrostResistWeight;
     }
 
     float Climate::ChillSlow() const
@@ -711,32 +719,38 @@ namespace RSL
         return Raining() && !Shelter::GetSingleton().Overhead();
     }
 
+    float Climate::ChillSpeed(float a_current) const
+    {
+        // WHERE YOU STOP AND HOW FAST YOU GET THERE ARE TWO QUESTIONS, and
+        // ColdLoad answers only the first.
+        //
+        // It used to answer both: the speed was |ColdLoad| x fColdChillRate,
+        // v0.4.0's law written as `(Severity - Mitigation) x ColdRate`. The
+        // trouble is that ColdLoad is also what sets ColdTarget, so a colder
+        // place lowered the equilibrium AND raised the speed with one number.
+        // Distance and rate were welded together, and no slider could separate
+        // them.
+        //
+        // Hypothermia never had that problem and is the model followed here:
+        // `100 / (fHypoWorsenHours x ChillSlow)`. The place decides whether it
+        // starts and where it ends; the coat decides how fast. So the chill is
+        // a flat rate divided by insulation, and nothing else.
+        //
+        // Warming keeps its own flat rate - see ColdSpeed below - because a
+        // coat that made a fire work more slowly would be the wrong lesson.
+        const float base = Settings::fColdChillRate / ChillSlow();
+
+        // Freezing eases in as it arrives, so the curve settles instead of
+        // snapping: a speed that runs flat right up to the target and then
+        // stops dead reads as a glitch. This is the one place the gap is
+        // allowed to matter, and it can only ever slow the fall - the factor
+        // is below one and approaches it.
+        const float gap = std::abs(ColdTarget() - a_current);
+        return base * (gap / (gap + std::max(0.01f, Settings::fColdChillEase)));
+    }
+
     float Climate::ColdSpeed(float a_current) const
     {
-        // THE SPEED IS SET BY THE SITUATION, NOT BY THE GAP.
-        //
-        // This is v0.4.0's law, and it was the right one:
-        //
-        //     delta per game hour = (Severity - Mitigation) x ColdRate
-        //
-        // Heat does not leave a body faster because the body has already lost
-        // some; it leaves at a rate set by how cold it is out here and what you
-        // are wearing. That quantity is exactly ColdLoad(), and v0.4.0's
-        // ColdRate is our fColdChillRate.
-        //
-        // The exponential this replaces made the speed proportional to the
-        // distance still to travel, which is the worst possible shape for
-        // something the player invests in: the bar drained FASTEST when it was
-        // full, so stepping away from a fire dumped the part that had just been
-        // earned, and it filled SLOWEST when nearly full, so the last tenth
-        // cost the most time. Both halves are gone with the gap term.
-        //
-        // What v0.4.0 lacked was an equilibrium - it integrated one way for
-        // ever and needed cap valves to stop. The target supplies that: the bar
-        // travels at this speed and stops when it arrives.
-        const float load = ColdLoad();
-        const bool  warming = ColdTarget() > a_current;
-
         // WARMING RUNS AT ITS OWN RATE, AND NOTHING SCALES IT.
         //
         // It used to be |load| x fColdWarmRate, the mirror of the chilling
@@ -753,24 +767,9 @@ namespace RSL
         // exactly that. Clothing, the tent and being wet still decide WHERE the
         // bar settles - that is ColdTarget, and a soaked player still cannot
         // reach the top - but no longer how fast it travels there.
-        if (warming) {
+        if (ColdTarget() > a_current) {
             return Settings::fColdWarmRate;
         }
-
-        // WARMTH IS TWO THINGS, NOT ONE. It moves the equilibrium - that is
-        // ColdLoad, above - and it slows the journey there, which is this. Up
-        // to now only the first existed, so four layers of fur and bare skin
-        // froze at exactly the same speed and differed only in where they
-        // stopped; that is not what wearing a coat feels like.
-        //
-        // Both of those belong to the chilling half alone. A coat that made a
-        // fire warm you more slowly would be the wrong lesson entirely.
-        const float base = std::abs(load) * Settings::fColdChillRate / ChillSlow();
-
-        // Freezing eases in as it arrives, so the curve settles instead of
-        // snapping: a speed that runs flat right up to the target and then
-        // stops dead reads as a glitch.
-        const float gap = std::abs(ColdTarget() - a_current);
-        return base * (gap / (gap + std::max(0.01f, Settings::fColdChillEase)));
+        return ChillSpeed(a_current);
     }
 }

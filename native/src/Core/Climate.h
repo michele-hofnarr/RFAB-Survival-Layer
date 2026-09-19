@@ -81,6 +81,13 @@ namespace RSL
         // than by the distance left to travel.
         [[nodiscard]] float ColdSpeed(float a_current) const;
 
+        // The falling half on its own, without the warming branch in front of
+        // it. Bought time is spent at this speed whichever way the bar is
+        // travelling, so it has to ask for the chill specifically - and asking
+        // through here is what stops the two drifting apart, which is what
+        // they did while the formula was written out twice.
+        [[nodiscard]] float ChillSpeed(float a_current) const;
+
         // The net load this situation puts on the player, unclamped. Positive
         // means losing heat. This is the analogue of v0.4.0's
         // Severity - Mitigation, and it is what the temperature indicator
@@ -94,9 +101,9 @@ namespace RSL
         // number - so it is written once, here.
         [[nodiscard]] float DryWarmth() const;
 
-        // What warmth divides the chilling speed by, never below 0.1. Needed
-        // outside ColdSpeed because the cold buffer melts on the same clock,
-        // and the log prints it.
+        // What warmth divides the chilling speed by, never below 0.1. Public
+        // because the log prints it; the cold buffer asks ChillSpeed for the
+        // whole figure rather than rebuilding it out of this.
         [[nodiscard]] float ChillSlow() const;
 
         // 0 freezing .. 4 warm, on v0.4.0's five-step scale.
