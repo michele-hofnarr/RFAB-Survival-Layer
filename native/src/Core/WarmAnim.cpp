@@ -133,6 +133,32 @@ namespace RSL
             return;
         }
 
+        // NOT IN FIRST PERSON, because there is nothing there to play.
+        //
+        // IdleWarmHandsStanding is one record naming one event in the master
+        // behaviour graph, and the two graphs answer it very differently. Read
+        // off the generated behaviour of this very build: the third-person
+        // graph carries eleven references to the name - the state, the clip
+        // generators, _EveryNEvents, _MG, _d02, _d04, _Behavior, _Details - and
+        // the first-person graph carries exactly one, the name sitting in the
+        // event list beside IdleCannibalFeedStanding. The event is accepted
+        // there and leads nowhere. Vanilla has no first-person gesture idles at
+        // all; the first-person graph is for weapons and magic.
+        //
+        // So sending it in first person can show nothing and can only go
+        // wrong - which is what a report of being teleported to the last
+        // location entry looks like: the engine putting an actor back where it
+        // last knew it stood after the animation and havok disagreed.
+        //
+        // The clock is reset with it, so stepping back out to third person
+        // starts the wait over rather than firing at once.
+        if (auto* camera = RE::PlayerCamera::GetSingleton();
+            camera && camera->IsInFirstPerson()) {
+            _lastActive = std::chrono::steady_clock::now();
+            Cancel();
+            return;
+        }
+
         if (PlayerIsBusy()) {
             _lastActive = std::chrono::steady_clock::now();
             Cancel();
