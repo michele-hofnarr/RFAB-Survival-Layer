@@ -213,23 +213,43 @@ namespace RSL
             return;
         }
 
-        // Worth exactly what a dose of medicine is worth to an illness. It had
-        // a setting of its own that happened to carry the same number, which is
-        // two knobs for one idea and a silent disagreement waiting to happen.
+        // THE CLOTH IS MEDICINE, on the same terms as a cure potion or an
+        // altar - the rule is copied from Disease::ApplyCure rather than
+        // restated, so the two cannot drift apart:
         //
-        // CAPPED AT ONE DOSE, NOT AT THE DAMAGE GUARD. LESION_LIMIT bounds how
-        // much DAMAGE one tick may fold in; the cloth shares that accumulator
-        // only because the accumulator is signed. Clamping the cloth against it
-        // as well made the guard decide what medicine is worth - at a potency
-        // of 25 against a guard of 20 it quietly paid 20, and the setting's own
-        // help text promises that one dose means one thing across the mod.
+        //   stage 1   counted as a cure, and the next pass takes the illness
+        //             off entirely
+        //   stage 2+  past curing, but not wasted: P moves fCurePotency
+        //             towards the healing end
         //
-        // The floor needs no clamp: what is already in the queue is at worst
-        // -LESION_LIMIT and this only ever adds.
-        const float held = std::min(_lesionP.load() + Settings::fCurePotency,
-            Settings::fCurePotency);
-        _lesionP.store(held);
-        logger::info("bandage used -> lesion P {:+.1f}", held);
+        // It used to be the second of those at every stage, which made a cloth
+        // worth a quarter of a step against a threshold of 100 and read as
+        // doing nothing at all.
+        //
+        // Stage 0 keeps the old nudge. There is no stage to take off, and the
+        // counter is going back down on its own anyway, but a cloth spent on a
+        // fresh scratch should still shorten it rather than be eaten for
+        // nothing.
+        auto& diseases = Disease::GetSingleton();
+        const auto id = lesion->Id();
+        auto&      state = diseases.Get(id);
+
+        if (state.stage == 1) {
+            diseases.AddCure(id);
+            logger::info("bandage used -> cure counted for {}", id);
+        } else if (state.stage > 1) {
+            state.prog = std::clamp(state.prog + Settings::fCurePotency,
+                -100.0f, 100.0f);
+            logger::info("bandage used -> {} stage {} is past curing, P {:+.1f}",
+                id, state.stage, state.prog);
+        } else {
+            // The floor needs no clamp: what is already in the queue is at
+            // worst -LESION_LIMIT and this only ever adds.
+            const float held = std::min(_lesionP.load() + Settings::fCurePotency,
+                Settings::fCurePotency);
+            _lesionP.store(held);
+            logger::info("bandage used -> lesion P {:+.1f}", held);
+        }
     }
 
     // The campfire power arrives as a magic effect on the player, and the apply

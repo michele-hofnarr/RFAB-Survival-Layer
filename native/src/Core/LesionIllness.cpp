@@ -14,9 +14,25 @@ namespace RSL
     namespace
     {
         // An established lesion closes about three times faster than a fresh
-        // scratch settles. v0.4.0's number, and it is what stops the "not quite
-        // ill yet" state from lasting forever.
+        // scratch settles. v0.4.0's number.
         constexpr float HEALING_SPEEDUP = 3.0f;
+
+        // How long a scratch that never set in takes to fade, out of combat:
+        // twenty game minutes from the floor to nothing.
+        //
+        // AT STAGE 0 THE AXES DO NOT GATE IT. Everywhere else recovery needs
+        // all three above their safe mark, and that is right for an illness
+        // somebody has. This is the state of not having one - a counter that
+        // crept up from a few sparks - and making it wait on being rested, fed
+        // and warm left it sitting just under the threshold for hours, so the
+        // next stray hit caught a lesion that had no business being caught.
+        constexpr float CALM_HOURS = 20.0f / 60.0f;
+
+        [[nodiscard]] bool InCombat()
+        {
+            auto* player = Player();
+            return player && player->IsInCombat();
+        }
     }
 
     float LesionIllness::Limit()
@@ -65,6 +81,15 @@ namespace RSL
         if (coldDeep) {
             _band = AxisBand::kWorsen;
             _drift = -(100.0f / std::max(0.01f, Settings::fDiseaseProgressHours));
+        } else if (a_stage == 0) {
+            // Not ill yet, and out of a fight: the counter simply goes back
+            // down. See CALM_HOURS for why the axes have no say here.
+            if (InCombat()) {
+                _band = AxisBand::kHold;
+            } else {
+                _band = AxisBand::kHeal;
+                _drift = 100.0f / CALM_HOURS;
+            }
         } else if (AxisState(a_tick.sleep, a_tick.hunger, a_tick.cold, a_tick.undead) ==
                    AxisBand::kHeal) {
             _band = AxisBand::kHeal;
