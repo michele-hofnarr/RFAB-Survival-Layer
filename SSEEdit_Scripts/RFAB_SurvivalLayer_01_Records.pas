@@ -388,6 +388,7 @@ function FlstAddRecord(items: IInterface; r: IwbMainRecord): Boolean;
 var
   el : IInterface;
   fid: Cardinal;
+  i  : Integer;
 begin
   Result := False;
   if not Assigned(r) then Exit;
@@ -397,7 +398,21 @@ begin
   // never add tgt as its own master (self-master -> a recursive / broken esp)
   if not SameText(GetFileName(GetFile(MasterOrSelf(r))), GetFileName(tgt)) then
     AddMasterIfMissing(tgt, GetFileName(GetFile(MasterOrSelf(r))));
-  el := ElementAssign(items, HighInteger, nil, False);
+
+  // A BLANK ENTRY IS FILLED, NOT APPENDED AFTER. EnsureFlstItems creates the
+  // FormIDs container, and creating it already makes one entry pointing at
+  // nothing - the same trap AddCond documents for conditions. Every list this
+  // file rebuilt since v0.3.0 went out with a 00000000 in slot 0 because of
+  // it, found by reading the saved plugin back.
+  el := nil;
+  i := 0;
+  while (i < ElementCount(items)) and not Assigned(el) do begin
+    if GetNativeValue(ElementByIndex(items, i)) = 0 then
+      el := ElementByIndex(items, i);
+    Inc(i);
+  end;
+  if not Assigned(el) then
+    el := ElementAssign(items, HighInteger, nil, False);
   if not Assigned(el) then Exit;
   // Written as a REFERENCE, not as a number. GetLoadOrderFormID + SetNativeValue
   // is remapped to the file's own master list when the plugin is saved - except
@@ -411,6 +426,20 @@ begin
     Exit;
   end;
   Result := True;
+end;
+
+// A finished list holds records and nothing else: every entry must resolve.
+// Asserted rather than assumed, because the blank slot FlstAddRecord now
+// fills went unnoticed for three releases.
+procedure FlstRequireResolved(items: IInterface; edid: string);
+var
+  i: Integer;
+begin
+  if not Assigned(items) then Exit;
+  for i := 0 to Pred(ElementCount(items)) do
+    if not Assigned(LinksTo(ElementByIndex(items, i))) then
+      Problem(edid + ': entry ' + IntToStr(i) + ' resolves to nothing ("'
+        + GetEditValue(ElementByIndex(items, i)) + '")');
 end;
 
 // Add explicit EditorIDs (space/comma-separated) from one file to a FormList.
@@ -544,6 +573,7 @@ begin
       Problem('fire list empty - check that the masters are loaded');
     Say('  items added: ' + IntToStr(found));
     Say('  REVIEW BY EYE - list built from an EditorID mask, not meaning.');
+    FlstRequireResolved(items, PFX + 'FireSources');
   finally
     sigs.Free;
   end;
@@ -585,6 +615,7 @@ begin
 
   if found = 0 then
     Problem('cold-interiors list empty - masters not loaded?');
+  FlstRequireResolved(items, PFX + 'ColdInteriors');
   Say('  items added: ' + IntToStr(found));
 end;
 
@@ -2955,7 +2986,10 @@ begin
     flst := RecordByEDID(tgt, 'FLST', PFX + 'FireSources');
     if Assigned(flst) then begin
       flstItems := ElementByName(flst, 'FormIDs');
-      if Assigned(flstItems) then FlstAddRecord(flstItems, cfLit);
+      if Assigned(flstItems) then begin
+        FlstAddRecord(flstItems, cfLit);
+        FlstRequireResolved(flstItems, PFX + 'FireSources');
+      end;
     end;
     Say('  _RSL_CampfireLit ACTI ready ["' + GetElementEditValues(cfLit, 'Model\MODL')
       + '"], added to fire list');
@@ -3758,6 +3792,7 @@ begin
     Exit;
   end;
   FlstAddRecord(items, msg);
+  FlstRequireResolved(items, 'HelpManualPC');
   Say('  HelpManualPC: +1 запись, теперь ' + IntToStr(ElementCount(items)));
 end;
 
