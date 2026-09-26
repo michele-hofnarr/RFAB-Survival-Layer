@@ -292,10 +292,11 @@ namespace RSL
         // invisible arithmetic, one step removed.
         static inline float fTorchOfFire{ 5.0f };
 
-        // Half of v0.4.0's 400 for the radius. That number was reached through
-        // a different model - severity was multiplied by 0.2 anywhere inside it
-        // - and at 400 here a fire reaches further than it looks like it should.
-        static inline float fFireRadius{ 200.0f };
+        // Three quarters of v0.4.0's 400 for the radius. That number was
+        // reached through a different model - severity was multiplied by 0.2
+        // anywhere inside it - and at 400 here a fire reaches further than it
+        // looks like it should.
+        static inline float fFireRadius{ 300.0f };
 
         // The ice crust. v0.4.0's generator defaults are on, at 90 points of
         // deprivation - a reserve of 0.10. The Papyrus fallback in that build

@@ -620,9 +620,16 @@ namespace RSL
                     if (auto* fire = Climate::NearestFire(Settings::fFireRadius)) {
                         auto*       base = fire->GetBaseObject();
                         const char* edid = base ? base->GetFormEditorID() : nullptr;
-                        logger::info("  fire: {} [{:08X}] at {:.0f}, worth {:+.1f} deg",
+                        // Found by model rather than by the list means a copy
+                        // of a listed fire - DynDOLOD's, as a rule. Said so,
+                        // because the base id alone then names nothing on
+                        // the list.
+                        const bool listed =
+                            Forms::fireSources && Forms::fireSources->HasForm(base);
+                        logger::info("  fire: {} [{:08X}]{} at {:.0f}, worth {:+.1f} deg",
                             (edid && *edid) ? edid : "<no editor id>",
                             base ? base->GetFormID() : 0,
+                            listed ? "" : " (a copy: wears a listed fire's model)",
                             fire->GetPosition().GetDistance(
                                 RE::PlayerCharacter::GetSingleton()->GetPosition()),
                             climate.fireOffset);

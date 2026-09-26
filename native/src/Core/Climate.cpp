@@ -280,23 +280,92 @@ namespace RSL
             return false;
         }
 
+        // A base's model path, lower-cased: the engine does not care about the
+        // case of a path, so a comparison of two must not either.
+        [[nodiscard]] std::string ModelKey(const RE::TESForm* a_form)
+        {
+            const auto* model = a_form ? a_form->As<RE::TESModel>() : nullptr;
+            const char* path = model ? model->GetModel() : nullptr;
+            std::string key = path ? path : "";
+            std::ranges::transform(key, key.begin(), [](unsigned char a_c) {
+                return static_cast<char>(std::tolower(a_c));
+            });
+            return key;
+        }
+
+        // Is this base a fire? On the list, or a moveable static wearing the
+        // model of one that is.
+        //
+        // THE SECOND HALF IS FOR COPIES. DynDOLOD takes some fires out of the
+        // world and puts a copy in their place: the original reference is
+        // rewritten into an XMarker 30000 units underground, and a new
+        // reference of a new base - "<name>_DynDOLOD_BASERECORD", same model,
+        // same scale, same spot - stands where it was. Measured on Steamcrag
+        // Camp, where the giant's campfire warmed nobody because the thing
+        // burning there was not on any list. In one load order it does this to
+        // all four burning giant campfires and FireplaceWood01Burning. The copy
+        // keeps nothing the plugin can see at runtime except its model: editor
+        // ids are not loaded, and the original is a marker now.
+        //
+        // The model is read off the winning record at runtime, not from the
+        // masters, because other patchers move it: PGPatcher repoints one
+        // giant campfire into a "_pgpatcher_dups" folder, and DynDOLOD copies
+        // the record as it finds it.
+        //
+        // MOVEABLE STATICS ONLY, and that is measured too. Every full copy
+        // DynDOLOD made of a listed fire is one. Matching models across every
+        // type would also take in thirteen quest activators that borrow a
+        // sconce model as a placeholder and two magelights; restricted to
+        // MSTT, the only unlisted records in the masters that share a listed
+        // model are three that are burning anyway - RuinsSmallFloorSconce,
+        // Campfire01LandBurning_Ash and MGMagicFirePillar010000.
+        [[nodiscard]] bool IsFire(const RE::TESForm* a_base)
+        {
+            auto* list = Forms::fireSources;
+            if (!a_base || !list) {
+                return false;
+            }
+            if (list->HasForm(a_base)) {
+                return true;
+            }
+            if (!a_base->Is(RE::FormType::MovableStatic)) {
+                return false;
+            }
+            // Built on first use, which is after the data has loaded: nothing
+            // asks before there is a world to stand in.
+            static const auto models = [list] {
+                std::unordered_set<std::string> out;
+                list->ForEachForm([&](RE::TESForm& a_form) {
+                    if (a_form.Is(RE::FormType::MovableStatic)) {
+                        if (auto key = ModelKey(&a_form); !key.empty()) {
+                            out.insert(std::move(key));
+                        }
+                    }
+                    return RE::BSContainer::ForEachResult::kContinue;
+                });
+                logger::info("fire models: {} from the moveable statics on the fire list",
+                    out.size());
+                return out;
+            }();
+            return models.contains(ModelKey(a_base));
+        }
+
         // Any world fire within the radius.
         //
         // v0.4.0 asked the engine directly through
         // FindClosestReferenceOfAnyTypeInListFromRef; CommonLibSSE has no
         // binding for it, so the references in range are walked instead and
-        // their base objects checked against the same form list. It stops at
-        // the first hit, and the list is what the generator built - burning
-        // campfires are Moveable Statics, which is the entry most home-made
-        // fire checks miss.
+        // their base objects checked against the same form list - and, for a
+        // copy of a listed fire, its model (IsFire). The list is what the
+        // generator built - burning campfires are Moveable Statics, which is
+        // the entry most home-made fire checks miss.
         [[nodiscard]] RE::TESObjectREFR* FindFire(RE::PlayerCharacter* a_player,
             float a_radius)
         {
             auto* tes = RE::TES::GetSingleton();
-            auto* list = Forms::fireSources;
             // No model means no loaded cell to walk, and walking it anyway is
             // not safe mid-transition.
-            if (!tes || !list || !a_player || !a_player->Is3DLoaded()) {
+            if (!tes || !Forms::fireSources || !a_player || !a_player->Is3DLoaded()) {
                 return nullptr;
             }
 
@@ -310,7 +379,7 @@ namespace RSL
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
                     auto* base = a_ref.GetBaseObject();
-                    if (!base || !list->HasForm(base)) {
+                    if (!IsFire(base)) {
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
                     // Nearest, not first: the idle turns towards it, so which
@@ -361,8 +430,7 @@ namespace RSL
             last = now;
 
             auto* tes = RE::TES::GetSingleton();
-            auto* list = Forms::fireSources;
-            if (!tes || !list || !a_player || !a_player->Is3DLoaded()) {
+            if (!tes || !Forms::fireSources || !a_player || !a_player->Is3DLoaded()) {
                 return;
             }
 
@@ -378,8 +446,11 @@ namespace RSL
                     if (a_ref.IsDisabled() || a_ref.IsDeleted()) {
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
+                    // Anything FindFire counts is not "unlisted", copies
+                    // included - the same predicate, or this log would keep
+                    // reporting a fire that already warms.
                     auto* base = a_ref.GetBaseObject();
-                    if (!base || list->HasForm(base)) {
+                    if (!base || IsFire(base)) {
                         return RE::BSContainer::ForEachResult::kContinue;
                     }
 
