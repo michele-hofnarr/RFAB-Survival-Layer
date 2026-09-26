@@ -86,5 +86,5 @@ gh release create vX.Y --title "vX.Y" --notes "..." \
 Or attach the loose `.esp` + `SKSE/` + `Interface/` + `scripts/` + `MCM/` if
 the archive is assembled elsewhere.
 
-Tested against **RFAB SE XI - Kazan edition [ver. 15.09.2026]** — note the
+Tested against **RFAB SE XI • Kazan Edition [ver. 25.09.2026]** — note the
 tested-on version in the release notes.

@@ -89,7 +89,7 @@ extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []() {
     SKSE::PluginVersionData v{};
     v.PluginName("RFAB Survival Layer");
     v.AuthorName("michele-hofnarr");
-    v.PluginVersion({ 0, 5, 0, 0 });
+    v.PluginVersion({ 0, 6, 0, 0 });
     v.UsesAddressLibrary();
     v.UsesNoStructs();
     v.CompatibleVersions({ SKSE::RUNTIME_SSE_LATEST });

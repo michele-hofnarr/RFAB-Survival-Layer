@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.21)
 cmake_policy(SET CMP0091 NEW)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
-project(RFAB_SurvivalLayer_Native VERSION 0.5.0 LANGUAGES CXX)
+project(RFAB_SurvivalLayer_Native VERSION 0.6.0 LANGUAGES CXX)
 
 # Dependencies come from two places, deliberately:
 #
