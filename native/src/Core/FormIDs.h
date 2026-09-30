@@ -221,6 +221,7 @@ namespace RSL::FormIDs
     inline constexpr RE::FormID MsgHypo3 = 0x00090D;
     inline constexpr RE::FormID MsgHypoCured = 0x00090E;
     inline constexpr RE::FormID MsgHypoNoRest = 0x00090F;
+    inline constexpr RE::FormID MsgHypoNoTeleport = 0x00121A;
     inline constexpr RE::FormID MsgHypoEase2 = 0x000C50;
     inline constexpr RE::FormID MsgHypoEase1 = 0x000C51;
     inline constexpr RE::FormID MsgHelpSurvival = 0x001007;

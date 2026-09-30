@@ -93,6 +93,10 @@ namespace RSL
         // says nothing.
         static inline RE::BGSMessage* msgHypoNoRest{ nullptr };
 
+        // Why a teleport failed, when hypothermia is the reason. See
+        // Core/Teleport.cpp; the Cold penalty's line is msgNoTeleport.
+        static inline RE::BGSMessage* msgHypoNoTeleport{ nullptr };
+
         // Common cold. Nine loose fields until the illnesses were unified -
         // the same three spells and six messages every other illness keeps in
         // a DiseaseForms, spelled out by hand because it was written first.
@@ -111,6 +115,7 @@ namespace RSL
 
         // RFAB_Blessing_Peryite. Its holders keep the boon on RFAB's stage 1.
         static inline RE::SpellItem* peryiteBlessing{ nullptr };
+
 
         // Caught by a hit or by eating badly: brown rot, gutworm, green spore,
         // food poisoning. Order is v0.4.0's hdId array.

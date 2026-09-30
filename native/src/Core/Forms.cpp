@@ -155,6 +155,8 @@ namespace RSL
             { MsgHypo1, MsgHypo2, MsgHypo3 },
             MsgHypoCured, { MsgHypoEase2, MsgHypoEase1 });
         msgHypoNoRest = Lookup<RE::BGSMessage>(MsgHypoNoRest, "hypothermia no-rest message");
+        msgHypoNoTeleport = Lookup<RE::BGSMessage>(MsgHypoNoTeleport,
+            "hypothermia no-teleport message");
 
         dzMarker = Lookup<RE::SpellItem>(DiseaseMarker, "disease marker");
         // The common cold, through the same loop as every other illness. It

@@ -4,7 +4,6 @@
 
 #include "Core/Forms.h"
 #include "Core/Hypothermia.h"
-#include "Core/Needs.h"
 #include "Core/Notify.h"
 #include "Settings.h"
 
@@ -18,18 +17,32 @@ namespace RSL
 
         std::chrono::steady_clock::time_point g_lastTold{};
 
-        // Is the player cold enough that the way out is closed?
+        // Is the way out closed, and what closed it? The message to show, or
+        // null when nothing does.
         //
-        // Two states, and they are the two the player can already see: any
-        // stage of hypothermia, or the cold penalty being on at all - which is
-        // exactly the axis being at or under its safe mark. Nothing new to
-        // explain and nothing new to tune.
-        [[nodiscard]] bool ColdEnough()
+        // Two states, and both are status effects the player can see: any
+        // stage of hypothermia, or the Cold penalty on them. Each has its own
+        // line, so the refusal names the thing the player can look up.
+        // Hypothermia wins when both are on: it is the graver of the two, and
+        // it outlasts Cold - a player who has warmed back past the penalty can
+        // still be carrying a stage of it.
+        //
+        // THE ABILITY ITSELF, NOT THE BAR. This used to test the cold axis
+        // against fColdSafe - the threshold Penalties puts Cold on at, so the
+        // two agreed in practice, but it was a second copy of the rule, and
+        // the rule is the status effect. Whatever decides when Cold goes on -
+        // the threshold, the rounding, anything added later - now decides this
+        // too, because it is the same question.
+        [[nodiscard]] RE::BGSMessage* BlockedBy()
         {
             if (Hypothermia::GetSingleton().Stage() >= 1) {
-                return true;
+                return Forms::msgHypoNoTeleport;
             }
-            return Needs::GetSingleton().ColdBase() <= Settings::fColdSafe;
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (player && Forms::abCold && player->HasSpell(Forms::abCold)) {
+                return Forms::msgNoTeleport;
+            }
+            return nullptr;
         }
 
         [[nodiscard]] bool IsWayOut(RE::MagicItem* a_spell)
@@ -55,9 +68,10 @@ namespace RSL
                 bool a_dualCast, float* a_alchStrength,
                 RE::MagicSystem::CannotCastReason* a_reason, bool a_useBaseValueForCost)
             {
+                RE::BGSMessage* why = nullptr;
                 if (Settings::bModEnabled && Settings::bColdBlocksTeleport && a_this &&
                     a_this->GetCasterAsActor() == RE::PlayerCharacter::GetSingleton() &&
-                    IsWayOut(a_spell) && ColdEnough()) {
+                    IsWayOut(a_spell) && (why = BlockedBy()) != nullptr) {
 
                     // kOK, and false anyway. The reason is what the HUD turns
                     // into its own line ("not enough magicka" and the like), and
@@ -71,8 +85,9 @@ namespace RSL
                     const auto now = std::chrono::steady_clock::now();
                     if (std::chrono::duration<float>(now - g_lastTold).count() >= TOLD_EVERY) {
                         g_lastTold = now;
-                        Notify::GetSingleton().Push(Forms::msgNoTeleport);
-                        logger::info("cold blocked {}",
+                        Notify::GetSingleton().Push(why);
+                        logger::info("{} blocked {}",
+                            why == Forms::msgHypoNoTeleport ? "hypothermia" : "cold",
                             a_spell->GetFullName() ? a_spell->GetFullName() : "a teleport");
                     }
                     return false;

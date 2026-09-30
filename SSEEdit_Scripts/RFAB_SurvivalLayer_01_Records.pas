@@ -2127,6 +2127,9 @@ begin
   AddMsg(PFX + 'MsgHypo3',      L('hy.msg.3'));
   AddMsg(PFX + 'MsgHypoCured',  L('hy.msg.cured'));
   AddMsg(PFX + 'MsgHypoNoRest', L('hy.msg.noRest'));
+  // Why a teleport failed, when hypothermia is the reason. The Cold penalty
+  // has its own line (MsgNoTeleport, built with the campfire's messages).
+  AddMsg(PFX + 'MsgHypoNoTeleport', L('hy.msg.noTeleport'));
   // Same gap as the diseases: dropping from severe to moderate was silent.
   AddMsg(PFX + 'MsgHypoEase2',  L('hy.msg.ease.2'));
   AddMsg(PFX + 'MsgHypoEase1',  L('hy.msg.ease.1'));

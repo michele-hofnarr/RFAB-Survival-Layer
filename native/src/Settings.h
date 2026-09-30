@@ -359,8 +359,8 @@ namespace RSL
         static inline float fWarmAnimRadius{ 200.0f };
 
         // The cold takes the way out away: no Teleport and no Mark and Recall
-        // while hypothermia is on or the cold axis is at or under its safe
-        // mark. Optional, because it is a real restriction on how the pack is
+        // while hypothermia is on or the Cold penalty is on the player.
+        // Optional, because it is a real restriction on how the pack is
         // played rather than a fix to anything.
         static inline bool  bColdBlocksTeleport{ true };
 
