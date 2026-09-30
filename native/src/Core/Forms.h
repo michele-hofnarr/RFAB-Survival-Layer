@@ -105,16 +105,13 @@ namespace RSL
         static inline DiseaseForms commonCold{};
 
         // RFAB's own seven, in v0.4.0's order: AT RJ WB RA BF BRR DR. The
-        // first six are base-game diseases the Peryite blessing freezes at
-        // stage 1; DR is Dragonborn's Droops and is not covered by it.
+        // first six are base-game diseases whose records carry a Peryite
+        // boon; DR is Dragonborn's Droops and carries none.
         static inline RfabDiseaseForms rfabDisease[7]{};
 
         // The hidden marker that keeps an advanced illness legible to the
         // world. No effects, no name on screen - see Disease::SyncMarker.
         static inline RE::SpellItem* dzMarker{ nullptr };
-
-        // RFAB_Blessing_Peryite. Its holders keep the boon on RFAB's stage 1.
-        static inline RE::SpellItem* peryiteBlessing{ nullptr };
 
 
         // Caught by a hit or by eating badly: brown rot, gutworm, green spore,

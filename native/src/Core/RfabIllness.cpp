@@ -65,10 +65,9 @@ namespace RSL
         return out;
     }
 
-    RfabIllness::RfabIllness(const RfabDiseaseForms& a_src, bool a_blessingFreezes) :
+    RfabIllness::RfabIllness(const RfabDiseaseForms& a_src) :
         Illness(AsCommon(a_src)),
-        _src(a_src),
-        _blessingFreezes(a_blessingFreezes)
+        _src(a_src)
     {}
 
     bool RfabIllness::Ready() const
@@ -155,18 +154,46 @@ namespace RSL
         return a_stage >= 2;
     }
 
-    bool RfabIllness::Frozen() const
+    bool RfabIllness::BoonActive() const
     {
         auto* player = Player();
-        return _blessingFreezes && Stage() == 1 && Forms::peryiteBlessing && player &&
-               player->HasSpell(Forms::peryiteBlessing);
+        auto* target = player ? player->AsMagicTarget() : nullptr;
+        auto* effects = target ? target->GetActiveEffectList() : nullptr;
+        if (!_src.base || !effects) {
+            return false;
+        }
+
+        using Flag = RE::ActiveEffect::Flag;
+        for (auto* active : *effects) {
+            const auto* mgef = active ? active->GetBaseObject() : nullptr;
+            if (!mgef || mgef->IsDetrimental()) {
+                continue;
+            }
+            // Both signs that the engine has it switched off: the effect's own
+            // inactive flag, and the last evaluation of its conditions.
+            if (active->flags.any(Flag::kInactive, Flag::kDispelled) ||
+                active->conditionStatus == RE::ActiveEffect::ConditionStatus::kFalse) {
+                continue;
+            }
+            for (const auto* effect : _src.base->effects) {
+                if (effect && effect->baseEffect == mgef) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool RfabIllness::Frozen() const
+    {
+        return Stage() == 1 && BoonActive();
     }
 
     std::int32_t RfabIllness::Progress(const Tick& a_tick)
     {
-        // THE WHOLE OF WHAT THE BLESSING DOES: P does not move. Not reset, not
+        // THE WHOLE OF WHAT THE BOON DOES: P does not move. Not reset, not
         // held at a value of our choosing - simply not driven by us, so that
-        // losing the blessing resumes from wherever the illness actually was.
+        // losing the boon resumes from wherever the illness actually was.
         if (Frozen()) {
             return 0;
         }
@@ -196,6 +223,6 @@ namespace RSL
     {
         return fmt::format("afflicted={} ourCopy={} seenClean={}{}", _afflicted,
             _ourCopyOn, _seenClean,
-            Frozen() ? " FROZEN by the Peryite blessing" : "");
+            Frozen() ? " FROZEN by RFAB's boon" : "");
     }
 }

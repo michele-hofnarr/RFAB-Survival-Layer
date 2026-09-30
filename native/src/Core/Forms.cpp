@@ -228,8 +228,6 @@ namespace RSL
             for (int i = 0; i < 7; ++i) {
                 LoadRfab(rfabDisease[i], sources[i]);
             }
-            peryiteBlessing =
-                LookupIn<RE::SpellItem>(RFAB, 0x60A5, "Peryite blessing");
         }
 
         powerCampfire = Lookup<RE::SpellItem>(PowerCampfire, "campfire power");

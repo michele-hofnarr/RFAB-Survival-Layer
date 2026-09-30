@@ -56,7 +56,6 @@ Skyrim.esm|#0B8781|SPEL|RfabDzRA  stage-1 spell
 Skyrim.esm|#0B877E|SPEL|RfabDzBF  stage-1 spell
 Skyrim.esm|#0B877F|SPEL|RfabDzBRR stage-1 spell
 Dragonborn.esm|#0285C1|SPEL|RfabDzDR stage-1 spell
-RFAB.esp|#0060A5|SPEL|RFAB_Blessing_Peryite (freezes the wrappers at stage 1)
 
 # --- Forms.cpp: the wrapper marker MGEF (HasMagicEffect probe) ---
 RFAB.esp|#0CD9BD|MGEF|RfabDzMarkAT

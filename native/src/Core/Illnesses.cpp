@@ -11,18 +11,6 @@
 
 namespace RSL
 {
-    namespace
-    {
-        // RFAB's seven in Forms order: AT RJ WB RA BF BRR DR. The first six are
-        // base-game diseases the Peryite blessing freezes at stage 1;
-        // Dragonborn's Droops is not covered by it.
-        //
-        // This used to be `a_index <= 5` inside the update loop - a magic
-        // number in the shared code, standing for a fact about six particular
-        // records. It is passed to the illness that owns it now.
-        constexpr int BLESSED_COUNT = 6;
-    }
-
     Illnesses& Illnesses::GetSingleton()
     {
         static Illnesses singleton;
@@ -45,8 +33,7 @@ namespace RSL
         }
 
         for (int i = 0; i < 7; ++i) {
-            _all.push_back(std::make_unique<RfabIllness>(Forms::rfabDisease[i],
-                i < BLESSED_COUNT));
+            _all.push_back(std::make_unique<RfabIllness>(Forms::rfabDisease[i]));
         }
 
         auto lesion = std::make_unique<LesionIllness>(Forms::elemLesion);

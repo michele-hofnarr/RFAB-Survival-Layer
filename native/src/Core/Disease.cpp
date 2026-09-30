@@ -455,8 +455,8 @@ namespace RSL
         // list, which is the same fact stated where it can be seen.
         //
         // Nothing else is excluded. A cure effect takes every illness the
-        // player has, the RFAB wrappers included and the Peryite blessing
-        // notwithstanding: the blessing stops this layer driving P, it does not
+        // player has, the RFAB wrappers included and RFAB's Peryite boon
+        // notwithstanding: the boon stops this layer driving P, it does not
         // make a disease incurable.
         for (const auto& illness : Illnesses::GetSingleton().All()) {
             if (!illness->Ready()) {

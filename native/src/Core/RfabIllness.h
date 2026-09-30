@@ -31,13 +31,30 @@
 //     whether it removed anything is the only way to tell a real stray instance
 //     from our copy showing RFAB's effect names.
 //
-// THE PERYITE BLESSING, and what it is for.
+// RFAB'S BOON, and what it is for.
 //
-// A player who has it is playing through it on purpose: for them those six
-// diseases are a boon, not an affliction. So while it is on, this layer stops
-// having an opinion about RFAB's OWN records - it may neither aggravate them
-// nor cure them by its own arithmetic. In the game they come off by Cure
-// Disease and by nothing else, and that is the custom being kept.
+// RFAB's disease records carry a Peryite boon beside the debuff - fortify
+// armour, restore magicka, resist stagger - behind conditions of RFAB's own.
+// A player the boon is working for is playing through the disease on purpose:
+// for them it is a gift, not an affliction. So while it works, this layer
+// stops having an opinion about RFAB's OWN record - it may neither aggravate it
+// nor cure it by its own arithmetic. In the game it comes off by Cure Disease
+// and by nothing else, and that is the custom being kept.
+//
+// THE BOON ITSELF DECIDES, NOT THE BLESSING. This used to ask only whether the
+// player held RFAB_Blessing_Peryite. RFAB's boons ask for more than that -
+// the blessing AND stage 21 of DA13, and on Witbane a second pair also wants
+// the Cultist perk - and a shrine hands out the blessing with no quest at all.
+// So a blessed player short of stage 21 had the disease frozen at stage 1 with
+// no boon to show for it: all of the penalty, and sleep, food and warmth unable
+// to shift it. The rule is now whether a boon of this disease is active on the
+// player, which is RFAB's conditions evaluated by the engine - whatever they
+// are, and whatever they become.
+//
+// A boon is one of the record's effects without the Detrimental flag. That is
+// the discriminator the generator already uses to strip boons from our stage
+// 2/3 copies, checked against all seven records: every penalty carries it and
+// no boon does.
 //
 // In code that is one sentence: at stage 1, P does not move. Nothing else
 // changes. Medicine still reaches the illness, a cure still takes it off, and
@@ -45,9 +62,9 @@
 // - which is the point.
 //
 // Stages 2 and 3 are not covered, because they are not RFAB's. They are this
-// layer's own addition and carry no Peryite bonus, so P runs there as it does
-// for any illness: something already in progress works its way back down to
-// stage 1 and stops.
+// layer's own addition and carry no boon, so P runs there as it does for any
+// illness: something already in progress works its way back down to stage 1,
+// and stops there if the boon takes hold again.
 //
 // It used to do more, and none of the rest was ever asked for. The same branch
 // re-added RFAB's disease spell whenever it found it gone - "re-assert if a
@@ -58,8 +75,8 @@
 // so nothing downstream ever saw the attempt. All of it went in with the
 // freeze in 5f2bda0 and none of it was in the version before.
 //
-// Dragonborn's Droops is not covered by the blessing, which is why the flag is
-// passed in per illness rather than tested as an index against five.
+// Dragonborn's Droops carries no boon, so it never stands still - which used
+// to be a flag passed in per illness and is now simply what its record says.
 
 namespace RSL
 {
@@ -68,7 +85,7 @@ namespace RSL
     class RfabIllness : public Illness
     {
     public:
-        RfabIllness(const RfabDiseaseForms& a_src, bool a_blessingFreezes);
+        explicit RfabIllness(const RfabDiseaseForms& a_src);
 
         // Take back the two stages this layer added and leave RFAB's illness
         // exactly where it was found.
@@ -91,7 +108,7 @@ namespace RSL
         [[nodiscard]] bool Contracts(const Tick& a_tick) override;
         [[nodiscard]] bool StageSpellGone(std::int32_t a_stage) const override;
 
-        // P does not move while the blessing holds this at stage 1. Everything
+        // P does not move while RFAB's boon holds this at stage 1. Everything
         // else about the pass is left alone.
         [[nodiscard]] std::int32_t Progress(const Tick& a_tick) override;
 
@@ -112,7 +129,7 @@ namespace RSL
         // absent because their record announces itself.
         [[nodiscard]] static DiseaseForms AsCommon(const RfabDiseaseForms& a_src);
 
-        // Is the Peryite blessing holding this one still right now?
+        // Is RFAB's boon holding this one still right now?
         //
         // ASKED EVERY TIME, by both the progression and the trace. It used to
         // be answered once inside Progress and kept in a member for the trace
@@ -122,8 +139,13 @@ namespace RSL
         // no longer had. A hundred and sixty lines of it in one session.
         [[nodiscard]] bool Frozen() const;
 
+        // Is any boon of this disease working on the player: an effect of
+        // RFAB's record without the Detrimental flag, active, and with its
+        // conditions not failed. Where it came from does not matter - the
+        // record's own spell, a bite that applied the effects without it.
+        [[nodiscard]] bool BoonActive() const;
+
         const RfabDiseaseForms& _src;
-        bool                    _blessingFreezes{ false };
 
         // Read once at the top of each pass: is RFAB's own illness on the
         // player at all, and is one of our copies wearing its effect names?
